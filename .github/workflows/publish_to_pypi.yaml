@@ -58,7 +58,7 @@ jobs:
           exit 1
 
       - name: Prepare distribution
-        uses: apify/actions/prepare-pypi-distribution@v1.6.2
+        uses: apify/actions/prepare-pypi-distribution@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           package_name: crawlee
           is_prerelease: ${{ inputs.is_prerelease && 'yes' || '' }}
@@ -66,7 +66,7 @@ jobs:
           ref: ${{ steps.ref.outputs.sha }}
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@v1.6.2
+        uses: apify/actions/python-package-check@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           package_name: crawlee
           dist_dir: dist

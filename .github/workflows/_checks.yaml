@@ -39,13 +39,13 @@ jobs:
 
   lint_check:
     name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@main
+    uses: apify/workflows/.github/workflows/python_lint_check.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
     with:
       python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
 
   type_check:
     name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@main
+    uses: apify/workflows/.github/workflows/python_type_check.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
     with:
       python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
 
@@ -62,7 +62,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.6.2
+        uses: apify/actions/pnpm-install@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           working-directory: website
 
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.6.2
+        uses: apify/actions/pnpm-install@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           working-directory: website
 
@@ -132,7 +132,7 @@ jobs:
   unit_tests:
     name: Unit tests
     if: inputs.run_tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@main
+    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
     secrets: inherit
     with:
       python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
@@ -221,7 +221,7 @@ jobs:
         run: uv run poe build
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@v1.6.2
+        uses: apify/actions/python-package-check@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           package_name: crawlee
           dist_dir: dist
@@ -249,4 +249,4 @@ jobs:
 
   doc_check:
     name: Doc check
-    uses: apify/workflows/.github/workflows/python_docs_check.yaml@main
+    uses: apify/workflows/.github/workflows/python_docs_check.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
