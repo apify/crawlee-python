@@ -1468,16 +1468,6 @@ async def test_abort_on_error_applies_to_one_run() -> None:
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
-async def test_repeated_run_keeps_own_stats() -> None:
-    """A repeated `run()` adds to the statistics the crawler built, since it continues the crawl."""
-    crawler = BasicCrawler(request_handler=AsyncMock())
-
-    await crawler.run(['https://a.placeholder.com'])
-    stats = await crawler.run(['https://b.placeholder.com'])
-
-    assert stats.requests_finished == 2
-
-
 async def test_request_limit_spans_runs() -> None:
     """`max_requests_per_crawl` counts the earlier runs, so a run that starts at the limit handles no request."""
     handler = AsyncMock()
@@ -1489,9 +1479,16 @@ async def test_request_limit_spans_runs() -> None:
     handler.assert_awaited_once()
 
 
-async def test_repeated_run_keeps_stats() -> None:
-    """A repeated `run()` adds to statistics passed to the crawler."""
-    crawler = BasicCrawler(request_handler=AsyncMock(), statistics=Statistics.with_default_state())
+@pytest.mark.parametrize(
+    'statistics',
+    [
+        pytest.param(None, id='own'),
+        pytest.param(Statistics.with_default_state(), id='passed'),
+    ],
+)
+async def test_repeated_run_keeps_stats(statistics: Statistics[StatisticsState] | None) -> None:
+    """A repeated `run()` adds to the statistics of the crawler, built by it or passed to it."""
+    crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
 
     await crawler.run(['https://a.placeholder.com'])
     stats = await crawler.run(['https://b.placeholder.com'])
