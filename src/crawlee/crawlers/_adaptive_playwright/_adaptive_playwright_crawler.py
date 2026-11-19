@@ -30,7 +30,13 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
-from crawlee.errors import ContextPipelineInitializationError, RequestHandlerError, RequestThrottledError
+from crawlee.errors import (
+    ContextPipelineInitializationError,
+    RequestHandlerError,
+    RequestThrottledError,
+    SessionError,
+    UserHandlerTimeoutError,
+)
 from crawlee.statistics import Statistics, StatisticsState
 
 from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
@@ -435,15 +441,24 @@ class AdaptivePlaywrightCrawler(
 
         if pw_run.result:
             if should_detect_rendering_type:
-                detection_result: RenderingType
+                detection_result: RenderingType | None
                 static_run = await self._crawl_one('static', context=context, use_state=use_initial_state_copy)
-                if static_run.result and self.result_comparator(static_run.result, pw_run.result):
+                if static_run.exception is not None and _is_inconclusive_static_failure(static_run.exception):
+                    detection_result = None
+                elif static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
                     detection_result = 'client only'
 
-                context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
-                self.rendering_type_predictor.store_result(context.request, detection_result)
+                if detection_result is None:
+                    context.log.debug(
+                        f'Static crawler failed during rendering type detection for {context.request.url}, '
+                        'the result is not used',
+                        exc_info=static_run.exception,
+                    )
+                else:
+                    context.log.debug(f'Detected rendering type {detection_result} for {context.request.url}')
+                    self.rendering_type_predictor.store_result(context.request, detection_result)
 
             self._context_result_map[context] = pw_run.result
 
@@ -506,6 +521,32 @@ class AdaptivePlaywrightCrawler(
 
     def track_rendering_type_mispredictions(self) -> None:
         self.statistics.state.rendering_type_mispredictions += 1
+
+
+def _is_inconclusive_static_failure(exception: Exception) -> bool:
+    """Tell whether a failed static run says nothing about whether the page needs a browser.
+
+    Failures that happen before the request handler can process the response are inconclusive: the request could not
+    be fetched or the response could not be prepared (`ContextPipelineInitializationError`), the session was blocked
+    (`SessionError`), the request was throttled or it timed out. An exception raised by the request handler itself,
+    for example because an element is missing in the static content, is evidence that the page needs a browser.
+    """
+    if isinstance(exception, ContextPipelineInitializationError):
+        return True
+
+    if isinstance(exception, RequestHandlerError):
+        exception = exception.wrapped_exception
+
+    transient_errors: tuple[type[Exception], ...] = (
+        SessionError,
+        RequestThrottledError,
+        TimeoutError,
+        ConnectionError,
+    )
+    if 'UserHandlerTimeoutError' in globals():
+        transient_errors += (UserHandlerTimeoutError,)
+
+    return isinstance(exception, transient_errors)
 
 
 @dataclass(frozen=True)

@@ -29,7 +29,7 @@ from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler_statisti
     AdaptivePlaywrightCrawlerStatisticState,
 )
 from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawling_context import AdaptiveContextError
-from crawlee.errors import RequestThrottledError
+from crawlee.errors import RequestThrottledError, SessionError
 from crawlee.http_clients import HttpClient, HttpCrawlingResult
 from crawlee.sessions import SessionPool
 from crawlee.statistics import Statistics
@@ -453,6 +453,78 @@ async def test_adaptive_crawling_predictor_calls(
 
     # If `static` and `client only` results are same, `store_result` should be called with `static`.
     mocked_store_result.assert_called_once_with(mocked_predict.call_args[0][0], expected_result_rendering_type)
+
+
+async def test_detection_run_failing_to_fetch_is_not_stored(test_urls: list[str]) -> None:
+    """Test that a static detection run that can't fetch the page does not train the predictor."""
+    predictor = _SimpleRenderingTypePredictor()
+    http_client = AsyncMock(spec=HttpClient)
+    http_client.crawl.side_effect = ConnectionResetError('Connection reset by peer')
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+        rendering_type_predictor=predictor,
+        http_client=http_client,
+    )
+    handler_calls = Mock()
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        context.page  # noqa: B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+        handler_calls()
+
+    with patch.object(predictor, 'store_result', Mock()) as mocked_store_result:
+        await crawler.run(test_urls[:1])
+
+    # Only the browser run reached the handler. The static run failed while fetching the page.
+    handler_calls.assert_called_once_with()
+    http_client.crawl.assert_awaited_once()
+    mocked_store_result.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'static_error',
+    [
+        pytest.param(SessionError('Blocked'), id='Session error'),
+        pytest.param(asyncio.TimeoutError(), id='Timeout'),
+        pytest.param(RequestThrottledError(), id='Throttled'),
+    ],
+)
+async def test_detection_run_inconclusive_error_in_static_handler_is_not_stored(
+    static_error: Exception, test_urls: list[str]
+) -> None:
+    """Test that a static detection run that fails with an inconclusive error does not train the predictor."""
+    predictor = _SimpleRenderingTypePredictor()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(rendering_type_predictor=predictor)
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            context.page  # noqa: B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+        except AdaptiveContextError:
+            raise static_error from None
+
+    with patch.object(predictor, 'store_result', Mock()) as mocked_store_result:
+        await crawler.run(test_urls[:1])
+
+    mocked_store_result.assert_not_called()
+
+
+async def test_detection_run_error_in_static_handler_is_stored_as_client_only(test_urls: list[str]) -> None:
+    """Test that a static handler failing on its own, e.g. on a missing element, is still a `client only` signal."""
+    predictor = _SimpleRenderingTypePredictor()
+    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(rendering_type_predictor=predictor)
+
+    @crawler.router.default_handler
+    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        try:
+            context.page  # noqa: B018 Intentionally "useless expression". Raises outside the browser sub crawler.
+        except AdaptiveContextError:
+            raise ValueError('Element not found in the static content') from None
+
+    with patch.object(predictor, 'store_result', Mock()) as mocked_store_result:
+        await crawler.run(test_urls[:1])
+
+    mocked_store_result.assert_called_once()
+    assert mocked_store_result.call_args.args[1] == 'client only'
 
 
 async def test_adaptive_crawling_result_use_state_isolation(
