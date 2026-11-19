@@ -60,8 +60,8 @@ class RobotsTxtFile:
             url: The direct URL of the robots.txt file to be loaded.
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            raise_on_error: Whether a failed fetch raises. If False, a failed fetch results in a file that allows
-                all URLs.
+            raise_on_error: Whether to raise the error of a failed fetch. If False, the error is logged and the returned
+                file has no restrictions.
         """
         try:
             response = await http_client.send_request(url, proxy_info=proxy_info)
@@ -103,8 +103,8 @@ class RobotsTxtFile:
             url: The URL whose domain will be used to find the corresponding robots.txt file.
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            raise_on_error: Whether a failed fetch raises. If False, a failed fetch results in a file that allows
-                all URLs.
+            raise_on_error: Whether to raise the error of a failed fetch. If False, the error is logged and the returned
+                file has no restrictions.
         """
         robots_url = URL(url).with_path('/robots.txt')
         return await cls.load(str(robots_url), http_client, proxy_info, raise_on_error=raise_on_error)
