@@ -160,7 +160,7 @@ class AdaptivePlaywrightCrawler(
             kwargs['concurrency_settings'] = ConcurrencySettings(desired_concurrency=1)
 
         # The crawler counts its own fields in the statistics, which would fail on every request with another model.
-        if statistics is not None and not issubclass(statistics._state_model, AdaptivePlaywrightCrawlerStatisticState):  # noqa: SLF001
+        if statistics is not None and not issubclass(statistics.state_model, AdaptivePlaywrightCrawlerStatisticState):
             raise ValueError(
                 'The `statistics` of `AdaptivePlaywrightCrawler` must use `AdaptivePlaywrightCrawlerStatisticState` as '
                 'their state model, e.g. `Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)`.'
@@ -295,7 +295,7 @@ class AdaptivePlaywrightCrawler(
         statistics: Statistics[AdaptivePlaywrightCrawlerStatisticState] | None = None,
         **kwargs: Unpack[_BasicCrawlerOptions],
     ) -> AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector]:
-        """Create `AdaptivePlaywrightCrawler` that uses `Parcel` for parsing static content."""
+        """Create `AdaptivePlaywrightCrawler` that uses `Parsel` for parsing static content."""
         return AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[Selector], Selector, Selector](
             rendering_type_predictor=rendering_type_predictor,
             result_checker=result_checker,

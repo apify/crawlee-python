@@ -96,7 +96,6 @@ class Statistics(Generic[TStatisticsState]):
         self.error_tracker_retry = ErrorTracker(save_error_snapshots=False)
 
         self._requests_in_progress = dict[str, RequestProcessingRecord]()
-        self._state_model = state_model
 
         self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
@@ -205,6 +204,11 @@ class Statistics(Generic[TStatisticsState]):
     @property
     def state(self) -> TStatisticsState:
         return self._state.current_value
+
+    @property
+    def state_model(self) -> type[TStatisticsState]:
+        """The model class of the statistics state."""
+        return self._state._state_type  # noqa: SLF001
 
     @ensure_context
     def register_status_code(self, code: int) -> None:

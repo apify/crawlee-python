@@ -520,7 +520,7 @@ async with session_pool:
 
 When a crawler runs again, it resets only a session pool it created. A `SessionPool` you pass keeps its sessions. In v1, a repeated `run()` reset a passed pool too.
 
-The `with_beautifulsoup_static_parser` and `with_parsel_static_parser` factory methods of `AdaptivePlaywrightCrawler` pass `statistics` to the crawler as they are, instead of a copy built with `Statistics.replace_state_model`, so the instance you pass is the one that counts. The instance must use `AdaptivePlaywrightCrawlerStatisticState` as its state model:
+The `with_beautifulsoup_static_parser` and `with_parsel_static_parser` factory methods of `AdaptivePlaywrightCrawler` pass `statistics` to the crawler as they are, instead of a copy built with `Statistics.replace_state_model`, so the instance you pass is the one that counts. The instance must use `AdaptivePlaywrightCrawlerStatisticState` as its state model, or the crawler raises a `ValueError`:
 
 ```python
 # v1
