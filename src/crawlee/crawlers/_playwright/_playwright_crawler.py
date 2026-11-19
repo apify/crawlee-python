@@ -563,8 +563,16 @@ class PlaywrightCrawler(
         yield context
 
     async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
+        # Session-backed HTTP clients read this jar from inside the handler. Copy again after the
+        # handler returns so cookies created while it runs stay on the session.
+        await self._persist_browser_cookies(context)
+
         yield self._build_crawling_context(context)
 
+        await self._persist_browser_cookies(context)
+
+    async def _persist_browser_cookies(self, context: TPostNavContext) -> None:
+        """Copy the browser cookies into the session, when the request has one."""
         if context.session:
             pw_cookies = await self._get_cookies(context.page)
             context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
