@@ -10,12 +10,14 @@ from crawlee.browsers import BrowserPool
 
 
 async def test_timed_out_plugin_is_not_exited() -> None:
-    """A pool whose plugin entry timed out exits cleanly without exiting that plugin."""
+    """A pool whose plugin entry timed out exits only the plugins it entered, not that one or the ones after it."""
     entered_plugin = AsyncMock()
     slow_plugin = AsyncMock()
     slow_plugin.__aenter__.side_effect = asyncio.Event().wait
-    slow_plugin.active = False
-    browser_pool = BrowserPool(plugins=[entered_plugin, slow_plugin], operation_timeout=timedelta(milliseconds=10))
+    later_plugin = AsyncMock()
+    browser_pool = BrowserPool(
+        plugins=[entered_plugin, slow_plugin, later_plugin], operation_timeout=timedelta(milliseconds=10)
+    )
 
     async with browser_pool:
         pass
@@ -23,6 +25,7 @@ async def test_timed_out_plugin_is_not_exited() -> None:
     assert not browser_pool.active
     entered_plugin.__aexit__.assert_awaited_once()
     slow_plugin.__aexit__.assert_not_awaited()
+    later_plugin.__aexit__.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
@@ -56,6 +59,9 @@ async def test_failed_enter_frees_pool(monkeypatch: pytest.MonkeyPatch, error: B
     failing_plugin.__aenter__.side_effect = None
     async with browser_pool:
         assert browser_pool.active
+
+    assert entered_plugin.__aexit__.await_count == 2
+    failing_plugin.__aexit__.assert_awaited_once()
 
 
 async def test_failed_rollback_keeps_enter_error(caplog: pytest.LogCaptureFixture) -> None:
@@ -111,6 +117,8 @@ async def test_failed_exit_frees_pool() -> None:
     async with browser_pool:
         assert browser_pool.active
 
+    assert plugin.__aexit__.await_count == 2
+
 
 async def test_enter_during_exit_raises() -> None:
     """A pool can't be entered again until its exit has exited its plugins."""
@@ -138,9 +146,9 @@ async def test_enter_during_exit_raises() -> None:
 async def test_failed_browser_close_exits_plugins() -> None:
     """A pool whose browser fails to close still closes its other browsers and exits its plugins."""
     plugin = AsyncMock()
-    failing_browser = AsyncMock()
+    failing_browser = AsyncMock(idle_time=timedelta(0))
     failing_browser.close.side_effect = RuntimeError('close failed')
-    other_browser = AsyncMock()
+    other_browser = AsyncMock(idle_time=timedelta(0))
     browser_pool = BrowserPool(plugins=[plugin])
 
     with pytest.raises(RuntimeError, match='close failed'):
@@ -162,7 +170,7 @@ async def test_plugin_exit_error_keeps_cancellation(caplog: pytest.LogCaptureFix
         close_started.set()
         await asyncio.Event().wait()
 
-    browser = AsyncMock()
+    browser = AsyncMock(idle_time=timedelta(0))
     browser.close.side_effect = close_until_cancelled
     browser_pool = BrowserPool(plugins=[failing_plugin])
     await browser_pool.__aenter__()
@@ -189,7 +197,7 @@ async def test_cancelled_plugin_exit_logs_close_error(caplog: pytest.LogCaptureF
 
     plugin = AsyncMock()
     plugin.__aexit__.side_effect = exit_until_cancelled
-    browser = AsyncMock()
+    browser = AsyncMock(idle_time=timedelta(0))
     browser.close.side_effect = RuntimeError('close failed')
     browser_pool = BrowserPool(plugins=[plugin])
     await browser_pool.__aenter__()
@@ -206,12 +214,43 @@ async def test_cancelled_plugin_exit_logs_close_error(caplog: pytest.LogCaptureF
     assert 'close failed' in caplog.text
 
 
-async def test_cancelled_task_stop_stops_the_other(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A pool whose first task stop is cancelled still stops the other task and exits its plugins."""
+async def test_cancelled_browser_close_logs_sibling_error(caplog: pytest.LogCaptureFixture) -> None:
+    """A browser that fails to close is logged when the pool's exit is cancelled while another browser still closes."""
+    close_started = asyncio.Event()
+
+    async def close_until_cancelled(**_: object) -> None:
+        close_started.set()
+        await asyncio.Event().wait()
+
     plugin = AsyncMock()
+    failing_browser = AsyncMock(idle_time=timedelta(0))
+    failing_browser.close.side_effect = RuntimeError('close failed')
+    hanging_browser = AsyncMock(idle_time=timedelta(0))
+    hanging_browser.close.side_effect = close_until_cancelled
+    browser_pool = BrowserPool(plugins=[plugin])
+    await browser_pool.__aenter__()
+    browser_pool._active_browsers.extend([failing_browser, hanging_browser])
+
+    exit_task = asyncio.create_task(browser_pool.__aexit__(None, None, None))
+    await close_started.wait()
+    exit_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await exit_task
+
+    assert not browser_pool.active
+    plugin.__aexit__.assert_awaited_once()
+    assert 'close failed' in caplog.text
+
+
+async def test_cancelled_task_stop_stops_the_other(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cancelled first task stop still lets the pool stop the other task, close its browsers and exit its plugins."""
+    plugin = AsyncMock()
+    browser = AsyncMock(idle_time=timedelta(0))
     browser_pool = BrowserPool(plugins=[plugin])
     close_stop = AsyncMock(wraps=browser_pool._close_inactive_browsers_task.stop)
     await browser_pool.__aenter__()
+    browser_pool._active_browsers.append(browser)
     monkeypatch.setattr(
         browser_pool._identify_inactive_browsers_task, 'stop', AsyncMock(side_effect=asyncio.CancelledError())
     )
@@ -221,6 +260,7 @@ async def test_cancelled_task_stop_stops_the_other(monkeypatch: pytest.MonkeyPat
         await browser_pool.__aexit__(None, None, None)
 
     close_stop.assert_awaited_once()
+    browser.close.assert_awaited_once()
     plugin.__aexit__.assert_awaited_once()
     monkeypatch.undo()
     await browser_pool._identify_inactive_browsers_task.stop()

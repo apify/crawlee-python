@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from datetime import timedelta
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -66,6 +68,7 @@ async def test_failed_rollback_keeps_enter_error(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A Playwright that fails to stop during an entry rollback is logged and the entry error is kept."""
+    caplog.set_level(logging.DEBUG, logger='crawlee.browsers._playwright_browser_plugin')
     plugin = PlaywrightBrowserPlugin()
     failing_context_manager = AsyncMock()
     failing_context_manager.__aenter__.side_effect = RuntimeError('start failed')
@@ -79,6 +82,26 @@ async def test_failed_rollback_keeps_enter_error(
 
     assert not plugin.active
     assert 'Stopping Playwright failed while rolling back the plugin entry.' in caplog.text
+
+
+async def test_hanging_rollback_stop_keeps_enter_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An entry rollback stops waiting for a Playwright that doesn't stop, so the entry still raises its own error."""
+    monkeypatch.setattr(PlaywrightBrowserPlugin, '_PLAYWRIGHT_STOP_TIMEOUT', timedelta(milliseconds=10))
+    plugin = PlaywrightBrowserPlugin()
+
+    async def hang(*_: object) -> None:
+        await asyncio.Event().wait()
+
+    failing_context_manager = AsyncMock()
+    failing_context_manager.__aenter__.side_effect = RuntimeError('start failed')
+    failing_context_manager.__aexit__.side_effect = hang
+    monkeypatch.setattr(plugin, '_playwright_context_manager', failing_context_manager)
+    monkeypatch.setattr('crawlee.browsers._playwright_browser_plugin.async_playwright', Mock(return_value=AsyncMock()))
+
+    with pytest.raises(RuntimeError, match='start failed'):
+        await asyncio.wait_for(plugin.__aenter__(), timeout=10)
+
+    assert not plugin.active
 
 
 async def test_failed_exit_frees_plugin(monkeypatch: pytest.MonkeyPatch) -> None:

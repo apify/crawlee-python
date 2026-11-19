@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -43,6 +45,9 @@ class StagehandBrowserPlugin(BrowserPlugin):
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
+
+    _PLAYWRIGHT_STOP_TIMEOUT = timedelta(seconds=5)
+    """The time limit for stopping Playwright while rolling back a failed entry."""
 
     def __init__(
         self,
@@ -179,16 +184,12 @@ class StagehandBrowserPlugin(BrowserPlugin):
             await client.__aenter__()
             self._stagehand_client = client
         except BaseException:
-            # The Playwright driver may already be running, so it's stopped too.
-            self._playwright = None
-            playwright_context_manager = self._playwright_context_manager
-            self._playwright_context_manager = async_playwright()
+            # Best effort: a Playwright driver that has already started is stopped too.
             try:
-                await playwright_context_manager.__aexit__(None, None, None)
+                timeout = self._PLAYWRIGHT_STOP_TIMEOUT.total_seconds()
+                await asyncio.wait_for(self.__aexit__(None, None, None), timeout)
             except Exception:
-                logger.warning('Stopping Playwright failed while rolling back the plugin entry.', exc_info=True)
-            finally:
-                self._active = False
+                logger.debug('Stopping Playwright failed while rolling back the plugin entry.', exc_info=True)
             raise
 
         return self
