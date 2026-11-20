@@ -78,9 +78,11 @@ class LocalEventManager(EventManager):
 
         It starts emitting system info events at regular intervals.
         """
+        # Read before the parent call, which resets the closed flag when it reopens the manager.
+        opening = self._active_ref_count == 0 or self._closed
         await super().__aenter__()
 
-        if self._active_ref_count == 1:
+        if opening:
             # A reading kept from a previous session would report the average load over the idle gap since then.
             self._cpu_load = proclimits.CpuLoad()
             self._emit_system_info_event_rec_task.start()
@@ -102,6 +104,17 @@ class LocalEventManager(EventManager):
                 await self._emit_system_info_event_rec_task.stop()
         finally:
             await super().__aexit__(exc_type, exc_value, exc_traceback)
+
+    async def close(self) -> None:
+        """Emit the final `PersistState` event, wait for all the event listeners, and stop emitting `SystemInfo`.
+
+        See `EventManager.close` for details.
+
+        Raises:
+            RuntimeError: If the context manager is not active.
+        """
+        await super().close()
+        await self._emit_system_info_event_rec_task.stop()
 
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage."""
