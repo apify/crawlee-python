@@ -63,13 +63,22 @@ jobs:
   changelog_update:
     name: Changelog update
     needs: [release_prepare]
+    runs-on: ubuntu-latest
+    environment:
+      name: automation
+      deployment: false
     permissions:
       contents: write
-    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
-    with:
-      version_number: ${{ needs.release_prepare.outputs.version_number }}
-      changelog_artifact_name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
-    secrets: inherit
+    outputs:
+      changelog_commitish: ${{ steps.changelog_update.outputs.changelog-commitish }}
+    steps:
+      - name: Bump version and update changelog
+        id: changelog_update
+        uses: apify/actions/python-bump-and-update-changelog@994a3e5ec79a5575ac4d81365bab7549c9687c32 # v1.9.0
+        with:
+          version-number: ${{ needs.release_prepare.outputs.version_number }}
+          changelog-artifact-name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
+          apify-service-account-github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
   github_release:
     name: GitHub release

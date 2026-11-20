@@ -38,6 +38,10 @@ jobs:
   end_to_end_tests:
     name: End-to-end tests
     if: github.event_name != 'workflow_dispatch' || !inputs.slack_test
+    # Pull request runs wait for an approval in `e2e-tests-pr`, the scheduled and manual runs on master don't.
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'e2e-tests-pr' || 'e2e-tests' }}
+      deployment: false
     strategy:
       fail-fast: false
       max-parallel: 12
@@ -95,6 +99,9 @@ jobs:
     needs: end_to_end_tests
     if: always() && ((github.event_name == 'schedule' && needs.end_to_end_tests.result == 'failure') || (github.event_name == 'workflow_dispatch' && inputs.slack_test))
     runs-on: ubuntu-latest
+    environment:
+      name: e2e-tests
+      deployment: false
     permissions:
       contents: read
       actions: read
