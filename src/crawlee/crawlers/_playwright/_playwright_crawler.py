@@ -383,19 +383,21 @@ class PlaywrightCrawler(
                 stacklevel=2,
             )
 
-        # Apply the custom method, headers, and payload to the navigation request only; the details of doing
-        # that correctly live in `NavigationRequestInterceptor`.
-        if context.request.headers or context.request.method != 'GET':
-            interceptor = NavigationRequestInterceptor(
-                context.page,
-                method=context.request.method,
-                headers=context.request.headers,
-                payload=context.request.payload,
-            )
-            await interceptor.register()
-
         try:
             async with self._shared_navigation_timeouts[id(context.request)] as remaining_timeout:
+                # Apply the custom method, headers, and payload to the navigation request only; the details of doing
+                # that correctly live in `NavigationRequestInterceptor`.
+                if context.request.headers or context.request.method != 'GET':
+                    interceptor = NavigationRequestInterceptor(
+                        context.page,
+                        method=context.request.method,
+                        headers=context.request.headers,
+                        payload=context.request.payload,
+                        timeout=remaining_timeout,
+                        fetch_authorized_request=self._can_fetch_navigation_request(context.page),
+                    )
+                    await interceptor.register()
+
                 response = await context.page.goto(
                     context.request.url, timeout=remaining_timeout.total_seconds() * 1000, **context.goto_options
                 )
@@ -410,6 +412,14 @@ class PlaywrightCrawler(
         context.request.loaded_url = context.page.url
 
         yield self._build_post_nav_context(context, response=response)
+
+    def _can_fetch_navigation_request(self, page: Page) -> bool:
+        """Check whether Playwright can send the navigation request of the page in place of the browser.
+
+        The browser has to accept a fulfilled redirect response, which WebKit does not.
+        """
+        browser = page.context.browser
+        return browser is not None and browser.browser_type.name in {'chromium', 'firefox'}
 
     def _create_extract_links_function(self, context: TPostNavContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.
