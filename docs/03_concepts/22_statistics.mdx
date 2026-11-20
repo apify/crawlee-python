@@ -62,7 +62,7 @@ The statistics a crawler creates for itself have persistence enabled and use the
 
 ## Custom statistics
 
-To change any of these options, create a `Statistics` instance and pass it to the crawler through the `statistics` argument. Use <ApiLink to="class/Statistics#with_default_state">`Statistics.with_default_state`</ApiLink> to get an instance with the standard `StatisticsState` model.
+To change any of these options, create a `Statistics` instance and pass it to the crawler through the `statistics` argument. Use <ApiLink to="class/Statistics#with_default_state">`Statistics.with_default_state`</ApiLink> to get an instance with the standard `StatisticsState` model. <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> needs the adaptive state model, so create its instance with `Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)`.
 
 The following example logs the statistics every second in the `inline` format, persists them under a custom key, and reads the persisted record back after the run.
 

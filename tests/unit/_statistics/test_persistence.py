@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from crawlee.crawlers import AdaptivePlaywrightCrawlerStatisticState
 from crawlee.statistics import Statistics, StatisticsState
 from crawlee.storages import KeyValueStore
 
@@ -274,11 +275,18 @@ def test_id_defaults_to_counter() -> None:
     assert Statistics.with_default_state()._id == '2'
 
 
-def test_replace_state_model_keeps_id() -> None:
-    """`replace_state_model` keeps the ID of the original statistics."""
-    statistics = Statistics.with_default_state(id='custom')
+@pytest.mark.parametrize(
+    'state_model',
+    [
+        pytest.param(StatisticsState, id='default'),
+        pytest.param(AdaptivePlaywrightCrawlerStatisticState, id='adaptive'),
+    ],
+)
+def test_state_model_matches_constructor(state_model: type[StatisticsState]) -> None:
+    """`state_model` returns the state model class the statistics were created with."""
+    statistics = Statistics(state_model=state_model)
 
-    assert statistics.replace_state_model(StatisticsState)._id == 'custom'
+    assert statistics.state_model is state_model
 
 
 async def test_reentering_keeps_counters_and_runtime() -> None:

@@ -10,10 +10,13 @@ import pytest
 
 from crawlee.autoscaling import ConcurrencySystem
 from crawlee.browsers import BrowserPool
-from crawlee.crawlers import AdaptivePlaywrightCrawler
+from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlerStatisticState
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
+from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
 
 
@@ -43,6 +46,34 @@ async def test_run_needs_entered_browser_pool() -> None:
 
     with pytest.raises(RuntimeError, match='BrowserPool passed to the crawler is not active'):
         await crawler.run(['https://a.placeholder.com'])
+
+
+@pytest.mark.parametrize(
+    'factory',
+    [
+        pytest.param(AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser, id='beautifulsoup'),
+        pytest.param(AdaptivePlaywrightCrawler.with_parsel_static_parser, id='parsel'),
+    ],
+)
+def test_factory_passes_stats_as_is(factory: Callable[..., AdaptivePlaywrightCrawler]) -> None:
+    """A factory method passes the given statistics to the crawler as they are."""
+    statistics = Statistics(state_model=AdaptivePlaywrightCrawlerStatisticState)
+    crawler = factory(statistics=statistics)
+
+    assert crawler.statistics is statistics
+
+
+@pytest.mark.parametrize(
+    'factory',
+    [
+        pytest.param(AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser, id='beautifulsoup'),
+        pytest.param(AdaptivePlaywrightCrawler.with_parsel_static_parser, id='parsel'),
+    ],
+)
+def test_rejects_plain_statistics(factory: Callable[..., AdaptivePlaywrightCrawler]) -> None:
+    """Statistics without the adaptive state model are rejected when the crawler is created."""
+    with pytest.raises(ValueError, match='AdaptivePlaywrightCrawlerStatisticState'):
+        factory(statistics=Statistics.with_default_state())
 
 
 @pytest.mark.parametrize(
