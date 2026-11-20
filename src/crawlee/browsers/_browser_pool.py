@@ -19,7 +19,7 @@ from crawlee.browsers._playwright_browser_plugin import PlaywrightBrowserPlugin
 from crawlee.browsers._types import BrowserType, CrawleePage
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Mapping, Sequence
+    from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping, Sequence
     from pathlib import Path
     from types import TracebackType
 
@@ -98,6 +98,7 @@ class BrowserPool:
         self._retire_browser_after_page_count = retire_browser_after_page_count
         self._pages = WeakValueDictionary[str, CrawleePage]()  # Track the pages in the pool
         self._plugins_cycle = itertools.cycle(self._plugins)  # Cycle through the plugins
+        self._entered_plugins: list[BrowserPlugin] = []
 
         # Hooks for custom behavior at different stages of the browser and page lifecycles.
         self._pre_launch_hooks: list[Callable[[str, BrowserPlugin], Awaitable[None]]] = []
@@ -218,8 +219,15 @@ class BrowserPool:
         try:
             for plugin in self._plugins:
                 await asyncio.wait_for(plugin.__aenter__(), timeout)
+                self._entered_plugins.append(plugin)
         except TimeoutError:
             logger.warning('Initializing of the browser plugin %s timed out, will be skipped.', plugin)
+        except BaseException:
+            try:
+                await self.__aexit__(None, None, None)
+            except Exception:
+                logger.warning('Exiting a browser plugin failed while rolling back the pool entry.', exc_info=True)
+            raise
 
         return self
 
@@ -229,7 +237,7 @@ class BrowserPool:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Exit the context manager and close all browser plugins.
+        """Exit the context manager and close the browser plugins it entered.
 
         Raises:
             RuntimeError: If the context manager is not active.
@@ -237,18 +245,39 @@ class BrowserPool:
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        await self._identify_inactive_browsers_task.stop()
-        await self._close_inactive_browsers_task.stop()
+        # Every browser and plugin is closed even when an earlier step fails, as an inactive pool can't be exited again.
+        failures: list[BaseException] = []
+        try:
+            try:
+                await self._stop_recurring_tasks()
+            finally:
+                try:
+                    browser_closes = (
+                        browser.close(force=True) for browser in self._active_browsers + self._inactive_browsers
+                    )
+                    await self._run_collecting_failures(browser_closes, failures)
+                finally:
+                    self._active_browsers.clear()
+                    self._inactive_browsers.clear()
 
-        for browser in self._active_browsers + self._inactive_browsers:
-            await browser.close(force=True)
-        self._active_browsers.clear()
-        self._inactive_browsers.clear()
+                    try:
+                        plugin_exits = (
+                            plugin.__aexit__(exc_type, exc_value, exc_traceback) for plugin in self._entered_plugins
+                        )
+                        await self._run_collecting_failures(plugin_exits, failures)
+                    finally:
+                        self._entered_plugins.clear()
+                        self._active = False
+        except BaseException:
+            # A cancellation above is raised instead, so the failures are only logged.
+            for failure in failures:
+                logger.warning('Closing the browser pool failed.', exc_info=failure)
+            raise
 
-        for plugin in self._plugins:
-            await plugin.__aexit__(exc_type, exc_value, exc_traceback)
-
-        self._active = False
+        for failure in failures[1:]:
+            logger.warning('Closing the browser pool failed.', exc_info=failure)
+        if failures:
+            raise failures[0]
 
     @ensure_context
     async def new_page(
@@ -391,6 +420,25 @@ class BrowserPool:
             if not browser.pages and not browser.is_opening_pages:
                 await browser.close()
                 self._inactive_browsers.remove(browser)
+
+    async def _stop_recurring_tasks(self) -> None:
+        try:
+            await self._identify_inactive_browsers_task.stop()
+        finally:
+            await self._close_inactive_browsers_task.stop()
+
+    @staticmethod
+    async def _run_collecting_failures(
+        coroutines: Iterable[Coroutine[Any, Any, object]], failures: list[BaseException]
+    ) -> None:
+        """Run `coroutines` concurrently and add their errors to `failures`, also when the wait is cancelled."""
+        tasks = [asyncio.create_task(coroutine) for coroutine in coroutines]
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            # A cancelled `gather` still waits for its tasks, so each one is done here.
+            errors = (task.exception() for task in tasks if not task.cancelled())
+            failures.extend(error for error in errors if error is not None)
 
     async def _execute_hooks(self, hooks: list[Callable[..., Awaitable[None]]], *args: Any) -> None:
         """Execute the provided hooks with the given arguments."""

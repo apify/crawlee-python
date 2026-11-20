@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Any
 
@@ -43,6 +45,9 @@ class StagehandBrowserPlugin(BrowserPlugin):
     """
 
     AUTOMATION_LIBRARY = 'stagehand'
+
+    _PLAYWRIGHT_STOP_TIMEOUT = timedelta(seconds=5)
+    """The time limit for stopping Playwright while rolling back a failed entry."""
 
     def __init__(
         self,
@@ -163,19 +168,29 @@ class StagehandBrowserPlugin(BrowserPlugin):
             raise RuntimeError(f'The {self.__class__.__name__} is already active.')
 
         self._active = True
-        self._playwright = await self._playwright_context_manager.__aenter__()
 
-        if self._stagehand_options.env == 'LOCAL':
-            if 'executable_path' not in self._browser_launch_options:
-                chrome_path = self._playwright.chromium.executable_path
-                self._browser_launch_options['executable_path'] = chrome_path
-                logger.debug('Resolved Chromium path from Playwright: %s', chrome_path)
+        try:
+            self._playwright = await self._playwright_context_manager.__aenter__()
 
-            self._stagehand_init_params['local_chrome_path'] = self._browser_launch_options['executable_path']
+            if self._stagehand_options.env == 'LOCAL':
+                if 'executable_path' not in self._browser_launch_options:
+                    chrome_path = self._playwright.chromium.executable_path
+                    self._browser_launch_options['executable_path'] = chrome_path
+                    logger.debug('Resolved Chromium path from Playwright: %s', chrome_path)
 
-        client = AsyncStagehand(**self._stagehand_init_params)
-        await client.__aenter__()
-        self._stagehand_client = client
+                self._stagehand_init_params['local_chrome_path'] = self._browser_launch_options['executable_path']
+
+            client = AsyncStagehand(**self._stagehand_init_params)
+            await client.__aenter__()
+            self._stagehand_client = client
+        except BaseException:
+            # Best effort: a Playwright driver that has already started is stopped too.
+            try:
+                timeout = self._PLAYWRIGHT_STOP_TIMEOUT.total_seconds()
+                await asyncio.wait_for(self.__aexit__(None, None, None), timeout)
+            except Exception:
+                logger.debug('Stopping Playwright failed while rolling back the plugin entry.', exc_info=True)
+            raise
 
         return self
 
@@ -189,14 +204,17 @@ class StagehandBrowserPlugin(BrowserPlugin):
         if not self._active:
             raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-        if self._stagehand_client is not None:
-            await self._stagehand_client.__aexit__(exc_type, exc_value, exc_traceback)
-            self._stagehand_client = None
-
-        await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
-        self._playwright_context_manager = async_playwright()
-        self._playwright = None
-        self._active = False
+        try:
+            if self._stagehand_client is not None:
+                await self._stagehand_client.__aexit__(exc_type, exc_value, exc_traceback)
+        finally:
+            try:
+                await self._playwright_context_manager.__aexit__(exc_type, exc_value, exc_traceback)
+            finally:
+                self._stagehand_client = None
+                self._playwright = None
+                self._playwright_context_manager = async_playwright()
+                self._active = False
 
     @override
     @ensure_context
