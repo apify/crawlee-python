@@ -54,7 +54,8 @@ def _extract_model_input(messages: list[ModelMessage]) -> tuple[str, str]:
 async def test_returns_validated_model() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS))
 
-    result = await extractor.extract('<html></html>', _Product)
+    async with extractor:
+        result = await extractor.extract('<html></html>', _Product)
 
     assert isinstance(result, _Product)
     assert result.name == 'Phone'
@@ -64,7 +65,8 @@ async def test_returns_validated_model() -> None:
 async def test_counts_token_usage() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS))
 
-    await extractor.extract('<html></html>', _Product)
+    async with extractor:
+        await extractor.extract('<html></html>', _Product)
 
     assert extractor.ai_usage.requests == 1
     assert extractor.ai_usage.input_tokens > 0
@@ -76,8 +78,9 @@ async def test_accepts_selector_input() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS))
 
     html = '<html><body><div>UNIQUE-CONTENT</div></body></html>'
-    with capture_run_messages() as messages:
-        await extractor.extract(Selector(text=html), _Product)
+    async with extractor:
+        with capture_run_messages() as messages:
+            await extractor.extract(Selector(text=html), _Product)
 
     prompt, _ = _extract_model_input(messages)
 
@@ -89,12 +92,13 @@ async def test_accepts_selector_input() -> None:
 async def test_scope_subtree() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS))
 
-    with capture_run_messages() as messages:
-        await extractor.extract(
-            '<div><article><h1>Phone</h1></article><footer>junk</footer></div>',
-            _Product,
-            scope='article',
-        )
+    async with extractor:
+        with capture_run_messages() as messages:
+            await extractor.extract(
+                '<div><article><h1>Phone</h1></article><footer>junk</footer></div>',
+                _Product,
+                scope='article',
+            )
 
     prompt, _ = _extract_model_input(messages)
 
@@ -106,15 +110,17 @@ async def test_scope_subtree() -> None:
 async def test_scope_raises() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS))
 
-    with pytest.raises(ValueError, match='matched nothing'):
-        await extractor.extract('<div>x</div>', _Product, scope='.missing')
+    async with extractor:
+        with pytest.raises(ValueError, match='matched nothing'):
+            await extractor.extract('<div>x</div>', _Product, scope='.missing')
 
 
 async def test_input_prompt() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS), distiller=_MockDistiller())
 
-    with capture_run_messages() as messages:
-        await extractor.extract('<html></html>', _Product)
+    async with extractor:
+        with capture_run_messages() as messages:
+            await extractor.extract('<html></html>', _Product)
 
     prompt, _ = _extract_model_input(messages)
 
@@ -128,8 +134,9 @@ async def test_instructions() -> None:
         distiller=_MockDistiller(),
     )
 
-    with capture_run_messages() as messages:
-        await extractor.extract('<html></html>', _Product)
+    async with extractor:
+        with capture_run_messages() as messages:
+            await extractor.extract('<html></html>', _Product)
 
     _, instructions = _extract_model_input(messages)
 
@@ -140,8 +147,9 @@ async def test_instructions() -> None:
 async def test_additional_instructions() -> None:
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS), distiller=_MockDistiller())
 
-    with capture_run_messages() as messages:
-        await extractor.extract('<h1>Phone</h1>', _Product, additional_instructions='PER-CALL-HINT')
+    async with extractor:
+        with capture_run_messages() as messages:
+            await extractor.extract('<h1>Phone</h1>', _Product, additional_instructions='PER-CALL-HINT')
 
     _, instructions = _extract_model_input(messages)
 
@@ -154,8 +162,9 @@ async def test_raise_for_invalid_output() -> None:
     # `name` is required, so output missing it fails validation on every retry until the run errors.
     extractor = PydanticAiDirectExtractor(TestModel(custom_output_args={'price': '$9'}), retries=2)
 
-    with pytest.raises(UnexpectedModelBehavior):
-        await extractor.extract('<h1>x</h1>', _Product)
+    async with extractor:
+        with pytest.raises(UnexpectedModelBehavior):
+            await extractor.extract('<h1>x</h1>', _Product)
 
     # The extractor's usage stats reflect the 3 failed attempts (1 initial + 2 retries).
     assert extractor.ai_usage.requests == 3
@@ -170,3 +179,11 @@ async def test_enter_sets_active() -> None:
         assert extractor.active is True
 
     assert extractor.active is False
+
+
+async def test_extract_needs_entered_extractor() -> None:
+    """An extractor that isn't entered with `async with` refuses to extract."""
+    extractor = PydanticAiDirectExtractor(TestModel(custom_output_args=DEFAULT_OUTPUT_ARGS))
+
+    with pytest.raises(RuntimeError, match='not active'):
+        await extractor.extract('<html></html>', _Product)
