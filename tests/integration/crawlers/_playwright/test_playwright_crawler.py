@@ -905,6 +905,24 @@ async def test_send_request_with_client(server_url: URL) -> None:
     assert check_data['default'] != check_data['send_request']
 
 
+async def test_send_request_includes_cookies_set_during_navigation(server_url: URL) -> None:
+    """A session-backed HTTP client sends cookies the browser stored during navigation."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    observed: dict[str, dict[str, str]] = {}
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        browser_cookies = {cookie['name']: cookie['value'] for cookie in await context.page.context.cookies()}
+        response = await context.send_request(str(server_url / 'cookies'))
+        observed['browser'] = browser_cookies
+        observed['sent'] = json.loads(await response.read())['cookies']
+
+    await crawler.run([str(server_url / 'set_complex_cookies')])
+
+    assert observed['browser'].get('basic') == '1'
+    assert observed['sent'].get('basic') == '1'
+
+
 async def test_extract_links(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
     extracted_links: list[str] = []
