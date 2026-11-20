@@ -68,7 +68,7 @@ When the retries run out, the crawler calls the failed request handler and marks
 
 The `crawl_depth` property tells how many links away from a start request a request is. Requests you pass to `run` or `add_requests` on the crawler have depth 0. Each request created by `context.enqueue_links` or `context.add_requests` gets the depth of the current request plus one.
 
-The crawler's `max_crawl_depth` option limits how deep the crawl goes. Requests at the maximum depth are still processed, but links found on their pages aren't enqueued. By default, the depth isn't limited.
+The crawler's `max_crawl_depth` option limits how deep the crawl goes. Requests at the maximum depth are still processed, but links found on their pages aren't enqueued. By default, the depth isn't limited. For other options that limit the crawl, see [Limiting the crawl](../guides/crawling-links#limiting-the-crawl).
 
 ## Binding to a session
 

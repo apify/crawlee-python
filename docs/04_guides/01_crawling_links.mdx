@@ -1,7 +1,7 @@
 ---
 id: crawling-links
 title: Crawling links
-description: How to crawl a list of URLs, discover and enqueue new links on the fly, and control which links get followed.
+description: How to crawl a list of URLs, discover and enqueue new links on the fly, control which links get followed, and limit the size of the crawl.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
@@ -26,7 +26,9 @@ import StrategySameDomainExample from '!!raw-loader!roa-loader!./code_examples/c
 import StrategySameHostnameExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_website_with_relative_links_same_hostname.py';
 import StrategySameOriginExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/crawl_website_with_relative_links_same_origin.py';
 
-Most crawls start from a handful of URLs and grow by following links discovered on the visited pages. This guide shows how to crawl a fixed list of URLs, how to enqueue newly discovered links with the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper, and how to control which links end up in the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>.
+import LimitCrawlExample from '!!raw-loader!roa-loader!./code_examples/crawling_links/limit_crawl.py';
+
+Most crawls start from a handful of URLs and grow by following links discovered on the visited pages. This guide shows how to crawl a fixed list of URLs, how to enqueue newly discovered links with the <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink> helper, how to control which links end up in the <ApiLink to="class/RequestQueue">`RequestQueue`</ApiLink>, and how to limit the size of the crawl.
 
 ## Crawling a list of URLs
 
@@ -139,3 +141,17 @@ These examples use the <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCr
         </RunnableCodeBlock>
     </TabItem>
 </Tabs>
+
+## Limiting the crawl
+
+A crawl that follows links can grow much larger than you need. The following options limit its size:
+
+- <ApiLink to="class/BasicCrawlerOptions#max_requests_per_crawl">`max_requests_per_crawl`</ApiLink> - A crawler option. The crawler stops after this number of requests finish or fail. A retried request counts once. Requests that are already in progress still finish, so the crawler can process a few more requests than the limit. When you [resume an interrupted crawl](./stopping-and-resuming-crawlers#resuming-a-paused-crawl), the requests processed before the interruption count towards the limit too.
+- <ApiLink to="class/BasicCrawlerOptions#max_crawl_depth">`max_crawl_depth`</ApiLink> - A crawler option. Start requests have depth 0, and each followed link adds one. Requests at the maximum depth are still processed, but links found on their pages aren't enqueued.
+- `limit` - An argument of <ApiLink to="class/EnqueueLinksFunction">`enqueue_links`</ApiLink>. It sets the maximum number of links that one call adds. Links that the filters, robots.txt, or `transform_request_function` skip don't count towards it, but links that are already in the queue do.
+
+<RunnableCodeBlock className="language-python" language="python">
+    {LimitCrawlExample}
+</RunnableCodeBlock>
+
+To stop the crawl on your own condition, for example once you find the data you need, call <ApiLink to="class/BasicCrawler#stop">`crawler.stop()`</ApiLink>. For details, see [Stopping a crawler](./stopping-and-resuming-crawlers#stopping-a-crawler).
