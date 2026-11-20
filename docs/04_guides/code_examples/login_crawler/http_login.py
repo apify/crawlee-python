@@ -55,11 +55,17 @@ async def main() -> None:
         user_id = data['userId']
         username = data['username']
 
-        # Set authentication cookies in the session that will be used
-        # for subsequent requests
-        context.session.cookies.set(name='token', value=token, expires=expires_int)
-        context.session.cookies.set(name='userID', value=user_id)
-        context.session.cookies.set(name='userName', value=username)
+        # Set authentication cookies in the session that will be used for subsequent
+        # requests. The domain limits them to the site you logged in to, so they aren't
+        # sent to other hosts.
+        context.session.cookies.set(
+            name='token',
+            value=token,
+            domain='demoqa.com',
+            expires=expires_int,
+        )
+        context.session.cookies.set(name='userID', value=user_id, domain='demoqa.com')
+        context.session.cookies.set(name='userName', value=username, domain='demoqa.com')
 
         # After successful authentication, continue crawling with the
         # authenticated session
