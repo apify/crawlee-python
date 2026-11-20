@@ -35,7 +35,9 @@ jobs:
   build_docs:
     name: Build docs
     # Holds only the docs build tokens, so the docs toolchain never runs where the service account token is available.
-    environment: docs
+    environment:
+      name: docs
+      deployment: false
     permissions:
       contents: read
       checks: read
@@ -132,7 +134,9 @@ jobs:
   invalidate_cloudfront_cache:
     name: Invalidate CloudFront cache
     needs: [deploy_docs]
-    environment: automation
+    environment:
+      name: automation
+      deployment: false
     permissions: {}
     runs-on: ubuntu-latest
 

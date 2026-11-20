@@ -45,7 +45,9 @@ jobs:
     name: Changelog update
     needs: [release_prepare]
     runs-on: ubuntu-latest
-    environment: automation
+    environment:
+      name: automation
+      deployment: false
     permissions:
       contents: write
     outputs:
