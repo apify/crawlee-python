@@ -1157,6 +1157,106 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
+async def test_context_kv_store_reads_value_set_to_none_as_default() -> None:
+    """A value set to `None` in a handler reads as the default value there, and the record is deleted afterwards."""
+    crawler = BasicCrawler()
+    read_value = Mock()
+    store = await crawler.get_key_value_store()
+    await store.set_value('foo', 'stored before the run')
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 'bar')
+        await store.set_value('foo', None)
+        read_value(await store.get_value('foo', 'default'))
+
+    await crawler.run(['https://hello.world'])
+
+    read_value.assert_called_once_with('default')
+    assert await store.record_exists('foo') is False
+
+
+async def test_context_kv_store_reads_pending_value_as_stored() -> None:
+    """A value set in a handler reads there the same way as after it's stored."""
+    crawler = BasicCrawler()
+    read_value = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', '{"a": 1}', content_type='application/json')
+        read_value(await store.get_value('foo'))
+
+    await crawler.run(['https://hello.world'])
+
+    read_value.assert_called_once_with({'a': 1})
+    store = await crawler.get_key_value_store()
+    assert await store.get_value('foo') == {'a': 1}
+
+
+async def test_context_kv_store_keeps_value_as_it_was_set() -> None:
+    """Changing an object after `set_value` in a handler changes neither the value read back nor the committed one."""
+    crawler = BasicCrawler()
+    read_value = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        value = ['item']
+        await store.set_value('foo', value)
+        value.append('changed')
+        read_value(await store.get_value('foo'))
+
+    await crawler.run(['https://hello.world'])
+
+    read_value.assert_called_once_with(['item'])
+    store = await crawler.get_key_value_store()
+    assert await store.get_value('foo') == ['item']
+
+
+async def test_context_kv_store_unstorable_value_fails_request() -> None:
+    """A value that can't be stored raises in the handler, so only the request fails and the crawl goes on."""
+    crawler = BasicCrawler(max_request_retries=0)
+    failed_request_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 5, content_type='text/plain')
+
+    @crawler.failed_request_handler
+    async def on_failed_request(context: BasicCrawlingContext, error: Exception) -> None:
+        failed_request_handler(type(error))
+
+    stats = await crawler.run(['https://hello.world'])
+
+    failed_request_handler.assert_called_once_with(TypeError)
+    assert stats.requests_failed == 1
+
+
+async def test_context_kv_store_unparsable_pending_value_names_key() -> None:
+    """Reading a pending value that can't be parsed raises in the handler with a note that names its key."""
+    crawler = BasicCrawler(max_request_retries=0)
+    failed_request_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 'not json', content_type='application/json')
+        await store.get_value('foo')
+
+    @crawler.failed_request_handler
+    async def on_failed_request(context: BasicCrawlingContext, error: Exception) -> None:
+        failed_request_handler(error)
+
+    await crawler.run(['https://hello.world'])
+
+    error = failed_request_handler.call_args.args[0]
+    assert isinstance(error, json.JSONDecodeError)
+    assert any("key 'foo'" in note for note in error.__notes__)
+
+
 async def test_context_use_state() -> None:
     crawler = BasicCrawler()
 

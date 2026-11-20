@@ -1,27 +1,33 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import json
+import os
 import shutil
 import urllib.parse
 from datetime import UTC, datetime
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import ValidationError
 from typing_extensions import override
 
 from crawlee._consts import METADATA_FILENAME
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import atomic_write, infer_mime_type, json_dumps, validate_subdirectory
+from crawlee._utils.file import atomic_write, json_dumps, validate_subdirectory
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_backends._base import KeyValueStoreBackend
-from crawlee.storage_backends.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
+from crawlee.storage_backends._utils import SortedKeys
+from crawlee.storage_backends.models import (
+    KeyValueStoreKeysListPage,
+    KeyValueStoreMetadata,
+    KeyValueStoreRecord,
+    KeyValueStoreRecordMetadata,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import Mapping, Sequence
 
     from crawlee.configuration import Configuration
 
@@ -39,9 +45,8 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
     {STORAGE_DIR}/key_value_stores/{STORE_ID}/{KEY}
     ```
 
-    Binary data is stored as-is, while JSON and text data are stored in human-readable format.
-    The implementation automatically handles serialization based on the content type and
-    maintains metadata about each record.
+    The values are stored as the bytes `KeyValueStore` serializes them to, so JSON and text data stay human-readable.
+    The content type and the size of each record are kept in a metadata file next to it.
 
     This implementation is ideal for long-running crawlers where persistence is important and
     for development environments where you want to easily inspect the stored data between runs.
@@ -71,6 +76,15 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
 
         self._lock = lock
         """A lock to ensure that only one operation is performed at a time."""
+
+        self._sorted_keys: SortedKeys | None = None
+        """The record keys, read from the directory when a listing starts and kept up to date by own writes. Dropped
+        after the last page, on a purge or drop, and when an own write fails or is cancelled, so that the next listing
+        reads it again.
+        """
+
+        self._next_exclusive_start_key: str | None = None
+        """The `exclusive_start_key` of the next page after the last listed page."""
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
@@ -204,11 +218,15 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
         # If the storage directory exists, remove it recursively.
         if self.path_to_kvs.exists():
             async with self._lock:
+                self._sorted_keys = None
                 await asyncio.to_thread(shutil.rmtree, self.path_to_kvs)
 
     @override
     async def purge(self) -> None:
         async with self._lock:
+            # Dropped before the files, so that a purge that fails or is cancelled midway leaves no stale keys.
+            self._sorted_keys = None
+
             for file_path in self.path_to_kvs.glob('*'):
                 if file_path.name == METADATA_FILENAME:
                     continue
@@ -225,104 +243,24 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
         async with self._lock:
             await self._update_metadata(update_accessed_at=True)
 
-        record_path = self.path_to_kvs / self._encode_key(key)
-
-        if not record_path.exists():
-            return None
-
-        # Found a file for this key, now look for its metadata
-        record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
-        if not record_metadata_filepath.exists():
-            logger.warning('Found value file for key "%s" but no metadata file.', key)
-            return None
-
-        # Read the metadata file
-        async with self._lock:
-            try:
-                file = await asyncio.to_thread(
-                    functools.partial(record_metadata_filepath.open, mode='r', encoding='utf-8'),
-                )
-            except FileNotFoundError:
-                logger.warning('Metadata file disappeared for key "%s", aborting get_value', key)
-                return None
-
-            try:
-                metadata_content = json.load(file)
-            except json.JSONDecodeError:
-                logger.warning('Invalid metadata file for key "%s"', key)
-                return None
-            finally:
-                await asyncio.to_thread(file.close)
-
-        try:
-            metadata = KeyValueStoreRecordMetadata(**metadata_content)
-        except ValidationError:
-            logger.warning('Invalid metadata schema for key "%s"', key)
-            return None
-
-        # Read the actual value
-        try:
-            value_bytes = await asyncio.to_thread(record_path.read_bytes)
-        except FileNotFoundError:
-            logger.warning('Value file disappeared for key "%s"', key)
-            return None
-
-        # Handle None values
-        if metadata.content_type == 'application/x-none':
-            value = None
-        # Handle JSON values
-        elif 'application/json' in metadata.content_type:
-            try:
-                value = json.loads(value_bytes.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.warning('Failed to decode JSON value for key "%s"', key)
-                return None
-        # Handle text values
-        elif metadata.content_type.startswith('text/'):
-            try:
-                value = value_bytes.decode('utf-8')
-            except UnicodeDecodeError:
-                logger.warning('Failed to decode text value for key "%s"', key)
-                return None
-        # Handle binary values
-        else:
-            value = value_bytes
-
-        # Calculate the size of the value in bytes
-        size = len(value_bytes)
-
-        return KeyValueStoreRecord(
-            key=metadata.key,
-            value=value,
-            content_type=metadata.content_type,
-            size=size,
-        )
+            # Read under the lock, so that the metadata and the value come from the same write.
+            return await asyncio.to_thread(self._read_record, key)
 
     @override
-    async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        # Special handling for None values
-        if value is None:
-            content_type = 'application/x-none'  # Special content type to identify None values
-            value_bytes = b''
-        else:
-            content_type = content_type or infer_mime_type(value)
+    async def get_values(self, *, keys: Sequence[str]) -> Mapping[str, KeyValueStoreRecord]:
+        # Update the metadata to record access
+        async with self._lock:
+            await self._update_metadata(update_accessed_at=True)
 
-            # Serialize the value to bytes.
-            if 'application/json' in content_type:
-                value_bytes = (await json_dumps(value)).encode('utf-8')
-            elif isinstance(value, str):
-                value_bytes = value.encode('utf-8')
-            elif isinstance(value, (bytes, bytearray)):
-                value_bytes = value
-            else:
-                # Fallback: attempt to convert to string and encode.
-                value_bytes = str(value).encode('utf-8')
+            # Read under the lock, so that the metadata and the value of each record come from the same write.
+            return await asyncio.to_thread(self._read_records, keys)
 
+    @override
+    async def set_value(self, *, key: str, value: bytes, content_type: str) -> None:
         record_path = self.path_to_kvs / self._encode_key(key)
 
         # Prepare the metadata
-        size = len(value_bytes)
-        record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type, size=size)
+        record_metadata = KeyValueStoreRecordMetadata(key=key, content_type=content_type, size=len(value))
         record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
         record_metadata_content = await json_dumps(record_metadata.model_dump(by_alias=True))
 
@@ -330,11 +268,19 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
             # Ensure the key-value store directory exists.
             await asyncio.to_thread(self.path_to_kvs.mkdir, parents=True, exist_ok=True)
 
-            # Write the value to the file.
-            await atomic_write(record_path, value_bytes)
+            try:
+                # Write the value to the file.
+                await atomic_write(record_path, value)
 
-            # Write the record metadata to the file.
-            await atomic_write(record_metadata_filepath, record_metadata_content)
+                # Write the record metadata to the file.
+                await atomic_write(record_metadata_filepath, record_metadata_content)
+            except BaseException:
+                # A write that fails or is cancelled may still change the directory, so the next listing reads it again.
+                self._sorted_keys = None
+                raise
+
+            if self._sorted_keys is not None:
+                self._sorted_keys.add(key)
 
             # Update the KVS metadata to record the access and modification.
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
@@ -348,80 +294,78 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
         async with self._lock:
             # Delete the value file and its metadata if found
             if record_path.exists():
-                await asyncio.to_thread(record_path.unlink, missing_ok=True)
+                try:
+                    await asyncio.to_thread(record_path.unlink, missing_ok=True)
 
-                # Delete the metadata file if it exists
-                if metadata_path.exists():
-                    await asyncio.to_thread(metadata_path.unlink, missing_ok=True)
-                else:
-                    logger.warning('Found value file for key "%s" but no metadata file when trying to delete it.', key)
+                    # Delete the metadata file if it exists
+                    if metadata_path.exists():
+                        await asyncio.to_thread(metadata_path.unlink, missing_ok=True)
+                    else:
+                        logger.warning(
+                            'Found value file for key "%s" but no metadata file when trying to delete it.', key
+                        )
+                except BaseException:
+                    # A delete that fails or is cancelled may still change the directory, so the next listing reads
+                    # it again.
+                    self._sorted_keys = None
+                    raise
 
                 deleted = True
 
             # If we deleted something, update the KVS metadata
             if deleted:
+                if self._sorted_keys is not None:
+                    self._sorted_keys.discard(key)
                 await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
-    async def iterate_keys(
+    async def list_keys(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        # Check if the KVS directory exists
-        if not self.path_to_kvs.exists():
-            return
-
-        # List and sort all files *inside* a brief lock, then release it immediately:
+        limit: int = 1000,
+    ) -> KeyValueStoreKeysListPage:
         async with self._lock:
-            files = sorted(await asyncio.to_thread(lambda: list(self.path_to_kvs.glob('*'))))
+            # Check if the KVS directory exists
+            if not self.path_to_kvs.exists():
+                self._sorted_keys = None
+                return KeyValueStoreKeysListPage(
+                    items=[], count=0, limit=limit, exclusive_start_key=exclusive_start_key
+                )
 
-        count = 0
+            # A listing that doesn't continue from the last listed page starts from the current directory content.
+            if (
+                self._sorted_keys is None
+                or exclusive_start_key is None
+                or exclusive_start_key != self._next_exclusive_start_key
+            ):
+                self._sorted_keys = await asyncio.to_thread(self._read_sorted_keys)
 
-        for file_path in files:
-            # Skip the main metadata file
-            if file_path.name == METADATA_FILENAME:
-                continue
+            keys, next_exclusive_start_key = self._sorted_keys.page(
+                prefix=prefix,
+                exclusive_start_key=exclusive_start_key,
+                limit=limit,
+            )
+            self._next_exclusive_start_key = next_exclusive_start_key
 
-            # Only process metadata files for records
-            if not file_path.name.endswith(f'.{METADATA_FILENAME}'):
-                continue
+            # No listing continues after the last page, so the next one reads the directory again anyway.
+            if next_exclusive_start_key is None:
+                self._sorted_keys = None
 
-            # Extract the base key name from the metadata filename
-            key_name = self._decode_key(file_path.name[: -len(f'.{METADATA_FILENAME}')])
-
-            # Apply exclusive_start_key filter if provided
-            if exclusive_start_key is not None and key_name <= exclusive_start_key:
-                continue
-
-            # Try to read and parse the metadata file
-            try:
-                metadata_content = await asyncio.to_thread(file_path.read_text, encoding='utf-8')
-            except FileNotFoundError:
-                logger.warning('Metadata file disappeared for key "%s", skipping it.', key_name)
-                continue
-
-            try:
-                metadata_dict = json.loads(metadata_content)
-            except json.JSONDecodeError:
-                logger.warning('Failed to decode metadata file for key "%s", skipping it.', key_name)
-                continue
-
-            try:
-                record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
-            except ValidationError:
-                logger.warning('Invalid metadata schema for key "%s", skipping it.', key_name)
-
-            yield record_metadata
-
-            count += 1
-            if limit and count >= limit:
-                break
+        items = await asyncio.to_thread(self._read_records_metadata, keys)
 
         # Update accessed_at timestamp
         async with self._lock:
             await self._update_metadata(update_accessed_at=True)
+
+        return KeyValueStoreKeysListPage(
+            items=items,
+            count=len(items),
+            limit=limit,
+            exclusive_start_key=exclusive_start_key,
+            next_exclusive_start_key=next_exclusive_start_key,
+        )
 
     @override
     async def get_public_url(self, *, key: str) -> str:
@@ -482,6 +426,100 @@ class FileSystemKeyValueStoreBackend(KeyValueStoreBackend):
         # Dump the serialized metadata to the file.
         data = await json_dumps(self._metadata.model_dump(by_alias=True))
         await atomic_write(self.path_to_metadata, data)
+
+    def _read_record(self, key: str) -> KeyValueStoreRecord | None:
+        """Read the record of the key from its files, or return `None` when it has none or they can't be read."""
+        record_path = self.path_to_kvs / self._encode_key(key)
+
+        if not record_path.exists():
+            return None
+
+        # Found a file for this key, now look for its metadata
+        record_metadata_filepath = record_path.with_name(f'{record_path.name}.{METADATA_FILENAME}')
+        if not record_metadata_filepath.exists():
+            logger.warning('Found value file for key "%s" but no metadata file.', key)
+            return None
+
+        # Read the metadata file
+        try:
+            metadata_content = json.loads(record_metadata_filepath.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            logger.warning('Metadata file disappeared for key "%s", aborting get_value', key)
+            return None
+        except json.JSONDecodeError:
+            logger.warning('Invalid metadata file for key "%s"', key)
+            return None
+
+        try:
+            metadata = KeyValueStoreRecordMetadata(**metadata_content)
+        except ValidationError:
+            logger.warning('Invalid metadata schema for key "%s"', key)
+            return None
+
+        # Read the actual value
+        try:
+            value_bytes = record_path.read_bytes()
+        except FileNotFoundError:
+            logger.warning('Value file disappeared for key "%s"', key)
+            return None
+
+        return KeyValueStoreRecord(
+            key=metadata.key,
+            value=value_bytes,
+            content_type=metadata.content_type,
+            size=len(value_bytes),
+        )
+
+    def _read_records(self, keys: Sequence[str]) -> dict[str, KeyValueStoreRecord]:
+        """Read the records of the keys that have one."""
+        records = dict[str, KeyValueStoreRecord]()
+        for key in keys:
+            record = self._read_record(key)
+            if record is not None:
+                records[key] = record
+        return records
+
+    def _read_records_metadata(self, keys: Sequence[str]) -> list[KeyValueStoreRecordMetadata]:
+        """Read the metadata of the records of the keys, skipping the ones whose metadata can't be read."""
+        items = list[KeyValueStoreRecordMetadata]()
+
+        for key in keys:
+            file_path = self.path_to_kvs / f'{self._encode_key(key)}.{METADATA_FILENAME}'
+
+            # Try to read and parse the metadata file
+            try:
+                metadata_content = file_path.read_text(encoding='utf-8')
+            except FileNotFoundError:
+                logger.warning('Metadata file disappeared for key "%s", skipping it.', key)
+                continue
+
+            try:
+                metadata_dict = json.loads(metadata_content)
+            except json.JSONDecodeError:
+                logger.warning('Failed to decode metadata file for key "%s", skipping it.', key)
+                continue
+
+            try:
+                record_metadata = KeyValueStoreRecordMetadata(**metadata_dict)
+            except ValidationError:
+                logger.warning('Invalid metadata schema for key "%s", skipping it.', key)
+                continue
+
+            items.append(record_metadata)
+
+        return items
+
+    def _read_sorted_keys(self) -> SortedKeys:
+        """Read the record keys from the names of their metadata files."""
+        metadata_suffix = f'.{METADATA_FILENAME}'
+        keys = list[str]()
+
+        with os.scandir(self.path_to_kvs) as entries:
+            for entry in entries:
+                if entry.name.endswith(metadata_suffix):
+                    keys.append(self._decode_key(entry.name.removesuffix(metadata_suffix)))
+
+        return SortedKeys(keys)
 
     def _encode_key(self, key: str) -> str:
         """Encode a key to make it safe for use in a file path."""

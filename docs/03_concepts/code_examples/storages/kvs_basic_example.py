@@ -12,7 +12,7 @@ async def main() -> None:
     await kvs.set_value(key='some-key', value={'foo': 'bar'})
 
     # Get the value associated with 'some-key'.
-    value = kvs.get_value('some-key')
+    value = await kvs.get_value('some-key')
     # Do something with it...
 
     # Delete the value associated with 'some-key' by setting it to None.

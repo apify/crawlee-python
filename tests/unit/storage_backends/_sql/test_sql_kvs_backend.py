@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
@@ -16,7 +15,7 @@ from crawlee.storage_backends._sql._db_models import KeyValueStoreMetadataDb, Ke
 from crawlee.storage_backends.models import KeyValueStoreMetadata
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterator
+    from collections.abc import AsyncGenerator
     from pathlib import Path
 
     from sqlalchemy import Connection
@@ -117,8 +116,8 @@ async def test_tables_and_metadata_record(configuration: Configuration) -> None:
 async def test_value_record_creation(kvs_backend: SqlKeyValueStoreBackend) -> None:
     """Test that SQL key-value store backend can create a record."""
     test_key = 'test-key'
-    test_value = 'Hello, world!'
-    await kvs_backend.set_value(key=test_key, value=test_value)
+    test_value = b'Hello, world!'
+    await kvs_backend.set_value(key=test_key, value=test_value, content_type='text/plain; charset=utf-8')
     async with kvs_backend.get_session() as session:
         stmt = select(KeyValueStoreRecordDb).where(KeyValueStoreRecordDb.key == test_key)
         result = await session.execute(stmt)
@@ -126,15 +125,15 @@ async def test_value_record_creation(kvs_backend: SqlKeyValueStoreBackend) -> No
         assert record is not None
         assert record.key == test_key
         assert record.content_type == 'text/plain; charset=utf-8'
-        assert record.size == len(test_value.encode('utf-8'))
-        assert record.value == test_value.encode('utf-8')
+        assert record.size == len(test_value)
+        assert record.value == test_value
 
 
 async def test_binary_data_persistence(kvs_backend: SqlKeyValueStoreBackend) -> None:
     """Test that binary data is stored correctly without corruption."""
     test_key = 'test-binary'
     test_value = b'\x00\x01\x02\x03\x04'
-    await kvs_backend.set_value(key=test_key, value=test_value)
+    await kvs_backend.set_value(key=test_key, value=test_value, content_type='application/octet-stream')
 
     async with kvs_backend.get_session() as session:
         stmt = select(KeyValueStoreRecordDb).where(KeyValueStoreRecordDb.key == test_key)
@@ -152,28 +151,13 @@ async def test_binary_data_persistence(kvs_backend: SqlKeyValueStoreBackend) -> 
     assert verify_record.content_type == 'application/octet-stream'
 
 
-async def test_json_serialization_to_record(kvs_backend: SqlKeyValueStoreBackend) -> None:
-    """Test that JSON objects are properly serialized to records."""
-    test_key = 'test-json'
-    test_value = {'name': 'John', 'age': 30, 'items': [1, 2, 3]}
-    await kvs_backend.set_value(key=test_key, value=test_value)
-
-    async with kvs_backend.get_session() as session:
-        stmt = select(KeyValueStoreRecordDb).where(KeyValueStoreRecordDb.key == test_key)
-        result = await session.execute(stmt)
-        record = result.scalar_one_or_none()
-        assert record is not None
-        assert record.key == test_key
-        assert json.loads(record.value.decode('utf-8')) == test_value
-
-
 async def test_record_deletion_on_value_delete(kvs_backend: SqlKeyValueStoreBackend) -> None:
     """Test that deleting a value removes its record from the database."""
     test_key = 'test-delete'
-    test_value = 'Delete me'
+    test_value = b'Delete me'
 
     # Set a value
-    await kvs_backend.set_value(key=test_key, value=test_value)
+    await kvs_backend.set_value(key=test_key, value=test_value, content_type='text/plain')
 
     async with kvs_backend.get_session() as session:
         stmt = select(KeyValueStoreRecordDb).where(KeyValueStoreRecordDb.key == test_key)
@@ -181,7 +165,7 @@ async def test_record_deletion_on_value_delete(kvs_backend: SqlKeyValueStoreBack
         record = result.scalar_one_or_none()
         assert record is not None
         assert record.key == test_key
-        assert record.value == test_value.encode('utf-8')
+        assert record.value == test_value
 
     # Delete the value
     await kvs_backend.delete_value(key=test_key)
@@ -196,7 +180,7 @@ async def test_record_deletion_on_value_delete(kvs_backend: SqlKeyValueStoreBack
 
 async def test_drop_removes_records(kvs_backend: SqlKeyValueStoreBackend) -> None:
     """Test that drop removes all records from the database."""
-    await kvs_backend.set_value(key='test', value='test-value')
+    await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     backend_metadata = await kvs_backend.get_metadata()
 
@@ -244,7 +228,7 @@ async def test_metadata_record_updates(kvs_backend: SqlKeyValueStoreBackend) -> 
     await asyncio.sleep(0.01)
 
     # Perform a write operation
-    await kvs_backend.set_value(key='test', value='test-value')
+    await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify modified timestamp was updated
     metadata = await kvs_backend.get_metadata()
@@ -269,8 +253,8 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
         )
 
         test_key = 'persistent-key'
-        test_value = 'persistent-value'
-        await original_backend.set_value(key=test_key, value=test_value)
+        test_value = b'persistent-value'
+        await original_backend.set_value(key=test_key, value=test_value, content_type='text/plain')
 
         kvs_id = (await original_backend.get_metadata()).id
 
@@ -302,7 +286,7 @@ async def test_error_handling_on_set_failure(kvs_backend: SqlKeyValueStoreBacken
             patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
             pytest.raises(SQLAlchemyError),
         ):
-            await kvs_backend.set_value(key='test', value='test-value')
+            await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify that retry logic was attempted
     assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
@@ -323,117 +307,44 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_backend: Sql
             patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock) as mock_sleep,
             pytest.raises(ValueError, match='unexpected error'),
         ):
-            await kvs_backend.set_value(key='test', value='test-value')
+            await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
 
 
-@pytest.fixture
-def fetch_records(kvs_backend: SqlKeyValueStoreBackend) -> Iterator[AsyncMock]:
-    """Wrap `_fetch_records` of the backend in a mock that records the value batches while still fetching them."""
-    with patch.object(kvs_backend, '_fetch_records', wraps=kvs_backend._fetch_records) as mock:
-        yield mock
-
-
-def fetched_keys(fetch_records: AsyncMock) -> list[list[str]]:
-    return [[item.key for item in call.args[0]] for call in fetch_records.await_args_list]
-
-
-async def test_iterate_entries_reads_values_in_batches(kvs_backend: SqlKeyValueStoreBackend) -> None:
-    """Test that `iterate_entries` reads values in batches instead of calling `get_value` per key."""
-    await kvs_backend.set_value(key='a-json', value={'nested': [1, 2]})
-    await kvs_backend.set_value(key='b-text', value='plain text')
+async def test_get_values_reads_records_with_single_query(kvs_backend: SqlKeyValueStoreBackend) -> None:
+    """`get_values` reads the records with one query, without calling `get_value` per key."""
+    await kvs_backend.set_value(key='a-json', value=b'{"nested": [1, 2]}', content_type='application/json')
+    await kvs_backend.set_value(key='b-text', value=b'plain text', content_type='text/plain')
     await kvs_backend.set_value(key='c-bytes', value=b'\x00\x01binary', content_type='application/octet-stream')
-    await kvs_backend.set_value(key='d-none', value=None)
 
-    with patch.object(kvs_backend, 'get_value', side_effect=AssertionError('get_value must not be called')):
-        records = [record async for record in kvs_backend.iterate_entries()]
+    with (
+        patch.object(kvs_backend, 'get_value', side_effect=AssertionError('get_value must not be called')),
+        patch.object(kvs_backend, 'get_session', wraps=kvs_backend.get_session) as get_session,
+    ):
+        records = await kvs_backend.get_values(keys=['c-bytes', 'a-json', 'b-text'])
 
-    assert [record.key for record in records] == ['a-json', 'b-text', 'c-bytes', 'd-none']
-    assert [record.value for record in records] == [{'nested': [1, 2]}, 'plain text', b'\x00\x01binary', None]
-    assert records[0].content_type.startswith('application/json')
-    assert records[1].content_type.startswith('text/plain')
-    assert records[2].content_type == 'application/octet-stream'
-    assert all(record.size is not None for record in records)
-
-
-async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_backend: SqlKeyValueStoreBackend) -> None:
-    """Test that `iterate_entries` applies `exclusive_start_key` and `limit` in the query."""
-    for i in range(6):
-        await kvs_backend.set_value(key=f'key{i}', value=f'value{i}')
-
-    with patch.object(kvs_backend, 'get_value', side_effect=AssertionError('get_value must not be called')):
-        records = [record async for record in kvs_backend.iterate_entries(exclusive_start_key='key1', limit=3)]
-
-    assert [(record.key, record.value) for record in records] == [
-        ('key2', 'value2'),
-        ('key3', 'value3'),
-        ('key4', 'value4'),
-    ]
+    assert {key: (record.value, record.content_type) for key, record in records.items()} == {
+        'c-bytes': (b'\x00\x01binary', 'application/octet-stream'),
+        'a-json': (b'{"nested": [1, 2]}', 'application/json'),
+        'b-text': (b'plain text', 'text/plain'),
+    }
+    assert all(record.size is not None for record in records.values())
+    get_session.assert_called_once()
 
 
-async def test_iterate_entries_limit_spans_multiple_pages(
-    kvs_backend: SqlKeyValueStoreBackend, fetch_records: AsyncMock
-) -> None:
-    """Test that `iterate_entries` stops at `limit` when it falls in the middle of a later metadata page."""
-    for i in range(6):
-        await kvs_backend.set_value(key=f'key{i}', value=f'value{i}')
+async def test_list_keys_checks_prefix_case(kvs_backend: SqlKeyValueStoreBackend) -> None:
+    """`list_keys` matches the prefix case-sensitively, and a page left without a match still has a next page."""
+    for key in ['Item-1', 'item-1', 'item-2', 'item-3']:
+        await kvs_backend.set_value(key=key, value=b'value', content_type='text/plain')
 
-    with patch.object(type(kvs_backend), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
-        records = [record async for record in kvs_backend.iterate_entries(limit=3)]
+    first_page = await kvs_backend.list_keys(prefix='Item-', limit=1)
+    second_page = await kvs_backend.list_keys(
+        prefix='Item-', exclusive_start_key=first_page.next_exclusive_start_key, limit=1
+    )
 
-    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(3)]
-    assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2']]
-
-
-async def test_fetch_records_skips_record_deleted_after_listing(kvs_backend: SqlKeyValueStoreBackend) -> None:
-    """Test that a record deleted between the metadata listing and its value fetch is skipped."""
-    await kvs_backend.set_value(key='kept', value='a')
-    await kvs_backend.set_value(key='removed', value='b')
-    batch = [item async for item in kvs_backend.iterate_keys()]
-    await kvs_backend.delete_value(key='removed')
-
-    records = await kvs_backend._fetch_records(batch)
-
-    assert [(record.key, record.value) for record in records] == [('kept', 'a')]
-
-
-async def test_iterate_entries_empty_store(kvs_backend: SqlKeyValueStoreBackend) -> None:
-    """Test that `iterate_entries` on an empty store yields nothing."""
-    records = [record async for record in kvs_backend.iterate_entries()]
-
-    assert records == []
-
-
-async def test_iterate_entries_batches_are_bounded_by_key_count(
-    kvs_backend: SqlKeyValueStoreBackend, fetch_records: AsyncMock
-) -> None:
-    """Test that `iterate_entries` splits the value queries when a batch reaches the maximum number of keys."""
-    for i in range(5):
-        await kvs_backend.set_value(key=f'key{i}', value=f'value{i}')
-
-    with patch.object(type(kvs_backend), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
-        records = [record async for record in kvs_backend.iterate_entries()]
-
-    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
-    assert fetched_keys(fetch_records) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
-
-
-async def test_iterate_entries_batches_are_bounded_by_size(
-    kvs_backend: SqlKeyValueStoreBackend, fetch_records: AsyncMock
-) -> None:
-    """Test that `iterate_entries` splits the value queries by the record sizes.
-
-    A record larger than the limit is still read, but alone in its batch.
-    """
-    await kvs_backend.set_value(key='small1', value='ab')
-    await kvs_backend.set_value(key='small2', value='cd')
-    await kvs_backend.set_value(key='large', value='x' * 100)
-    await kvs_backend.set_value(key='small3', value='ef')
-
-    with patch.object(type(kvs_backend), '_ITERATE_ENTRIES_BATCH_MAX_BYTES', 10):
-        records = [record async for record in kvs_backend.iterate_entries()]
-
-    assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
-    assert fetched_keys(fetch_records) == [['large'], ['small1', 'small2', 'small3']]
+    assert [item.key for item in first_page.items] == ['Item-1']
+    assert second_page.items == []
+    assert second_page.count == 0
+    assert second_page.next_exclusive_start_key is not None

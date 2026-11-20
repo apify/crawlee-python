@@ -56,7 +56,7 @@ The following example uses most of these helpers in a <ApiLink to="class/ParselC
 
 ## Results are committed after the handler succeeds
 
-The `push_data`, `add_requests` and `enqueue_links` calls and the `set_value` calls on a key-value store from `get_key_value_store` don't write anything right away. The context records them in an internal `RequestHandlerRunResult` object, and the crawler commits the recorded changes only after the request handler returns without an exception. Reading a key from that key-value store in the same handler returns the value you've set, even before the commit.
+The `push_data`, `add_requests` and `enqueue_links` calls and the `set_value` calls on a key-value store from `get_key_value_store` don't write anything right away. The context records them in an internal `RequestHandlerRunResult` object, and the crawler commits the recorded changes only after the request handler returns without an exception. The key-value store keeps each value as it was when you called `set_value`, so changing the object afterwards doesn't change what's committed. Reading a key from that key-value store in the same handler returns the value you've set, even before the commit. It comes back the way the store reads it after the commit, so a tuple is read as a list.
 
 When the handler raises, the crawler discards the recorded changes and retries the request. A handler that pushes an item and then fails on the next line doesn't leave a partial or duplicate item in the dataset. The retry starts with an empty record and produces the output once, when it succeeds. The same applies to requests added by a failed attempt.
 
