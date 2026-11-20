@@ -12,7 +12,7 @@ from yarl import URL
 from crawlee._request import Request
 from crawlee._types import HttpHeaders
 from crawlee._utils.crypto import compute_short_hash
-from crawlee._utils.http import parse_content_type_charset
+from crawlee._utils.file import parse_content_type_charset
 from crawlee._utils.urls import convert_to_absolute_url, is_url_absolute, validate_http_url
 
 if TYPE_CHECKING:

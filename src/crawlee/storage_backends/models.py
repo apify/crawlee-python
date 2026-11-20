@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Generic
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-from typing_extensions import TypeVar
 
 from crawlee._types import HttpMethod, JsonSerializable
 from crawlee._utils.docs import docs_group
@@ -13,8 +12,6 @@ from crawlee._utils.urls import validate_http_url
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
-
-KvsValueType = TypeVar('KvsValueType', default=Any)
 
 
 @docs_group('Storage data')
@@ -103,7 +100,8 @@ class KeyValueStoreRecordMetadata(BaseModel):
     content_type: str
     """The MIME type of the record.
 
-    Describe the format and type of data stored in the record, following the MIME specification.
+    Describe the format and type of data stored in the record, following the MIME specification. In a key listing,
+    `application/octet-stream` can also mean that the storage backend doesn't know the type.
     """
 
     size: int | None = None
@@ -111,15 +109,39 @@ class KeyValueStoreRecordMetadata(BaseModel):
 
 
 @docs_group('Storage data')
-class KeyValueStoreRecord(KeyValueStoreRecordMetadata, Generic[KvsValueType]):
+class KeyValueStoreRecord(KeyValueStoreRecordMetadata):
     """Model for a key-value store record."""
 
     model_config = ConfigDict(
         alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
     )
 
-    value: KvsValueType
-    """The value of the record."""
+    value: bytes
+    """The raw value of the record, as stored. `KeyValueStore` parses it according to `content_type`."""
+
+
+@docs_group('Storage data')
+class KeyValueStoreKeysListPage(BaseModel):
+    """Model for a single page of key-value store keys."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, from_attributes=True
+    )
+
+    items: list[KeyValueStoreRecordMetadata]
+    """The record metadata on this page, ordered by key."""
+
+    count: int
+    """The number of keys on this page."""
+
+    limit: int
+    """The maximum number of keys requested for this page."""
+
+    exclusive_start_key: str | None = None
+    """The `exclusive_start_key` that this page was requested with."""
+
+    next_exclusive_start_key: str | None = None
+    """The `exclusive_start_key` of the next page, or `None` on the last page."""
 
 
 @docs_group('Storage data')
