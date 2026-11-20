@@ -148,7 +148,7 @@ A storage backend is the layer behind Crawlee's three storages. <ApiLink to="cla
 The <ApiLink to="class/StorageBackend">`StorageBackend`</ApiLink> contract defines three factory methods: `create_dataset_backend`, `create_kvs_backend`, and `create_rq_backend`. The returned backends define the rest of the contract:
 
 - <ApiLink to="class/DatasetBackend">`DatasetBackend`</ApiLink> handles appending and reading items.
-- <ApiLink to="class/KeyValueStoreBackend">`KeyValueStoreBackend`</ApiLink> handles record access and iteration.
+- <ApiLink to="class/KeyValueStoreBackend">`KeyValueStoreBackend`</ApiLink> handles reading and writing records as bytes and listing their keys a page at a time.
 - <ApiLink to="class/RequestQueueBackend">`RequestQueueBackend`</ApiLink> handles adding, fetching, and marking requests as handled.
 
 A custom backend implements all four classes.

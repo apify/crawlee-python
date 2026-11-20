@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fakeredis import FakeAsyncRedis
+from redis.asyncio.client import Pipeline
 from redis.exceptions import RedisError
 
 from crawlee.configuration import Configuration
@@ -15,7 +16,7 @@ from crawlee.storage_backends._redis import RedisKeyValueStoreBackend
 from crawlee.storage_backends._redis._utils import await_redis_response
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterator
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture
@@ -53,8 +54,8 @@ async def test_base_keys_creation(kvs_backend: RedisKeyValueStoreBackend) -> Non
 async def test_value_record_creation_and_content(kvs_backend: RedisKeyValueStoreBackend) -> None:
     """Test that values are properly persisted to records with correct content and metadata."""
     test_key = 'test-key'
-    test_value = 'Hello, world!'
-    await kvs_backend.set_value(key=test_key, value=test_value)
+    test_value = b'Hello, world!'
+    await kvs_backend.set_value(key=test_key, value=test_value, content_type='text/plain; charset=utf-8')
 
     # Check if the records were created
     records_key = 'key_value_stores:test_kvs:items'
@@ -66,7 +67,6 @@ async def test_value_record_creation_and_content(kvs_backend: RedisKeyValueStore
 
     # Check record content
     content = await await_redis_response(kvs_backend.redis.hget(records_key, test_key))
-    content = content.decode() if isinstance(content, bytes) else content
     assert content == test_value
 
     # Check record metadata
@@ -78,7 +78,7 @@ async def test_value_record_creation_and_content(kvs_backend: RedisKeyValueStore
     # Check record metadata
     assert metadata['key'] == test_key
     assert metadata['contentType'] == 'text/plain; charset=utf-8'
-    assert metadata['size'] == len(test_value.encode('utf-8'))
+    assert metadata['size'] == len(test_value)
 
     # Verify retrieval works correctly
     check_value = await kvs_backend.get_value(key=test_key)
@@ -92,7 +92,7 @@ async def test_binary_data_persistence(kvs_backend: RedisKeyValueStoreBackend) -
     test_value = b'\x00\x01\x02\x03\x04'
     records_key = 'key_value_stores:test_kvs:items'
     records_items_metadata = 'key_value_stores:test_kvs:metadata_items'
-    await kvs_backend.set_value(key=test_key, value=test_value)
+    await kvs_backend.set_value(key=test_key, value=test_value, content_type='application/octet-stream')
 
     # Verify binary file exists
     record_exists = await await_redis_response(kvs_backend.redis.hexists(records_key, test_key))
@@ -111,29 +111,15 @@ async def test_binary_data_persistence(kvs_backend: RedisKeyValueStoreBackend) -
     assert record.content_type == 'application/octet-stream'
 
 
-async def test_json_serialization_to_record(kvs_backend: RedisKeyValueStoreBackend) -> None:
-    """Test that JSON objects are properly serialized to records."""
-    test_key = 'test-json'
-    test_value = {'name': 'John', 'age': 30, 'items': [1, 2, 3]}
-    await kvs_backend.set_value(key=test_key, value=test_value)
-
-    # Check if record content is valid JSON
-    records_key = 'key_value_stores:test_kvs:items'
-    record = await await_redis_response(kvs_backend.redis.hget(records_key, test_key))
-    assert record is not None
-    assert isinstance(record, (str, bytes))
-    assert json.loads(record) == test_value
-
-
 async def test_records_deletion_on_value_delete(kvs_backend: RedisKeyValueStoreBackend) -> None:
     """Test that deleting a value removes its records from Redis."""
     test_key = 'test-delete'
-    test_value = 'Delete me'
+    test_value = b'Delete me'
     records_key = 'key_value_stores:test_kvs:items'
     records_items_metadata = 'key_value_stores:test_kvs:metadata_items'
 
     # Set a value
-    await kvs_backend.set_value(key=test_key, value=test_value)
+    await kvs_backend.set_value(key=test_key, value=test_value, content_type='text/plain')
 
     # Verify records exist
     record_exists = await await_redis_response(kvs_backend.redis.hexists(records_key, test_key))
@@ -152,8 +138,8 @@ async def test_records_deletion_on_value_delete(kvs_backend: RedisKeyValueStoreB
 
 
 async def test_drop_removes_keys(kvs_backend: RedisKeyValueStoreBackend) -> None:
-    """Test that drop removes the entire store directory from disk."""
-    await kvs_backend.set_value(key='test', value='test-value')
+    """`drop` removes the store and all its keys from Redis."""
+    await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     metadata = await kvs_backend.get_metadata()
     name = await await_redis_response(kvs_backend.redis.hget('key_value_stores:id_to_name', metadata.id))
@@ -181,6 +167,7 @@ async def test_drop_removes_keys(kvs_backend: RedisKeyValueStoreBackend) -> None
     assert kvs_id is None
     assert items == {}
     assert metadata_items == {}
+    assert await await_redis_response(kvs_backend.redis.exists('key_value_stores:test_kvs:keys')) == 0
 
 
 async def test_metadata_record_updates(kvs_backend: RedisKeyValueStoreBackend) -> None:
@@ -209,7 +196,7 @@ async def test_metadata_record_updates(kvs_backend: RedisKeyValueStoreBackend) -
     await asyncio.sleep(0.01)
 
     # Perform a write operation
-    await kvs_backend.set_value(key='test', value='test-value')
+    await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify modified timestamp was updated
     metadata = await kvs_backend.get_metadata()
@@ -232,7 +219,7 @@ async def test_error_handling_on_set_failure(kvs_backend: RedisKeyValueStoreBack
         patch.object(kvs_backend.redis, 'pipeline', return_value=mock_pipeline_ctx),
         pytest.raises(RedisError),
     ):
-        await kvs_backend.set_value(key='test', value='test-value')
+        await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify that retry logic was attempted
     assert mock_sleep.call_count == 2  # Assuming default max_attempts=3
@@ -252,126 +239,139 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_backend: Red
         patch.object(kvs_backend.redis, 'pipeline', return_value=mock_pipeline_ctx),
         pytest.raises(ValueError, match='unexpected error'),
     ):
-        await kvs_backend.set_value(key='test', value='test-value')
+        await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
 
 
-@pytest.fixture
-def hmget(kvs_backend: RedisKeyValueStoreBackend) -> Iterator[MagicMock]:
-    """Wrap the Redis `hmget` of the backend in a mock that records the calls while still performing them."""
-    with patch.object(kvs_backend.redis, 'hmget', wraps=kvs_backend.redis.hmget) as mock:
-        yield mock
-
-
-def hmget_keys(hmget: MagicMock) -> list[list[str]]:
-    return [list(call.args[1]) for call in hmget.call_args_list]
-
-
-async def test_iterate_entries_reads_values_in_batches(
-    kvs_backend: RedisKeyValueStoreBackend, hmget: MagicMock
-) -> None:
-    """Test that `iterate_entries` fetches values with batched HMGET calls instead of `get_value` per key."""
-    await kvs_backend.set_value(key='a-json', value={'nested': [1, 2]})
-    await kvs_backend.set_value(key='b-text', value='plain text')
+async def test_get_values_reads_records_in_single_transaction(kvs_backend: RedisKeyValueStoreBackend) -> None:
+    """`get_values` reads the metadata and the values in a single transaction instead of `get_value` per key."""
+    await kvs_backend.set_value(key='a-json', value=b'{"nested": [1, 2]}', content_type='application/json')
+    await kvs_backend.set_value(key='b-text', value=b'plain text', content_type='text/plain')
     await kvs_backend.set_value(key='c-bytes', value=b'\x00\x01binary', content_type='application/octet-stream')
-    await kvs_backend.set_value(key='d-none', value=None)
 
-    with patch.object(kvs_backend, 'get_value', side_effect=AssertionError('get_value must not be called')):
-        records = [record async for record in kvs_backend.iterate_entries()]
+    with (
+        patch.object(kvs_backend.redis, 'pipeline', wraps=kvs_backend.redis.pipeline) as pipeline,
+        patch.object(kvs_backend, 'get_value', side_effect=AssertionError('get_value must not be called')),
+    ):
+        records = await kvs_backend.get_values(keys=['c-bytes', 'a-json', 'b-text'])
 
-    assert [record.key for record in records] == ['a-json', 'b-text', 'c-bytes', 'd-none']
-    assert [record.value for record in records] == [{'nested': [1, 2]}, 'plain text', b'\x00\x01binary', None]
-    assert records[0].content_type.startswith('application/json')
-    assert records[1].content_type.startswith('text/plain')
-    assert records[2].content_type == 'application/octet-stream'
-
-    # All values fit in a single batch.
-    assert hmget_keys(hmget) == [['a-json', 'b-text', 'c-bytes', 'd-none']]
-
-
-async def test_iterate_entries_batches_are_bounded_by_key_count(
-    kvs_backend: RedisKeyValueStoreBackend, hmget: MagicMock
-) -> None:
-    """Test that `iterate_entries` splits the HMGET calls when a batch reaches the maximum number of keys."""
-    for i in range(5):
-        await kvs_backend.set_value(key=f'key{i}', value=f'value{i}')
-
-    with patch.object(type(kvs_backend), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2):
-        records = [record async for record in kvs_backend.iterate_entries()]
-
-    assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
-    assert hmget_keys(hmget) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
+    assert {key: (record.value, record.content_type) for key, record in records.items()} == {
+        'c-bytes': (b'\x00\x01binary', 'application/octet-stream'),
+        'a-json': (b'{"nested": [1, 2]}', 'application/json'),
+        'b-text': (b'plain text', 'text/plain'),
+    }
+    pipeline.assert_called_once()
 
 
-async def test_iterate_entries_batches_are_bounded_by_size(
-    kvs_backend: RedisKeyValueStoreBackend, hmget: MagicMock
-) -> None:
-    """Test that `iterate_entries` splits the HMGET calls by the record sizes known from the metadata.
-
-    A record larger than the limit is still fetched, but alone in its batch.
-    """
-    await kvs_backend.set_value(key='small1', value='ab')
-    await kvs_backend.set_value(key='small2', value='cd')
-    await kvs_backend.set_value(key='large', value='x' * 100)
-    await kvs_backend.set_value(key='small3', value='ef')
-
-    with patch.object(type(kvs_backend), '_ITERATE_ENTRIES_BATCH_MAX_BYTES', 10):
-        records = [record async for record in kvs_backend.iterate_entries()]
-
-    assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
-    assert hmget_keys(hmget) == [['large'], ['small1', 'small2', 'small3']]
-
-
-async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_backend: RedisKeyValueStoreBackend) -> None:
-    """Test that `iterate_entries` applies `exclusive_start_key` and `limit`."""
-    for i in range(6):
-        await kvs_backend.set_value(key=f'key{i}', value=f'value{i}')
-
-    with patch.object(kvs_backend, 'get_value', side_effect=AssertionError('get_value must not be called')):
-        records = [record async for record in kvs_backend.iterate_entries(exclusive_start_key='key1', limit=3)]
-
-    assert [(record.key, record.value) for record in records] == [
-        ('key2', 'value2'),
-        ('key3', 'value3'),
-        ('key4', 'value4'),
-    ]
-
-
-async def test_iterate_entries_skips_value_deleted_after_listing(
+async def test_get_values_skips_missing_records(
     kvs_backend: RedisKeyValueStoreBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Test that `iterate_entries` silently skips a record whose value is gone by the time its batch is fetched."""
-    await kvs_backend.set_value(key='kept', value='a')
-    await kvs_backend.set_value(key='removed', value='b')
+    """`get_values` silently leaves out a key without a record and a record whose value is gone."""
+    await kvs_backend.set_value(key='kept', value=b'a', content_type='text/plain')
+    await kvs_backend.set_value(key='removed', value=b'b', content_type='text/plain')
     await await_redis_response(kvs_backend.redis.hdel(kvs_backend._items_key, 'removed'))
 
     with caplog.at_level('WARNING'):
-        records = [record async for record in kvs_backend.iterate_entries()]
+        records = await kvs_backend.get_values(keys=['kept', 'removed', 'nonexistent'])
 
-    assert [(record.key, record.value) for record in records] == [('kept', 'a')]
+    assert {key: record.value for key, record in records.items()} == {'kept': b'a'}
     assert 'missing' not in caplog.text
 
 
-async def test_iterate_entries_empty_store(kvs_backend: RedisKeyValueStoreBackend) -> None:
-    """Test that `iterate_entries` on an empty store yields nothing."""
-    records = [record async for record in kvs_backend.iterate_entries()]
+async def test_get_value_without_record_logs_nothing(
+    kvs_backend: RedisKeyValueStoreBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    """`get_value` returns `None` for a key without a record and logs no warning."""
+    with caplog.at_level('WARNING'):
+        record = await kvs_backend.get_value(key='nonexistent')
 
-    assert records == []
+    assert record is None
+    assert caplog.records == []
+
+
+async def test_get_values_without_keys(kvs_backend: RedisKeyValueStoreBackend) -> None:
+    """`get_values` returns no records for an empty list of keys."""
+    await kvs_backend.set_value(key='key', value=b'a', content_type='text/plain')
+
+    assert await kvs_backend.get_values(keys=[]) == {}
+
+
+async def test_list_keys_reads_only_the_requested_page(kvs_backend: RedisKeyValueStoreBackend) -> None:
+    """`list_keys` reads the metadata of the keys on the page, not of the whole store."""
+    for i in range(5):
+        await kvs_backend.set_value(key=f'key{i}', value=b'value', content_type='text/plain')
+
+    with (
+        patch.object(Pipeline, 'hmget', autospec=True, side_effect=Pipeline.hmget) as hmget,
+        patch.object(kvs_backend.redis, 'hgetall', side_effect=AssertionError('hgetall must not be called')),
+    ):
+        page = await kvs_backend.list_keys(exclusive_start_key='key0', limit=2)
+
+    assert [item.key for item in page.items] == ['key1', 'key2']
+    assert page.next_exclusive_start_key == 'key2'
+    assert [call.args[2] for call in hmget.call_args_list] == [['key1', 'key2']]
+
+
+async def test_list_keys_skips_key_without_metadata(kvs_backend: RedisKeyValueStoreBackend) -> None:
+    """A key whose metadata is gone is left out of the page and its count, and the next page starts after it."""
+    for key in ['a', 'b', 'c']:
+        await kvs_backend.set_value(key=key, value=b'value', content_type='text/plain')
+    await await_redis_response(kvs_backend.redis.hdel(kvs_backend._metadata_items_key, 'b'))
+
+    page = await kvs_backend.list_keys(limit=2)
+
+    assert [item.key for item in page.items] == ['a']
+    assert page.count == 1
+    assert page.next_exclusive_start_key == 'b'
+
+
+async def test_keys_index_follows_the_records(kvs_backend: RedisKeyValueStoreBackend) -> None:
+    """The sorted set with the keys gains a key when its record is set and loses it when the record is deleted."""
+    keys_index = 'key_value_stores:test_kvs:keys'
+    await kvs_backend.set_value(key='kept', value=b'a', content_type='text/plain')
+    await kvs_backend.set_value(key='removed', value=b'b', content_type='text/plain')
+
+    await kvs_backend.delete_value(key='removed')
+
+    assert await await_redis_response(kvs_backend.redis.zrange(keys_index, 0, -1)) == [b'kept']
+
+    await kvs_backend.purge()
+
+    assert await await_redis_response(kvs_backend.redis.exists(keys_index)) == 0
+
+
+async def test_open_indexes_keys_of_store_without_index(
+    redis_client: FakeAsyncRedis,
+    suppress_user_warning: None,  # noqa: ARG001
+) -> None:
+    """Opening a store whose records were written before the keys index existed makes its keys listable."""
+    storage_backend = RedisStorageBackend(redis=redis_client)
+    kvs_backend = await storage_backend.create_kvs_backend(name='unindexed_kvs')
+    await kvs_backend.set_value(key='key1', value=b'a', content_type='text/plain')
+    await kvs_backend.set_value(key='key2', value=b'b', content_type='text/plain')
+    await await_redis_response(redis_client.delete(kvs_backend._keys_key))
+
+    reopened_backend = await storage_backend.create_kvs_backend(name='unindexed_kvs')
+
+    page = await reopened_backend.list_keys()
+    assert [item.key for item in page.items] == ['key1', 'key2']
+
+    await reopened_backend.drop()
 
 
 async def test_decoding_redis_client_is_rejected(suppress_user_warning: None) -> None:  # noqa: ARG001
     """Test that reading values through a Redis client created with `decode_responses=True` raises a clear error."""
     storage_backend = RedisStorageBackend(redis=FakeAsyncRedis(decode_responses=True))
     kvs_backend = await storage_backend.create_kvs_backend(name='decoding_kvs')
-    await kvs_backend.set_value(key='key', value='value')
+    await kvs_backend.set_value(key='key', value=b'value', content_type='text/plain')
 
     with pytest.raises(TypeError, match='decode_responses'):
         await kvs_backend.get_value(key='key')
 
     with pytest.raises(TypeError, match='decode_responses'):
-        _ = [record async for record in kvs_backend.iterate_entries()]
+        await kvs_backend.get_values(keys=['key'])
 
 
 async def test_lost_race_uses_existing_id(

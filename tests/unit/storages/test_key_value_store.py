@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
@@ -12,13 +13,12 @@ from crawlee import service_locator
 from crawlee.configuration import Configuration
 from crawlee.events import Event, EventPersistStateData
 from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend, SqlStorageBackend, StorageBackend
-from crawlee.storage_backends._memory import MemoryKeyValueStoreBackend
-from crawlee.storage_backends.models import KeyValueStoreRecord
+from crawlee.storage_backends.models import KeyValueStoreKeysListPage, KeyValueStoreRecordMetadata
 from crawlee.storages import KeyValueStore
 from crawlee.storages._storage_instance_manager import StorageInstanceManager
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterator
+    from collections.abc import AsyncGenerator
     from pathlib import Path
 
 
@@ -131,12 +131,143 @@ async def test_set_get_value(kvs: KeyValueStore) -> None:
     assert result == test_value
 
 
-async def test_set_get_none(kvs: KeyValueStore) -> None:
-    """Test setting and getting None as a value."""
-    test_key = 'none-key'
-    await kvs.set_value(test_key, None)
-    result = await kvs.get_value(test_key)
-    assert result is None
+async def test_set_none_deletes_record(kvs: KeyValueStore) -> None:
+    """Setting `None` deletes the record, so a later read falls back to the default value."""
+    await kvs.set_value('none-key', 'value')
+
+    await kvs.set_value('none-key', None)
+
+    assert await kvs.record_exists('none-key') is False
+    assert await kvs.get_value('none-key', 'default') == 'default'
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected_value', 'expected_content_type'),
+    [
+        pytest.param(b'\x00\x01', b'\x00\x01', 'application/octet-stream', id='bytes'),
+        pytest.param(bytearray(b'\x00\x01'), b'\x00\x01', 'application/octet-stream', id='bytearray'),
+        pytest.param(memoryview(b'\x00\x01'), b'\x00\x01', 'application/octet-stream', id='memoryview'),
+        pytest.param('text', 'text', 'text/plain; charset=utf-8', id='str'),
+        pytest.param(42, 42, 'application/json; charset=utf-8', id='int'),
+        pytest.param(1.5, 1.5, 'application/json; charset=utf-8', id='float'),
+        pytest.param(True, True, 'application/json; charset=utf-8', id='bool'),
+        pytest.param((1, 'two'), [1, 'two'], 'application/json; charset=utf-8', id='tuple'),
+        pytest.param({'key': [1, 2]}, {'key': [1, 2]}, 'application/json; charset=utf-8', id='dict'),
+    ],
+)
+async def test_set_value_infers_content_type(
+    kvs: KeyValueStore, value: Any, expected_value: Any, expected_content_type: str
+) -> None:
+    """Without a content type, bytes are stored as binary data, `str` as text and any other value as JSON."""
+    await kvs.set_value('key', value)
+
+    record = await kvs.get_record('key')
+    assert record is not None
+    assert record.content_type == expected_content_type
+
+    result = await kvs.get_value('key')
+    assert result == expected_value
+    assert type(result) is type(expected_value)
+
+
+async def test_get_record_returns_raw_value(kvs: KeyValueStore) -> None:
+    """`get_record` returns the stored bytes with their content type, and `None` for a missing record."""
+    await kvs.set_value('key', 'příliš', content_type='text/html')
+
+    record = await kvs.get_record('key')
+
+    assert record is not None
+    assert record.key == 'key'
+    assert record.value == 'příliš'.encode()
+    assert record.content_type == 'text/html'
+    assert record.size == len(record.value)
+    assert await kvs.get_record('nonexistent') is None
+
+
+@pytest.mark.parametrize(
+    'value',
+    [
+        pytest.param('{"key": [1, 2]}', id='str'),
+        pytest.param(b'{"key": [1, 2]}', id='bytes'),
+    ],
+)
+async def test_set_value_stores_serialized_json_as_is(kvs: KeyValueStore, value: str | bytes) -> None:
+    """A `str` or bytes value with a JSON content type is stored as it is and read back parsed."""
+    await kvs.set_value('key', value, content_type='application/json')
+
+    record = await kvs.get_record('key')
+    assert record is not None
+    assert record.value == b'{"key": [1, 2]}'
+    assert await kvs.get_value('key') == {'key': [1, 2]}
+
+
+async def test_set_value_rejects_object_with_non_json_content_type(kvs: KeyValueStore) -> None:
+    """A value that is neither `str` nor bytes can't be stored under a content type other than JSON."""
+    with pytest.raises(TypeError, match='can only be stored as JSON'):
+        await kvs.set_value('key', {'key': 'value'}, content_type='text/plain')
+
+    assert await kvs.record_exists('key') is False
+
+
+@pytest.mark.parametrize(
+    ('content_type', 'text', 'encoding'),
+    [
+        pytest.param('text/html', '<p>žluťoučký</p>', 'utf-8', id='text'),
+        pytest.param('application/xml', '<a>žluťoučký</a>', 'utf-8', id='xml'),
+        pytest.param('application/rss+xml', '<rss>žluťoučký</rss>', 'utf-8', id='xml suffix'),
+        pytest.param('text/plain; charset=windows-1250', 'žluťoučký', 'windows-1250', id='charset'),
+    ],
+)
+async def test_text_values_are_read_as_str(kvs: KeyValueStore, content_type: str, text: str, encoding: str) -> None:
+    """Text and XML values are stored and decoded to `str` with the charset of the content type."""
+    await kvs.set_value('key', text, content_type=content_type)
+
+    record = await kvs.get_record('key')
+    assert record is not None
+    assert record.value == text.encode(encoding)
+    assert await kvs.get_value('key') == text
+
+
+async def test_get_value_raises_on_unparsable_record(kvs: KeyValueStore) -> None:
+    """A record that can't be parsed according to its content type raises and stays readable with `get_record`."""
+    await kvs.set_value('key', b'{not json', content_type='application/json')
+
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        await kvs.get_value('key')
+
+    assert any("key 'key'" in note for note in exc_info.value.__notes__)
+
+    record = await kvs.get_record('key')
+    assert record is not None
+    assert record.value == b'{not json'
+
+
+async def test_iterate_entries_raises_on_unparsable_record(kvs: KeyValueStore) -> None:
+    """A record that can't be parsed according to its content type raises from `iterate_entries` too."""
+    await kvs.set_value('key', b'{not json', content_type='application/json')
+
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        _ = [entry async for entry in kvs.iterate_entries()]
+
+    assert any("key 'key'" in note for note in exc_info.value.__notes__)
+
+
+async def test_set_value_rejects_unserializable_value(kvs: KeyValueStore) -> None:
+    """A value JSON can't serialize raises and stores nothing."""
+    value: dict[str, Any] = {}
+    value['self'] = value
+
+    with pytest.raises(ValueError, match='Circular reference'):
+        await kvs.set_value('key', value)
+
+    assert await kvs.record_exists('key') is False
+
+
+async def test_set_value_stringifies_unsupported_types(kvs: KeyValueStore) -> None:
+    """Objects JSON doesn't support are stored as their string form, and dict keys become strings."""
+    await kvs.set_value('key', {'created_at': datetime(2026, 1, 1, tzinfo=UTC), 1: 'int key'})
+
+    assert await kvs.get_value('key') == {'created_at': '2026-01-01 00:00:00+00:00', '1': 'int key'}
 
 
 async def test_get_value_nonexistent(kvs: KeyValueStore) -> None:
@@ -202,6 +333,19 @@ async def test_list_keys(kvs: KeyValueStore) -> None:
     assert 'key1' in key_names
     assert 'key2' in key_names
     assert 'key3' in key_names
+
+
+async def test_backend_page_carries_count_limit_and_start_key(kvs: KeyValueStore) -> None:
+    """A backend page carries the number of its keys and the `limit` and `exclusive_start_key` it was requested with."""
+    for key in ['a', 'b', 'c']:
+        await kvs.set_value(key, 'value')
+
+    page = await kvs._backend.list_keys(exclusive_start_key='a', limit=3)
+
+    assert [item.key for item in page.items] == ['b', 'c']
+    assert page.count == 2
+    assert page.limit == 3
+    assert page.exclusive_start_key == 'a'
 
 
 async def test_list_keys_with_limit(kvs: KeyValueStore) -> None:
@@ -320,43 +464,171 @@ async def test_iterate_entries_empty_kvs(kvs: KeyValueStore) -> None:
     assert collected_entries == []
 
 
-async def test_iterate_entries_uses_storage_backend_implementation() -> None:
-    """Test that `iterate_entries` and `iterate_values` delegate to the storage backend's `iterate_entries`."""
+async def test_iterate_entries_reads_values_in_batches(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The values are read with `get_values` in batches bounded by the number of keys."""
+    for i in range(5):
+        await kvs.set_value(f'key{i}', f'value{i}')
 
-    class OptimizedKeyValueStoreBackend(MemoryKeyValueStoreBackend):
-        async def iterate_entries(
-            self,
-            *,
-            exclusive_start_key: str | None = None,
-            limit: int | None = None,
-        ) -> AsyncIterator[KeyValueStoreRecord]:
-            # A single-pass implementation that never touches `get_value`.
-            keys = sorted(k for k in self._records if exclusive_start_key is None or k > exclusive_start_key)
-            for key in keys[:limit]:
-                record = self._records[key]
-                yield KeyValueStoreRecord(
-                    key=key,
-                    value=f'optimized-{record.value}',
-                    content_type=record.content_type,
-                    size=record.size,
-                )
+    get_values = AsyncMock(wraps=kvs._backend.get_values)
+    monkeypatch.setattr(kvs._backend, 'get_values', get_values)
+    monkeypatch.setattr(KeyValueStore, '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 2)
 
-        async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-            raise AssertionError(
-                f'get_value must not be called for {key!r} when the backend implements iterate_entries'
-            )
+    entries = [entry async for entry in kvs.iterate_entries()]
 
-    backend = await OptimizedKeyValueStoreBackend.open(id=None, name=None, alias=None)
-    kvs = KeyValueStore(backend, id=(await backend.get_metadata()).id, name=None)
-    await kvs.set_value('key1', 'value1')
-    await kvs.set_value('key2', 'value2')
-    await kvs.set_value('key3', 'value3')
+    assert entries == [(f'key{i}', f'value{i}') for i in range(5)]
+    assert [call.kwargs['keys'] for call in get_values.await_args_list] == [
+        ['key0', 'key1'],
+        ['key2', 'key3'],
+        ['key4'],
+    ]
 
-    entries = [entry async for entry in kvs.iterate_entries(exclusive_start_key='key1', limit=1)]
-    values = [value async for value in kvs.iterate_values()]
 
-    assert entries == [('key2', 'optimized-value2')]
-    assert values == ['optimized-value1', 'optimized-value2', 'optimized-value3']
+async def test_iterate_entries_batches_are_bounded_by_size(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The batches are bounded by the record sizes, and a record over the limit is read alone in its batch."""
+    await kvs.set_value('small1', 'ab')
+    await kvs.set_value('small2', 'cd')
+    await kvs.set_value('large', 'x' * 100)
+    await kvs.set_value('small3', 'ef')
+
+    get_values = AsyncMock(wraps=kvs._backend.get_values)
+    monkeypatch.setattr(kvs._backend, 'get_values', get_values)
+    monkeypatch.setattr(KeyValueStore, '_ITERATE_ENTRIES_BATCH_MAX_BYTES', 10)
+
+    keys = [key async for key, _ in kvs.iterate_entries()]
+
+    assert keys == ['large', 'small1', 'small2', 'small3']
+    assert [call.kwargs['keys'] for call in get_values.await_args_list] == [['large'], ['small1', 'small2', 'small3']]
+
+
+async def test_iterate_entries_follows_key_order(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The entries follow the order of the keys, whatever order the storage backend returns the records in."""
+    for key in ['a', 'b', 'c']:
+        await kvs.set_value(key, f'value-{key}')
+
+    records_in_reverse_order = {key: await kvs.get_record(key) for key in ['c', 'b', 'a']}
+    monkeypatch.setattr(kvs._backend, 'get_values', AsyncMock(return_value=records_in_reverse_order))
+
+    entries = [entry async for entry in kvs.iterate_entries()]
+
+    assert entries == [('a', 'value-a'), ('b', 'value-b'), ('c', 'value-c')]
+
+
+async def test_iterate_entries_skips_record_deleted_after_listing(
+    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A record deleted after its key was listed, but before its value was read, is skipped."""
+    for key in ['a', 'b', 'c']:
+        await kvs.set_value(key, f'value-{key}')
+
+    monkeypatch.setattr(KeyValueStore, '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 1)
+
+    entries = []
+    async for key, value in kvs.iterate_entries():
+        if key == 'a':
+            await kvs.delete_value('b')
+        entries.append((key, value))
+
+    assert entries == [('a', 'value-a'), ('c', 'value-c')]
+
+
+@pytest.mark.parametrize(
+    ('limit', 'expected_count'),
+    [
+        pytest.param(None, 10, id='no limit'),
+        pytest.param(7, 7, id='limit inside a later page'),
+        pytest.param(3, 3, id='limit at a page boundary'),
+    ],
+)
+async def test_iteration_spans_multiple_pages(
+    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch, limit: int | None, expected_count: int
+) -> None:
+    """The keys and the entries are listed page by page, up to the limit, without skipping or repeating a key."""
+    for i in range(10):
+        await kvs.set_value(f'key{i}', i)
+
+    monkeypatch.setattr(KeyValueStore, '_LIST_KEYS_PAGE_SIZE', 3)
+
+    keys = [metadata.key async for metadata in kvs.iterate_keys(limit=limit)]
+    entries = [entry async for entry in kvs.iterate_entries(limit=limit)]
+
+    assert keys == [f'key{i}' for i in range(expected_count)]
+    assert entries == [(f'key{i}', i) for i in range(expected_count)]
+
+
+async def test_iteration_continues_past_short_pages(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A short or empty page before the last one doesn't end the iteration, and only its keys count toward the limit."""
+    pages = [
+        KeyValueStoreKeysListPage(
+            items=[KeyValueStoreRecordMetadata(key='a', content_type='text/plain')],
+            count=1,
+            limit=3,
+            next_exclusive_start_key='b',
+        ),
+        KeyValueStoreKeysListPage(items=[], count=0, limit=2, exclusive_start_key='b', next_exclusive_start_key='c'),
+        KeyValueStoreKeysListPage(
+            items=[KeyValueStoreRecordMetadata(key=key, content_type='text/plain') for key in ['d', 'e']],
+            count=2,
+            limit=2,
+            exclusive_start_key='c',
+            next_exclusive_start_key='e',
+        ),
+    ]
+    list_keys = AsyncMock(side_effect=pages)
+    monkeypatch.setattr(kvs._backend, 'list_keys', list_keys)
+
+    keys = [metadata.key async for metadata in kvs.iterate_keys(limit=3)]
+
+    assert keys == ['a', 'd', 'e']
+    assert [call.kwargs['limit'] for call in list_keys.await_args_list] == [3, 2, 2]
+
+
+async def test_iteration_with_prefix(kvs: KeyValueStore) -> None:
+    """Only the records whose key starts with the prefix are listed and iterated."""
+    await kvs.set_value('Item-1', 'a')
+    await kvs.set_value('Item-2', 'b')
+    await kvs.set_value('item-3', 'c')
+    await kvs.set_value('other', 'd')
+
+    listed_keys = [metadata.key for metadata in await kvs.list_keys(prefix='Item-')]
+    values = [value async for value in kvs.iterate_values(prefix='Item-')]
+
+    assert listed_keys == ['Item-1', 'Item-2']
+    assert values == ['a', 'b']
+
+
+async def test_iteration_with_prefix_spans_multiple_pages(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The keys with the prefix are listed page by page, and the page with the last of them ends the listing."""
+    for key in ['a', 'item-1', 'item-2', 'item-3', 'item-4', 'j']:
+        await kvs.set_value(key, 'value')
+
+    monkeypatch.setattr(KeyValueStore, '_LIST_KEYS_PAGE_SIZE', 2)
+    list_keys = AsyncMock(wraps=kvs._backend.list_keys)
+    monkeypatch.setattr(kvs._backend, 'list_keys', list_keys)
+
+    keys = [metadata.key async for metadata in kvs.iterate_keys(prefix='item-')]
+
+    assert keys == ['item-1', 'item-2', 'item-3', 'item-4']
+    assert list_keys.await_count == 2
+
+
+@pytest.mark.parametrize(
+    ('exclusive_start_key', 'expected_keys'),
+    [
+        pytest.param('Z', ['item-1', 'item-2'], id='start key before the prefix'),
+        pytest.param('item-1', ['item-2'], id='start key with the prefix'),
+        pytest.param('z', [], id='start key after the prefix'),
+    ],
+)
+async def test_list_keys_with_prefix_and_exclusive_start_key(
+    kvs: KeyValueStore, exclusive_start_key: str, expected_keys: list[str]
+) -> None:
+    """The start key narrows the keys with the prefix, wherever it sorts relative to the prefix."""
+    for key in ['a', 'item-1', 'item-2', 'j']:
+        await kvs.set_value(key, 'value')
+
+    listed_keys = await kvs.list_keys(prefix='item-', exclusive_start_key=exclusive_start_key)
+
+    assert [metadata.key for metadata in listed_keys] == expected_keys
 
 
 async def test_async_iteration(kvs: KeyValueStore) -> None:
@@ -593,22 +865,6 @@ async def test_record_exists_after_delete(kvs: KeyValueStore) -> None:
     assert await kvs.record_exists(test_key) is False
 
 
-async def test_record_exists_with_none_value(kvs: KeyValueStore) -> None:
-    """Test that record_exists returns True even when value is None."""
-    test_key = 'none-value-key'
-
-    # Set None as value
-    await kvs.set_value(test_key, None)
-
-    # Should still exist even though value is None
-    assert await kvs.record_exists(test_key) is True
-
-    # Verify we can distinguish between None value and nonexistent key
-    assert await kvs.get_value(test_key) is None
-    assert await kvs.record_exists(test_key) is True
-    assert await kvs.record_exists('truly-nonexistent') is False
-
-
 async def test_record_exists_different_content_types(kvs: KeyValueStore) -> None:
     """Test record_exists with different content types."""
     test_cases = [
@@ -631,7 +887,7 @@ async def test_record_exists_multiple_keys(kvs: KeyValueStore) -> None:
         ('key1', 'value1'),
         ('key2', {'nested': 'object'}),
         ('key3', [1, 2, 3]),
-        ('key4', None),
+        ('key4', 42),
     ]
 
     # Initially, none should exist
@@ -808,7 +1064,7 @@ async def test_alias_key_operations(
         'key1': {'data': 'value1', 'number': 1},
         'key2': 'simple string value',
         'key3': [1, 2, 3, 4, 5],
-        'key4': None,
+        'key4': 42,
     }
 
     for key, value in test_data.items():

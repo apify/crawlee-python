@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-import sys
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Self
+from typing import Self
 
 from typing_extensions import override
 
 from crawlee._utils.crypto import crypto_random_object_id
-from crawlee._utils.file import infer_mime_type
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee.storage_backends._base import KeyValueStoreBackend
-from crawlee.storage_backends._memory._utils import json_snapshot
-from crawlee.storage_backends.models import KeyValueStoreMetadata, KeyValueStoreRecord, KeyValueStoreRecordMetadata
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+from crawlee.storage_backends._utils import SortedKeys
+from crawlee.storage_backends.models import (
+    KeyValueStoreKeysListPage,
+    KeyValueStoreMetadata,
+    KeyValueStoreRecord,
+    KeyValueStoreRecordMetadata,
+)
 
 
 class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
@@ -27,9 +27,6 @@ class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
 
     The memory implementation provides fast access to data but is limited by available memory and
     does not support data sharing across different processes.
-
-    A value with a JSON content type is stored as an independent JSON snapshot, serialized the same way as by the
-    file-system backend, and every read returns a fresh copy of it. Other values are stored as they are.
     """
 
     def __init__(
@@ -45,6 +42,11 @@ class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
 
         self._records = dict[str, KeyValueStoreRecord]()
         """Dictionary to hold key-value records."""
+
+        self._sorted_keys: SortedKeys | None = None
+        """The keys of `_records` in sorted order, built when a listing starts and dropped when a listing reaches its
+        last page. While it exists, writes keep it up to date.
+        """
 
     @override
     async def get_metadata(self) -> KeyValueStoreMetadata:
@@ -98,43 +100,38 @@ class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
     @override
     async def drop(self) -> None:
         self._records.clear()
+        self._sorted_keys = None
         await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
     async def purge(self) -> None:
         self._records.clear()
+        self._sorted_keys = None
         await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
         await self._update_metadata(update_accessed_at=True)
 
-        record = self._records.get(key, None)
+        record = self._records.get(key)
         if record is None:
             return None
 
-        if 'application/json' in record.content_type:
-            return record.model_copy(update={'value': json_snapshot(record.value)})
-
-        return record
+        # A copy, so that changing the returned record doesn't change the stored one.
+        return record.model_copy()
 
     @override
-    async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        content_type = content_type or infer_mime_type(value)
-        size = sys.getsizeof(value)
-
-        if 'application/json' in content_type:
-            value = json_snapshot(value)
-
-        # Create and store the record
+    async def set_value(self, *, key: str, value: bytes, content_type: str) -> None:
         record = KeyValueStoreRecord(
             key=key,
             value=value,
             content_type=content_type,
-            size=size,
+            size=len(value),
         )
 
         self._records[key] = record
+        if self._sorted_keys is not None:
+            self._sorted_keys.add(key)
 
         await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
@@ -142,38 +139,44 @@ class MemoryKeyValueStoreBackend(KeyValueStoreBackend):
     async def delete_value(self, *, key: str) -> None:
         if key in self._records:
             del self._records[key]
+            if self._sorted_keys is not None:
+                self._sorted_keys.discard(key)
             await self._update_metadata(update_accessed_at=True, update_modified_at=True)
 
     @override
-    async def iterate_keys(
+    async def list_keys(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
+        limit: int = 1000,
+    ) -> KeyValueStoreKeysListPage:
         await self._update_metadata(update_accessed_at=True)
 
-        # Get all keys, sorted alphabetically
-        keys = sorted(self._records.keys())
+        if self._sorted_keys is None:
+            self._sorted_keys = SortedKeys(self._records)
 
-        # Apply exclusive_start_key filter if provided
-        if exclusive_start_key is not None:
-            keys = [k for k in keys if k > exclusive_start_key]
+        keys, next_exclusive_start_key = self._sorted_keys.page(
+            prefix=prefix,
+            exclusive_start_key=exclusive_start_key,
+            limit=limit,
+        )
 
-        # Apply limit if provided
-        if limit is not None:
-            keys = keys[:limit]
+        if next_exclusive_start_key is None:
+            self._sorted_keys = None
 
-        # Yield metadata for each key, skipping records deleted while the iteration was suspended.
+        items = list[KeyValueStoreRecordMetadata]()
         for key in keys:
-            record = self._records.get(key)
-            if record is None:
-                continue
-            yield KeyValueStoreRecordMetadata(
-                key=key,
-                content_type=record.content_type,
-                size=record.size,
-            )
+            record = self._records[key]
+            items.append(KeyValueStoreRecordMetadata(key=key, content_type=record.content_type, size=record.size))
+
+        return KeyValueStoreKeysListPage(
+            items=items,
+            count=len(items),
+            limit=limit,
+            exclusive_start_key=exclusive_start_key,
+            next_exclusive_start_key=next_exclusive_start_key,
+        )
 
     @override
     async def get_public_url(self, *, key: str) -> str:
