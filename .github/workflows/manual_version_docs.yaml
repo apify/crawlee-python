@@ -145,6 +145,7 @@ jobs:
     name: Commit versioned docs
     needs: [version_docs]
     runs-on: ubuntu-latest
+    environment: automation
     permissions:
       contents: read
 

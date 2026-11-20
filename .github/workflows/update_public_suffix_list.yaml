@@ -22,6 +22,7 @@ jobs:
   update-public-suffix-list:
     name: Update Public Suffix List
     runs-on: ubuntu-latest
+    environment: automation
 
     steps:
       - name: Checkout repository

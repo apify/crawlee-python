@@ -38,6 +38,7 @@ jobs:
   end_to_end_tests:
     name: End-to-end tests
     if: github.event_name != 'workflow_dispatch' || !inputs.slack_test
+    environment: e2e-tests
     strategy:
       fail-fast: false
       max-parallel: 12
@@ -95,6 +96,7 @@ jobs:
     needs: end_to_end_tests
     if: always() && ((github.event_name == 'schedule' && needs.end_to_end_tests.result == 'failure') || (github.event_name == 'workflow_dispatch' && inputs.slack_test))
     runs-on: ubuntu-latest
+    environment: e2e-tests
     permissions:
       contents: read
       actions: read

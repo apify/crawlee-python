@@ -22,6 +22,7 @@ jobs:
   update-playwright-version:
     name: Update Playwright version
     runs-on: ubuntu-latest
+    environment: automation
 
     steps:
       - name: Checkout repository
