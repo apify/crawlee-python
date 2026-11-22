@@ -2471,32 +2471,28 @@ async def test_run_stops_listening_for_migration(
     event: Event, event_data: EventMigratingData | EventAbortingData
 ) -> None:
     """Once `run()` returns, a migration or an abort no longer reaches the crawler."""
-    event_manager = LocalEventManager()
-    crawler = BasicCrawler(event_manager=event_manager, request_handler=AsyncMock())
+    event_manager = service_locator.get_event_manager()
+    crawler = BasicCrawler(request_handler=AsyncMock())
 
-    async with event_manager:
-        await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://a.placeholder.com'])
 
-        with patch.object(crawler.statistics, 'persist_state') as persist_state:
-            event_manager.emit(event=event, event_data=event_data)
-            await event_manager.wait_for_all_listeners_to_complete()
+    with patch.object(crawler.statistics, 'persist_state') as persist_state:
+        event_manager.emit(event=event, event_data=event_data)
+        await event_manager.wait_for_all_listeners_to_complete()
 
     persist_state.assert_not_called()
 
 
 async def test_services_no_side_effect_on_crawler_init() -> None:
     custom_configuration = Configuration()
-    custom_event_manager = LocalEventManager.from_config(custom_configuration)
     custom_storage_backend = MemoryStorageBackend()
 
     _ = BasicCrawler(
         configuration=custom_configuration,
-        event_manager=custom_event_manager,
         storage_backend=custom_storage_backend,
     )
 
     assert service_locator.get_configuration() is not custom_configuration
-    assert service_locator.get_event_manager() is not custom_event_manager
     assert service_locator.get_storage_backend() is not custom_storage_backend
 
 
@@ -2519,24 +2515,37 @@ async def test_crawler_uses_default_services() -> None:
 
 async def test_services_crawlers_can_use_different_services() -> None:
     custom_configuration_1 = Configuration()
-    custom_event_manager_1 = LocalEventManager.from_config(custom_configuration_1)
     custom_storage_backend_1 = MemoryStorageBackend()
 
     custom_configuration_2 = Configuration()
-    custom_event_manager_2 = LocalEventManager.from_config(custom_configuration_2)
     custom_storage_backend_2 = MemoryStorageBackend()
 
     _ = BasicCrawler(
         configuration=custom_configuration_1,
-        event_manager=custom_event_manager_1,
         storage_backend=custom_storage_backend_1,
     )
 
     _ = BasicCrawler(
         configuration=custom_configuration_2,
-        event_manager=custom_event_manager_2,
         storage_backend=custom_storage_backend_2,
     )
+
+
+async def test_crawlers_share_event_manager() -> None:
+    """Every crawler uses the event manager of the global service locator, whatever services it gets."""
+    crawler = BasicCrawler(configuration=Configuration(), storage_backend=MemoryStorageBackend())
+
+    assert crawler._service_locator.get_event_manager() is service_locator.get_event_manager()
+
+
+async def test_event_manager_set_after_crawler_init() -> None:
+    """Creating a crawler doesn't retrieve the event manager, so a custom one can still be registered afterwards."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+    custom_event_manager = LocalEventManager()
+
+    service_locator.set_event_manager(custom_event_manager)
+
+    assert crawler._service_locator.get_event_manager() is custom_event_manager
 
 
 async def test_crawler_uses_default_storages(tmp_path: Path) -> None:
@@ -3442,8 +3451,7 @@ async def test_status_message_reports_failed_request_count() -> None:
     crawler._last_run = Mock(previous_state=StatisticsState(requests_failed=2))
     crawler._statistics = Mock(state=StatisticsState(requests_failed=5))
 
-    async with service_locator.get_event_manager():
-        await crawler._crawler_state_task()
+    await crawler._crawler_state_task()
 
     problem_messages = [m for m in captured_messages if m.startswith('Experiencing problems')]
     assert problem_messages == ['Experiencing problems, 3 failed requests since last status update.']
@@ -3860,44 +3868,93 @@ async def test_multiple_crawlers_with_global_event_manager() -> None:
 
     event_manager = service_locator.get_event_manager()
 
-    # After both crawlers are finished, event manager should be inactive.
-    assert event_manager.active is False
+    # The event manager keeps running after the crawlers finish, until the event loop shuts down.
+    assert event_manager.active is True
 
     await rq1.drop()
     await rq2.drop()
 
 
-async def test_global_and_local_event_manager_in_crawler_run() -> None:
-    """Test that both global and local event managers are used in crawler run."""
+async def test_run_ends_with_persist_state() -> None:
+    """At the end of a run, the crawler emits `PersistState` and waits for the listeners it invokes."""
+    event_manager = service_locator.get_event_manager()
+    persisted = AsyncMock()
 
-    config = service_locator.get_configuration()
+    async def slow_listener() -> None:
+        await asyncio.sleep(0.1)
+        await persisted()
 
-    local_event_manager = LocalEventManager.from_config(config)
-
-    crawler = BasicCrawler(event_manager=local_event_manager)
-
-    handler_call = AsyncMock()
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        global_event_manager = service_locator.get_event_manager()
-        await handler_call(local_event_manager.active, global_event_manager.active)
+    event_manager.on(event=Event.PERSIST_STATE, listener=slow_listener)
+    crawler = BasicCrawler(request_handler=AsyncMock())
 
     await crawler.run(['https://a.placeholder.com'])
 
-    assert handler_call.call_count == 1
+    assert persisted.call_count == 1
 
-    local_em_state, global_em_state = handler_call.call_args_list[0][0]
 
-    # Both event managers should be active.
-    assert local_em_state is True
-    assert global_em_state is True
+async def test_run_end_waits_own_listeners() -> None:
+    """The end of a run doesn't wait for listeners of other emissions that are still running."""
+    event_manager = service_locator.get_event_manager()
+    release = asyncio.Event()
 
-    global_event_manager = service_locator.get_event_manager()
+    async def blocked_listener() -> None:
+        await release.wait()
 
-    # After crawler is finished, both event managers should be inactive.
-    assert local_event_manager.active is False
-    assert global_event_manager.active is False
+    event_manager.on(event=Event.CRAWLER_STATUS, listener=blocked_listener)
+    [blocked_task] = event_manager.emit(event=Event.CRAWLER_STATUS, event_data=None)
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    await asyncio.wait_for(crawler.run(['https://a.placeholder.com']), timeout=10)
+
+    assert blocked_task.done() is False
+
+    release.set()
+    await blocked_task
+
+
+async def test_failed_start_skips_persist_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run whose components fail to start doesn't emit `PersistState` at its end."""
+    monkeypatch.setattr(Statistics, '__aenter__', AsyncMock(side_effect=RuntimeError('Statistics failed to start.')))
+    event_manager = service_locator.get_event_manager()
+    persisted = AsyncMock()
+
+    event_manager.on(event=Event.PERSIST_STATE, listener=persisted)
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    with pytest.raises(RuntimeError, match=r'Statistics failed to start'):
+        await crawler.run(['https://a.placeholder.com'])
+
+    await event_manager.wait_for_all_listeners_to_complete()
+
+    persisted.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'supports_lazy_start',
+    [
+        pytest.param(True, id='lazy'),
+        pytest.param(False, id='strict'),
+    ],
+)
+async def test_owner_exit_mid_run_persists_at_end(
+    monkeypatch: pytest.MonkeyPatch, *, supports_lazy_start: bool
+) -> None:
+    """A run ends with a `PERSIST_STATE` event also when the owner stopped the event manager during the run."""
+    event_manager = service_locator.get_event_manager()
+    monkeypatch.setattr(event_manager, 'supports_lazy_start', supports_lazy_start)
+    persisted = AsyncMock()
+    await event_manager.__aenter__()
+    event_manager.on(event=Event.PERSIST_STATE, listener=persisted)
+
+    async def handler(_context: BasicCrawlingContext) -> None:
+        await event_manager.__aexit__(None, None, None)
+
+    crawler = BasicCrawler(request_handler=handler)
+    final_statistics = await crawler.run(['https://a.placeholder.com'])
+
+    assert final_statistics.requests_finished == 1
+    # One event comes from the owner's exit and one from the end of the run.
+    assert persisted.call_count == 2
 
 
 @pytest.mark.parametrize(

@@ -76,12 +76,12 @@ Pass a `Configuration` to the crawler's `configuration` argument to use it for t
     {CrawlerConfigurationExample}
 </RunnableCodeBlock>
 
-The crawler still reads the global service locator for the services you don't pass, and some components always read it. If no global configuration is registered yet, creating the crawler registers a default one, so a later `service_locator.set_configuration()` call raises a `ServiceConflictError`. Running the example above logs warnings about this implicit setup. Register any global configuration before you create the crawler.
+The crawler still reads the global service locator for the services you don't pass, and some components always read it. If no global configuration is registered yet, creating or running the crawler registers a default one, so a later `service_locator.set_configuration()` call raises a `ServiceConflictError`. Running the example above logs warnings about this implicit setup. Register any global configuration before you create the crawler.
 
 A few settings are always read from the global configuration, whatever you pass to the crawler:
 
 - The log level that the crawler applies when it configures logging.
 - The browser launch defaults `headless`, `default_browser_path`, and `disable_browser_sandbox`.
-- The event intervals. Autoscaling and state persistence listen to the global event manager, even when you pass an `event_manager` to the crawler.
+- The event intervals, since the whole process shares one event manager.
 
 To change these settings, register the configuration globally or configure the component directly, for example with the `headless` argument of <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.

@@ -21,16 +21,16 @@ Locally, Crawlee uses the <ApiLink to="class/LocalEventManager">`LocalEventManag
 - <ApiLink to="class/Configuration#persist_state_interval">`persist_state_interval`</ApiLink> defaults to 1 minute. You can set it with the `CRAWLEE_PERSIST_STATE_INTERVAL_MILLIS` environment variable.
 - <ApiLink to="class/Configuration#system_info_interval">`system_info_interval`</ApiLink> defaults to 1 second. You can set it with the `CRAWLEE_SYSTEM_INFO_INTERVAL_MILLIS` environment variable.
 
-The event manager is one of the global services of the [service locator](./service-locator). Call `service_locator.get_event_manager()` to get it. If none was set, the service locator creates a `LocalEventManager` from the current configuration on first access. To use a different one, register it with `service_locator.set_event_manager()` before you create the crawler. A crawler also accepts an `event_manager` argument, but components such as statistics and storages subscribe through the global service locator, so the global registration is the one to change.
+The event manager is one of the global services of the [service locator](./service-locator), and the whole process shares it. Call `service_locator.get_event_manager()` to get it. If none was set, the service locator creates a `LocalEventManager` from the global configuration on first access. To use a different one, register it with `service_locator.set_event_manager()` before anything uses the event manager.
 
-The event manager is an async context manager. The crawler enters it when `run()` starts and exits it when the run finishes, so events are only emitted while a crawler runs. Outside a crawler, use `async with event_manager:` yourself.
+The event manager starts by itself on the first `on()` or `emit()` call in a running event loop, so it works whether a crawler runs or not. It keeps running until the event loop shuts down, for example at the end of `asyncio.run()`, and emits one last `PERSIST_STATE` event during that shutdown. To control when it stops, enter an inactive event manager with `async with`. It then stops when the block exits, and entering an active one raises an error. A custom event manager that has to connect somewhere before it can start sets `supports_lazy_start` to `False`, so it has to be entered before anything registers a listener.
 
 ## Events
 
 The <ApiLink to="class/Event">`Event`</ApiLink> enum lists the event names. Each event comes with a payload model:
 
-- `PERSIST_STATE` carries <ApiLink to="class/EventPersistStateData">`EventPersistStateData`</ApiLink>. It's emitted when the event manager starts, then at every `persist_state_interval`, and one last time when it closes. Its `is_migrating` flag tells whether the process is about to be migrated.
-- `SYSTEM_INFO` carries <ApiLink to="class/EventSystemInfoData">`EventSystemInfoData`</ApiLink> with the CPU usage ratio and the memory used by the current process and its children. The `LocalEventManager` emits it at every `system_info_interval`.
+- `PERSIST_STATE` carries <ApiLink to="class/EventPersistStateData">`EventPersistStateData`</ApiLink>. It's emitted at every `persist_state_interval` while the event manager runs, at the end of every crawler run, and one last time when the event manager stops. Its `is_migrating` flag tells whether the process is about to be migrated.
+- `SYSTEM_INFO` carries <ApiLink to="class/EventSystemInfoData">`EventSystemInfoData`</ApiLink> with the CPU usage ratio and the memory used by the current process and its children. The `LocalEventManager` emits it at every `system_info_interval` while anything listens to it.
 - `CRAWLER_STATUS` carries <ApiLink to="class/EventCrawlerStatusData">`EventCrawlerStatusData`</ApiLink> with the same status message that the crawler periodically logs.
 - `MIGRATING`, `ABORTING`, and `EXIT` carry <ApiLink to="class/EventMigratingData">`EventMigratingData`</ApiLink>, <ApiLink to="class/EventAbortingData">`EventAbortingData`</ApiLink>, and <ApiLink to="class/EventExitData">`EventExitData`</ApiLink>. Crawlee itself never emits them locally. They come from a platform, for example from the event manager of the [Apify SDK](https://docs.apify.com/sdk/python) when an Actor run is migrated to another server or aborted.
 
@@ -38,7 +38,7 @@ The enum also defines session pool and browser pool event names, such as `SESSIO
 
 ## Listening to events
 
-Register a listener with <ApiLink to="class/EventManager#on">`on()`</ApiLink> and remove it with <ApiLink to="class/EventManager#off">`off()`</ApiLink>. Calling `off()` without a listener removes all listeners of the event. A listener can be sync or async and accepts either the event payload or no argument at all. Each invocation runs in its own task, and sync listeners run in a separate thread, so a slow listener doesn't block the crawler. An exception raised by a listener is logged and doesn't affect other listeners.
+Register a listener with <ApiLink to="class/EventManager#on">`on()`</ApiLink> and remove it with <ApiLink to="class/EventManager#off">`off()`</ApiLink>. Calling `off()` without a listener removes all listeners of the event. A listener stays registered until you remove it or the event loop shuts down, so remove your listeners once the code they serve is done. Components that save their state on `PERSIST_STATE` events stop listening when you close them, for example a <ApiLink to="class/RequestList">`RequestList`</ApiLink> on `close()` or when its `async with` block exits. A listener can be sync or async and accepts either the event payload or no argument at all. Each invocation runs in its own task, and sync listeners run in a separate thread, so a slow listener doesn't block the crawler. An exception raised by a listener is logged and doesn't affect other listeners.
 
 The following example registers an event manager with a shorter persist state interval and prints the payload of the persist state and system info events during a short crawl:
 

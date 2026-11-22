@@ -96,8 +96,7 @@ class Configuration(BaseSettings):
             )
         ),
     ] = timedelta(minutes=1)
-    """Interval at which `PersistState` events are emitted. The event ensures the state persistence during
-    the crawler run. This option is utilized by the `EventManager`."""
+    """Interval at which `PersistState` events are emitted. This option is utilized by the `EventManager`."""
 
     system_info_interval: Annotated[
         timedelta_ms,

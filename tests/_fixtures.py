@@ -12,6 +12,7 @@ import pytest
 from curl_cffi import CurlHttpVersion
 
 from crawlee import service_locator
+from crawlee._service_locator import ServiceLocator
 from crawlee._utils.public_suffix import PUBLIC_SUFFIX_LIST_SNAPSHOT
 from crawlee.crawlers import BasicCrawler
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
@@ -62,7 +63,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
 
         # Reset the services in the service locator.
         service_locator._configuration = None
-        service_locator._event_manager = None
+        ServiceLocator.global_event_manager = None
         service_locator._storage_backend = None
         service_locator.storage_instance_manager.clear_cache()
 

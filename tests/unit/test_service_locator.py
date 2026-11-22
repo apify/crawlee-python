@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 
 from crawlee import service_locator
+from crawlee._service_locator import ServiceLocator
 from crawlee.configuration import Configuration
 from crawlee.errors import ServiceConflictError
 from crawlee.events import LocalEventManager
@@ -66,6 +69,23 @@ def test_event_manager_conflict() -> None:
 
     with pytest.raises(ServiceConflictError, match=r'EventManager is already in use.'):
         service_locator.set_event_manager(custom_event_manager)
+
+
+def test_locators_share_event_manager() -> None:
+    """Every service locator returns the same event manager, also one with services of its own."""
+    scoped_locator = ServiceLocator(configuration=Configuration(), storage_backend=MemoryStorageBackend())
+
+    assert scoped_locator.get_event_manager() is service_locator.get_event_manager()
+
+
+def test_event_manager_uses_global_config() -> None:
+    """The default event manager takes its intervals from the global configuration, whoever creates it."""
+    service_locator.set_configuration(Configuration(persist_state_interval=timedelta(seconds=7)))
+    scoped_locator = ServiceLocator(configuration=Configuration(persist_state_interval=timedelta(seconds=3)))
+
+    event_manager = scoped_locator.get_event_manager()
+
+    assert event_manager._persist_state_interval == timedelta(seconds=7)
 
 
 def test_default_storage_backend() -> None:

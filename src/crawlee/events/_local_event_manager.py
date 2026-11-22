@@ -6,6 +6,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 import proclimits
+from typing_extensions import override
 
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recurring_task import RecurringTask
@@ -15,8 +16,7 @@ from crawlee.events._event_manager import EventManager, EventManagerOptions
 from crawlee.events._types import Event, EventSystemInfoData
 
 if TYPE_CHECKING:
-    from types import TracebackType
-    from typing import Self, Unpack
+    from typing import Unpack
 
 logger = getLogger(__name__)
 
@@ -25,9 +25,9 @@ logger = getLogger(__name__)
 class LocalEventManager(EventManager):
     """Event manager for local environments.
 
-    It extends the `EventManager` to emit `SystemInfo` events at regular intervals. The `LocalEventManager`
-    is intended to be used in local environments, where the system metrics are required by the load signals of the
-    `ConcurrencySystem`.
+    It extends the `EventManager` to emit `SystemInfo` events at regular intervals while anything listens to them.
+    The `LocalEventManager` is intended to be used in local environments, where the system metrics are required by the
+    load signals of the `ConcurrencySystem`.
     """
 
     def __init__(
@@ -72,38 +72,29 @@ class LocalEventManager(EventManager):
             persist_state_interval=config.persist_state_interval,
         )
 
-    async def __aenter__(self) -> Self:
-        """Initialize the local event manager upon entering the async context.
+    @override
+    def _start(self, loop: asyncio.AbstractEventLoop) -> None:
+        super()._start(loop)
 
-        It starts emitting system info events at regular intervals.
-        """
-        await super().__aenter__()
+        # A reading kept from a previous run would report the average load over the idle gap since then.
+        self._cpu_load = proclimits.CpuLoad()
+        self._emit_system_info_event_rec_task.start()
 
-        if self._active_ref_count == 1:
-            # A reading kept from a previous session would report the average load over the idle gap since then.
-            self._cpu_load = proclimits.CpuLoad()
-            self._emit_system_info_event_rec_task.start()
-
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        exc_traceback: TracebackType | None,
-    ) -> None:
-        """Close the local event manager upon exiting the async context.
-
-        It stops emitting system info events and closes the event manager.
-        """
+    @override
+    async def _stop(self, *, timeout: timedelta | None) -> None:
         try:
-            if self._active_ref_count == 1:
-                await self._emit_system_info_event_rec_task.stop()
+            await self._emit_system_info_event_rec_task.stop()
         finally:
-            await super().__aexit__(exc_type, exc_value, exc_traceback)
+            await super()._stop(timeout=timeout)
 
     async def _emit_system_info_event(self) -> None:
-        """Emit a system info event with the current CPU and memory usage."""
+        """Emit a system info event with the current CPU and memory usage, if anyone listens to it."""
+        # The manager runs for as long as its event loop does, so it measures only while the readings are needed.
+        if not self._listeners_to_wrappers.get(Event.SYSTEM_INFO):
+            # A fresh sampler, so that the first reading for a new listener doesn't span the idle gap.
+            self._cpu_load = proclimits.CpuLoad()
+            return
+
         # Both readings block the thread they run in - `get_cpu_info` may sample the CPU utilization over a short
         # interval - so run them concurrently instead of one after the other.
         cpu_info, memory_info = await asyncio.gather(

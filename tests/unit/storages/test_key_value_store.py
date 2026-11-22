@@ -1419,9 +1419,8 @@ async def test_mutating_read_value_does_not_change_stored_value(kvs: KeyValueSto
 
 async def _emit_persist_state() -> None:
     event_manager = service_locator.get_event_manager()
-    async with event_manager:
-        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
-        await event_manager.wait_for_all_listeners_to_complete()
+    event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+    await event_manager.wait_for_all_listeners_to_complete()
 
 
 async def test_purge_drops_autosaved_values(kvs: KeyValueStore) -> None:

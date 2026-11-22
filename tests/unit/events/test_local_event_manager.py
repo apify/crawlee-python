@@ -4,7 +4,7 @@ import asyncio
 import threading
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from crawlee._utils.system import CpuInfo, MemoryInfo
 from crawlee.events import LocalEventManager
@@ -37,6 +37,22 @@ async def test_emit_system_info_event(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert mocked_listener.call_count >= 1
     assert isinstance(mocked_listener.call_args[0][0], EventSystemInfoData)
+
+
+async def test_lazy_start_emits_system_info(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A manager started by `on`, without `async with`, emits `SystemInfo` events too."""
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', lambda _: MagicMock(spec=CpuInfo))
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
+    received = asyncio.Event()
+
+    async def listener(_event_data: EventSystemInfoData) -> None:
+        received.set()
+
+    # An interval this long means the event can only come from the immediate first run of the recurring task.
+    event_manager = LocalEventManager(system_info_interval=timedelta(hours=1))
+    event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
+
+    await asyncio.wait_for(received.wait(), timeout=5)
 
 
 async def test_system_info_readings_run_concurrently(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,3 +113,69 @@ async def test_cpu_sampler_restarts_with_each_session(monkeypatch: pytest.Monkey
 
     assert len(samplers) == 2
     assert samplers[0] is not samplers[1]
+
+
+async def test_cpu_sampler_restarts_after_idle(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A listener registered after a gap without listeners gets a fresh CPU sampler, not one spanning the gap."""
+    get_cpu_info = MagicMock(return_value=MagicMock(spec=CpuInfo))
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', get_cpu_info)
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
+    listener = AsyncMock()
+
+    async with LocalEventManager(system_info_interval=timedelta(hours=1)) as event_manager:
+        # Only the direct emissions below sample the CPU. The recurring one is cancelled before it ever runs.
+        await event_manager._emit_system_info_event_rec_task.stop()
+
+        event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
+        await event_manager._emit_system_info_event()
+
+        event_manager.off(event=Event.SYSTEM_INFO, listener=listener)
+        await event_manager._emit_system_info_event()
+
+        event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
+        await event_manager._emit_system_info_event()
+
+    samplers = [call.args[0] for call in get_cpu_info.call_args_list]
+    assert len(samplers) == 2
+    assert samplers[0] is not samplers[1]
+
+
+async def test_system_info_only_when_listened(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without a `SystemInfo` listener, the manager skips the readings."""
+    get_cpu_info = MagicMock(return_value=MagicMock(spec=CpuInfo))
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', get_cpu_info)
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
+
+    event_manager = LocalEventManager(system_info_interval=timedelta(hours=1))
+    listener = AsyncMock()
+
+    async with event_manager:
+        # Only the direct emissions below sample the CPU. The recurring one is cancelled before it ever runs.
+        await event_manager._emit_system_info_event_rec_task.stop()
+
+        await event_manager._emit_system_info_event()
+        assert get_cpu_info.call_count == 0
+
+        event_manager.on(event=Event.SYSTEM_INFO, listener=listener)
+        await event_manager._emit_system_info_event()
+        await event_manager.wait_for_all_listeners_to_complete()
+
+    assert get_cpu_info.call_count == 1
+    assert listener.call_count == 1
+
+
+async def test_system_info_uses_emit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The `SystemInfo` event goes through `emit`, so a subclass that overrides it sees the event."""
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_cpu_info', lambda _: MagicMock(spec=CpuInfo))
+    monkeypatch.setattr('crawlee.events._local_event_manager.get_memory_info', lambda: MagicMock(spec=MemoryInfo))
+
+    async with LocalEventManager(system_info_interval=timedelta(hours=1)) as event_manager:
+        # Only the direct emission below calls `emit`. The recurring one is cancelled before it ever runs.
+        await event_manager._emit_system_info_event_rec_task.stop()
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
+
+        with patch.object(event_manager, 'emit', wraps=event_manager.emit) as emit:
+            await event_manager._emit_system_info_event()
+
+    emit.assert_called_once()
+    assert emit.call_args.kwargs['event'] == Event.SYSTEM_INFO

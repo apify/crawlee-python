@@ -42,6 +42,42 @@ A custom storage backend has more names to update. The `StorageBackend` methods 
 
 `Event` now subclasses `enum.StrEnum`. Calling `str()` on a member or formatting it in an f-string returns its value, for example `'systemInfo'`, where v1 returned `'Event.SYSTEM_INFO'`. Comparisons with plain strings work the same way as in v1.
 
+## One event manager per process
+
+The whole process shares a single event manager. The `event_manager` argument is removed from `BasicCrawler` and its subclasses, from `SessionPool` and from `ServiceLocator`. In v1, a crawler could get an event manager of its own, but statistics, storages and autoscaling kept listening to the global one. To use a custom event manager, register it before anything uses the event manager:
+
+```python
+# v1
+event_manager = LocalEventManager(persist_state_interval=timedelta(seconds=30))
+crawler = ParselCrawler(event_manager=event_manager)
+
+# v2
+event_manager = LocalEventManager(persist_state_interval=timedelta(seconds=30))
+service_locator.set_event_manager(event_manager)
+crawler = ParselCrawler()
+```
+
+The event manager starts by itself on the first `on()` or `emit()` call in a running event loop, and keeps running until the event loop shuts down. In v1, it ran only while a crawler or your own `async with` block held it, so a request queue, a `RequestList` or a `use_state` dictionary used outside of them didn't save its state. Note that:
+
+- A crawler no longer enters the event manager. It emits a `PERSIST_STATE` event at the end of every run and waits for the listeners that event invokes.
+- Listeners stay registered until `off()` removes them or the event loop shuts down. In v1, all of them were removed when the event manager stopped.
+- A `use_state` dictionary keeps listening until the event loop shuts down. If its storage backend is closed before that, such as a `SqlStorageBackend` or `RedisStorageBackend` used with `async with`, the final `PERSIST_STATE` event at the shutdown logs a warning that the state failed to persist. The state saved at the end of the crawler run stays in the store.
+- The event manager runs in one event loop at a time, and using it from another one while it runs raises a `RuntimeError`. Run parallel crawlers in one event loop or in separate processes, not in threads that each call `asyncio.run()`.
+- The event manager stops when its event loop cancels the remaining tasks on shutdown, as `asyncio.run()` does.
+- An event loop driven by `loop.run_until_complete()` that never shuts down leaves the tasks of the event manager pending. No final `PERSIST_STATE` event comes, and Python logs `Task was destroyed but it is pending!` for them at exit.
+- A process killed by a signal that `asyncio.run()` doesn't handle, such as `SIGTERM`, gets no final `PERSIST_STATE` event either.
+
+Other changes:
+
+- The first `PERSIST_STATE` event comes one `persist_state_interval` after the event manager starts, where v1 emitted one right away.
+- The `LocalEventManager` emits `SYSTEM_INFO` events only while something listens to them.
+- `emit()` returns the tasks of the listeners it starts.
+- A stop waits for the listeners in two rounds, each limited by `close_timeout`, so it can take up to twice as long.
+
+Entering an inactive event manager with `async with` takes over its lifecycle, so it stops when the block exits. Entering an active one raises a `RuntimeError`, where v1 counted the entries. A manager that started by itself is active too, so check `active` before entering one. Code that registered listeners with `on()` and then entered the manager with `async with` worked in v1. In v2, `on()` called in a running event loop starts the manager, so that `async with` raises. Enter the manager before you register the listeners, or leave out the `async with`.
+
+A custom event manager that has to await something to start, such as a connection, sets the `supports_lazy_start` class attribute to `False`. Whoever enters it with `async with` owns it, and calling `on()` while nobody has entered it raises a `RuntimeError`. A crawler no longer enters the event manager, so enter such a manager yourself around every `run()`. A subclass that starts its work in `__aenter__()` doesn't get that work on a lazy start, so it needs `supports_lazy_start = False` too.
+
 ## `StatisticsState.crawler_runtime` is read-only
 
 `StatisticsState.crawler_runtime` is computed from the runtime accumulated by previous runs and the start timestamp of the run in progress. In v1, assigning to it only emitted a `DeprecationWarning` and the value was ignored. In v2, the property has no setter, so an assignment raises `AttributeError`. Remove any such assignments.
@@ -71,6 +107,7 @@ Secondary arguments of the public API are now keyword-only. The main argument of
 - `KeyValueStore.iterate_keys`, `iterate_values`, `iterate_entries` and `list_keys`, which take `exclusive_start_key` and `limit` by keyword only.
 - `Dataset.export_to(key, *, content_type, to_kvs_id, ...)`.
 - `ConcurrencySettings(*, min_concurrency, max_concurrency, max_tasks_per_minute, desired_concurrency)`.
+- `ServiceLocator(*, configuration, storage_backend)`.
 - `RequestList(requests, *, name, persist_state_key, persist_requests_key, state)`.
 - `ProxyConfiguration.new_url(*, session_id, request)` and `ProxyConfiguration.new_proxy_info(*, session_id, request)`. Both arguments of `new_proxy_info` now default to `None`.
 - `AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(*, ...)` and `with_parsel_static_parser(*, ...)`.
@@ -558,7 +595,7 @@ class MyHttpClient(HttpClient):
 
 ## Crawlers manage only what they create
 
-A crawler now enters and exits only the objects it creates, the same as Crawlee JS. An object you pass is yours to enter and exit. The `Statistics` and the event managers are the exceptions, since the crawler enters them on every run. You can enter an event manager yourself as well. In v1, the crawler entered a passed object that wasn't active yet and exited it when its run finished, even while another crawler still used it.
+A crawler now enters and exits only the objects it creates, the same as Crawlee JS. An object you pass is yours to enter and exit. `Statistics` is the exception, since the crawler enters it on every run. In v1, the crawler entered a passed object that wasn't active yet and exited it when its run finished, even while another crawler still used it.
 
 What you do with an object you pass depends on its type:
 
@@ -638,6 +675,8 @@ Every crawler logs to a logger named after its class under `crawlee.crawlers`, s
 
 The autoscaled pool of a crawler logs to the `autoscaled_pool` child of the crawler's logger, for example `crawlee.crawlers.ParselCrawler.autoscaled_pool`. A standalone `AutoscaledPool` logs to `crawlee.autoscaling._autoscaled_pool` unless you pass it a `logger`.
 
+When the wait for the `PERSIST_STATE` listeners at the end of a run is cancelled, the warning `Asyncio wait was cancelled; canceling unfinished tasks.` comes from the crawler's logger. In v1, it came from `crawlee.events._event_manager`, which ran that wait when the crawler exited the event manager.
+
 ### Custom crawler logger
 
 The private `_logger` argument of the crawlers is replaced by a public `logger` argument. The crawler, its autoscaled pool, and the periodic statistics log to it.
@@ -681,6 +720,8 @@ The crawler has finished all the remaining ongoing requests and will shut down n
 The crawler logs the first message once per run, the next time it looks for a new request after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
 
 When the statistics, the session pool or another component fails to persist its state on a `PERSIST_STATE` event, it now logs a WARNING `Failed to persist the state under key '<key>'.` with the traceback. The WARNING comes from the component's own logger, such as `crawlee.statistics._statistics`. In v1, the `crawlee.events._event_manager` logger logged the ERROR `Exception in the event listener`. A failed persist when the component is exited logs the same WARNING, where v1 raised the error.
+
+The warning a crawler logged when it got a `configuration` but no `event_manager`, `No event manager set, implicitly using event manager from global service_locator.`, is removed together with the argument. The warning about the implicit creation of the event manager now starts with `Implicit creation of the event manager will implicitly set the global configuration as side effect.` It comes when something first uses the event manager, such as a crawler run, where v1 logged it when a crawler was created.
 
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 
