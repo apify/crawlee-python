@@ -138,6 +138,66 @@ async def test_request_records_persistence(rq_client: SqlRequestQueueClient) -> 
         assert request['url'] in ['https://example.com/1', 'https://example.com/2', 'https://example.com/3']
 
 
+@pytest.mark.parametrize(
+    ('forefront', 'expected_sequence_numbers'),
+    [
+        pytest.param(False, list(range(1, 101)), id='regular'),
+        pytest.param(True, list(range(-100, 0)), id='forefront'),
+    ],
+)
+async def test_concurrent_adds_get_unique_sequence_numbers(
+    rq_client: SqlRequestQueueClient,
+    *,
+    forefront: bool,
+    expected_sequence_numbers: list[int],
+) -> None:
+    """Test that concurrent `add_batch_of_requests` calls give every request its own sequence number."""
+    batches = [[Request.from_url(f'https://example.com/{batch}/{i}') for i in range(5)] for batch in range(20)]
+
+    await asyncio.gather(*(rq_client.add_batch_of_requests(batch, forefront=forefront) for batch in batches))
+
+    metadata = await rq_client.get_metadata()
+
+    async with rq_client.get_session() as session:
+        stmt = select(RequestDb.sequence_number).where(RequestDb.request_queue_id == metadata.id)
+        result = await session.execute(stmt)
+        sequence_numbers = result.scalars().all()
+
+    assert sorted(sequence_numbers) == expected_sequence_numbers
+
+
+@pytest.mark.parametrize(
+    ('forefront', 'expected_sequence_numbers'),
+    [
+        pytest.param(False, list(range(21, 41)), id='regular'),
+        pytest.param(True, list(range(-20, 0)), id='forefront'),
+    ],
+)
+async def test_concurrent_reclaims_get_unique_sequence_numbers(
+    rq_client: SqlRequestQueueClient,
+    *,
+    forefront: bool,
+    expected_sequence_numbers: list[int],
+) -> None:
+    """Test that concurrent `reclaim_request` calls give every request its own sequence number."""
+    await rq_client.add_batch_of_requests([Request.from_url(f'https://example.com/{i}') for i in range(20)])
+
+    fetched = []
+    while (request := await rq_client.fetch_next_request()) is not None:
+        fetched.append(request)
+
+    await asyncio.gather(*(rq_client.reclaim_request(request, forefront=forefront) for request in fetched))
+
+    metadata = await rq_client.get_metadata()
+
+    async with rq_client.get_session() as session:
+        stmt = select(RequestDb.sequence_number).where(RequestDb.request_queue_id == metadata.id)
+        result = await session.execute(stmt)
+        sequence_numbers = result.scalars().all()
+
+    assert sorted(sequence_numbers) == expected_sequence_numbers
+
+
 async def test_drop_removes_records(rq_client: SqlRequestQueueClient) -> None:
     """Test that drop removes all records from the database."""
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
