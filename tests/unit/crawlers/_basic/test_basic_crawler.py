@@ -4459,6 +4459,27 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
 
 
+async def test_run_raises_when_cancelled() -> None:
+    """Cancelling the task that awaits `run()` raises `CancelledError` instead of returning the statistics."""
+    crawler = BasicCrawler(configure_logging=False)
+    handler_started = asyncio.Event()
+    release_handler = asyncio.Event()
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        handler_started.set()
+        await release_handler.wait()
+
+    run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    await handler_started.wait()
+    run_task.cancel()
+    # The crawl lets the running request finish before it ends.
+    release_handler.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await run_task
+
+
 async def test_concurrency_system_excludes_settings() -> None:
     """The settings configure the default concurrency system, so a supplied one leaves them nowhere to go."""
     with pytest.raises(ValueError, match='cannot be combined'):

@@ -920,7 +920,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             try:
                 await run_task
             except CancelledError:
-                pass
+                # SIGINT cancels only `run_task`, and the crawl then ends gracefully. A cancellation of the task that
+                # awaits `run()`, such as a timeout around it, propagates.
+                current_task = asyncio.current_task()
+                if current_task is not None and current_task.cancelling() > 0:
+                    raise
             finally:
                 if remove_sigint_handler is not None:
                     remove_sigint_handler()
