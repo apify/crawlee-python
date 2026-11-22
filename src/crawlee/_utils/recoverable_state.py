@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -100,6 +101,10 @@ class RecoverableState(Generic[TStateModel]):
         self._key_value_store: KeyValueStore | None = None
         self._log = logger
 
+        # The digest of the state that this object last wrote or loaded, or `None` when it doesn't know what the record
+        # holds. A digest rather than a copy, since the state can be large.
+        self._persisted_digest: bytes | None = None
+
     async def initialize(self) -> TStateModel:
         """Initialize the recoverable state.
 
@@ -137,8 +142,8 @@ class RecoverableState(Generic[TStateModel]):
         """Clean up resources used by the recoverable state.
 
         If persistence is enabled, this method deregisters the object from PERSIST_STATE events and persists the
-        current state one last time, logging a warning if that fails. The in-memory state is kept, and `initialize`
-        can be called again.
+        current state one last time if it has changed since it was last saved or loaded, logging a warning if that
+        fails. The in-memory state is kept, and `initialize` can be called again.
         """
         async with self._lock:
             self._initialized = False
@@ -192,6 +197,10 @@ class RecoverableState(Generic[TStateModel]):
 
             key_value_store = await self._open_key_value_store()
 
+            # The next persist has to write the state even if it hasn't changed. Cleared before the delete, since a
+            # delete that fails or is cancelled may still land.
+            self._persisted_digest = None
+
             await self._with_timeout(
                 lambda: key_value_store.set_value(self._persist_state_key, None), 'Clearing the persisted state'
             )
@@ -199,15 +208,25 @@ class RecoverableState(Generic[TStateModel]):
     async def persist_state(self, event_data: EventPersistStateData | None = None) -> None:
         """Persist the current state to the KeyValueStore.
 
-        This method is typically called in response to a PERSIST_STATE event, but can also be called directly when
-        needed. It does nothing if persistence is disabled, or before `initialize` has read the persisted record. A
-        failed write raises from a direct call, while the persists on PERSIST_STATE events and in `teardown` log a
-        warning instead.
+        It does nothing if persistence is disabled, or before `initialize` has read the persisted record. A failed write
+        raises from a direct call, while the persists on PERSIST_STATE events and in `teardown` log a warning instead.
+        A direct call writes the state even if it hasn't changed since it was last saved or loaded, while the other
+        persists skip such a write.
 
         Args:
             event_data: Optional data associated with a PERSIST_STATE event
         """
+        await self._persist(event_data, skip_unchanged=False)
+
+    async def _persist(self, event_data: EventPersistStateData | None, *, skip_unchanged: bool) -> None:
         if not self._persistence_enabled or not self._record_loaded:
+            return
+
+        # Serialized once, so that the digest describes exactly what is written.
+        serialized_state = await self._serialize_state(self.current_value)
+        digest = self._digest(serialized_state)
+
+        if skip_unchanged and digest == self._persisted_digest:
             return
 
         self._log.debug(
@@ -216,14 +235,33 @@ class RecoverableState(Generic[TStateModel]):
 
         key_value_store = await self._open_key_value_store()
 
+        # Cleared until the write succeeds, since a write that fails or is cancelled may still land.
+        self._persisted_digest = None
+
         await self._with_timeout(
             lambda: key_value_store.set_value(
                 self._persist_state_key,
-                self.current_value.model_dump(mode='json', by_alias=True),
+                serialized_state,
                 content_type='application/json',
             ),
             'Persisting the state',
         )
+
+        self._persisted_digest = digest
+
+    @staticmethod
+    async def _serialize_state(state: BaseModel) -> bytes:
+        from crawlee.storages._utils import serialize_value  # noqa: PLC0415 avoid circular import
+
+        # The snapshot is taken in the event loop thread, since request handlers can change the state while a thread
+        # dumps it. It's encoded like the other JSON values of a key-value store.
+        snapshot = state.model_dump(mode='json', by_alias=True)
+        serialized_state, _ = await serialize_value(snapshot, 'application/json')
+        return serialized_state
+
+    @staticmethod
+    def _digest(serialized_state: bytes) -> bytes:
+        return hashlib.blake2b(serialized_state, digest_size=16).digest()
 
     @property
     def _event_manager(self) -> EventManager:
@@ -243,7 +281,7 @@ class RecoverableState(Generic[TStateModel]):
 
     async def _persist_state_quietly(self, event_data: EventPersistStateData | None = None) -> None:
         try:
-            await self.persist_state(event_data)
+            await self._persist(event_data, skip_unchanged=True)
         except Exception:
             self._log.warning(f"Failed to persist the state under key '{self._persist_state_key}'.", exc_info=True)
 
@@ -256,18 +294,27 @@ class RecoverableState(Generic[TStateModel]):
     async def _load_saved_state(self) -> None:
         if self._persistence_enabled:
             key_value_store = await self._open_key_value_store()
+            loaded_state = None
             try:
                 stored_state = await self._with_timeout(
                     lambda: key_value_store.get_value(self._persist_state_key), 'Loading the persisted state'
                 )
                 if stored_state is not None:
-                    self._state = self._state_type.model_validate(stored_state)
+                    loaded_state = self._state_type.model_validate(stored_state)
             except ValueError as exc:
                 exc.add_note(
                     f"The state persisted under key '{self._persist_state_key}' is invalid. Fix or delete the record "
                     'to start from the default state.'
                 )
                 raise
+
+            if loaded_state is not None:
+                # A state just loaded is in the record already, so it isn't written back until it changes. It replaces
+                # the in-memory state only after the digest is taken, so that a load cancelled meanwhile keeps the
+                # earlier state.
+                serialized_state = await self._serialize_state(loaded_state)
+                self._persisted_digest = self._digest(serialized_state)
+                self._state = loaded_state
 
         if self._state is None:
             self._state = self._default_state.model_copy(deep=True)

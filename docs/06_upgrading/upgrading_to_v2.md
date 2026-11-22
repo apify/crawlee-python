@@ -708,6 +708,10 @@ Entering `Statistics` or `SessionPool` again keeps their in-memory state. In v1,
 
 `persistence_enabled` of `Statistics` no longer accepts `'explicit_only'`. Pass `True` or `False`.
 
+## State is saved only when it has changed
+
+A component, such as the session pool, a `RequestList` or a `use_state` dictionary, now saves its state on a `PERSIST_STATE` event and on exit only if the state has changed since it was last saved or loaded. A direct `persist_state()` call and `KeyValueStore.persist_autosaved_values()` save the state every time. In v1, the state was saved on every `PERSIST_STATE` event and on exit.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
@@ -763,6 +767,8 @@ The crawler has finished all the remaining ongoing requests and will shut down n
 The crawler logs the first message once per run, the next time it looks for a new request after the stop. It logs the second one once the ongoing requests have finished, where v1 logged it right after the stop. In `Crawler.stop() was called with following reason: ...`, a trailing period or space in the reason is dropped, so the default reason and the `max_requests_per_crawl` one no longer end with a double period.
 
 When the statistics, the session pool or another component fails to persist its state on a `PERSIST_STATE` event, it now logs a WARNING `Failed to persist the state under key '<key>'.` with the traceback. The WARNING comes from the component's own logger, such as `crawlee.statistics._statistics`. In v1, the `crawlee.events._event_manager` logger logged the ERROR `Exception in the event listener`. A failed persist when the component is exited logs the same WARNING, where v1 raised the error.
+
+A component logs the DEBUG message `Persisting RecoverableState (model=..., event_data=...).` only for the saves it makes. For when it saves, see [State is saved only when it has changed](#state-is-saved-only-when-it-has-changed).
 
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 

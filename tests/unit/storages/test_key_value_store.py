@@ -1779,6 +1779,7 @@ async def test_purge_drops_autosaved_values(kvs: KeyValueStore) -> None:
     autosaved_value['count'] = 1
 
     await kvs.purge()
+    autosaved_value['count'] = 2
     await kvs.persist_autosaved_values()
     await _emit_persist_state()
 
