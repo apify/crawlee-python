@@ -17,6 +17,9 @@ def track_requests(page: Page) -> tuple[set[str], set[str]]:
 
     Chromium fails a request blocked by `Network.setBlockedURLs` with the `inspector` reason. Any other failure, such
     as `net::ERR_NO_BUFFER_SPACE` on a loaded Windows runner, is a transport error and does not count as blocked.
+
+    The sets are complete once `page.goto` returns: it waits for the `load` event, which the browser fires only after
+    the page's script and image requests have finished or failed.
     """
     requested: set[str] = set()
     blocked: set[str] = set()
@@ -118,7 +121,6 @@ async def test_block_requests_default(server_url: URL) -> None:
         page = await browser.new_page()
         requested_no_block, blocked_no_block = track_requests(page)
         await page.goto(target_url)
-        await page.wait_for_load_state('networkidle')
         await page.close()
 
         # With blocking
@@ -126,7 +128,6 @@ async def test_block_requests_default(server_url: URL) -> None:
         requested_blocked, blocked_blocked = track_requests(page)
         await block_requests(page)
         await page.goto(target_url)
-        await page.wait_for_load_state('networkidle')
         await page.close()
 
         await browser.close()
@@ -148,18 +149,16 @@ async def test_block_requests_with_extra_patterns(server_url: URL) -> None:
         target_url = str(server_url / 'resource_loading_page')
 
         page = await browser.new_page()
-        loaded_urls_blocked = []
-
-        page.on('requestfinished', lambda req: loaded_urls_blocked.append(req.url.rsplit('/', 1)[-1]))
+        requested, blocked = track_requests(page)
         await block_requests(page, extra_url_patterns=['*.js'])
         await page.goto(target_url)
-        await page.wait_for_load_state('networkidle')
         await page.close()
 
         await browser.close()
 
-        # With blocking, only HTML should load
-        assert set(loaded_urls_blocked) == {'resource_loading_page'}
+    # The page requests both resources, and both the image and the script are blocked
+    assert requested == {'resource_loading_page', 'test.js', 'test.png'}
+    assert blocked == {'test.js', 'test.png'}
 
 
 async def test_block_requests_with_custom_patterns(server_url: URL) -> None:
@@ -170,15 +169,13 @@ async def test_block_requests_with_custom_patterns(server_url: URL) -> None:
         target_url = str(server_url / 'resource_loading_page')
 
         page = await browser.new_page()
-        loaded_urls_blocked = []
-
-        page.on('requestfinished', lambda req: loaded_urls_blocked.append(req.url.rsplit('/', 1)[-1]))
+        requested, blocked = track_requests(page)
         await block_requests(page, url_patterns=['*.js'])
         await page.goto(target_url)
-        await page.wait_for_load_state('networkidle')
         await page.close()
 
         await browser.close()
 
-        # With blocking, only PNG should load
-        assert set(loaded_urls_blocked) == {'resource_loading_page', 'test.png'}
+    # The page requests both resources, and only the script is blocked
+    assert requested == {'resource_loading_page', 'test.js', 'test.png'}
+    assert blocked == {'test.js'}

@@ -310,6 +310,7 @@ include = [
 
 [tool.ty.overrides.rules]
 import-not-found = "ignore"
+missing-module-member = "ignore"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "assert_never()"]

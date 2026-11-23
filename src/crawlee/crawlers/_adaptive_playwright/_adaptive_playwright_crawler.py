@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
+from contextvars import ContextVar
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import getLogger
 from random import random
 from typing import TYPE_CHECKING, Any, Generic, get_args
@@ -30,7 +31,12 @@ from crawlee.crawlers import (
 from crawlee.crawlers._beautifulsoup._beautifulsoup_parser import BeautifulSoupParser
 from crawlee.crawlers._parsel._parsel_parser import ParselParser
 from crawlee.crawlers._playwright._playwright_crawler import _PlaywrightCrawlerAdditionalOptions
-from crawlee.errors import ContextPipelineInitializationError, RequestHandlerError, RequestThrottledError
+from crawlee.errors import (
+    ContextPipelineInitializationError,
+    RequestHandlerError,
+    RequestThrottledError,
+    UserDefinedErrorHandlerError,
+)
 from crawlee.statistics import Statistics, StatisticsState
 
 from ._adaptive_playwright_crawler_statistics import AdaptivePlaywrightCrawlerStatisticState
@@ -48,13 +54,20 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from crawlee._types import UseStateFunction
+    from crawlee._types import SkippedReason, UseStateFunction
     from crawlee.crawlers._basic._basic_crawler import _BasicCrawlerOptions
 
 
 TStaticParseResult = TypeVar('TStaticParseResult')
 TStaticSelectResult = TypeVar('TStaticSelectResult')
 TStaticCrawlingContext = TypeVar('TStaticCrawlingContext', bound=ParsedHttpCrawlingContext)
+
+_run_skipped_requests: ContextVar[list[tuple[str, SkippedReason]]] = ContextVar('_run_skipped_requests')
+"""Requests skipped in the current sub crawler run. They are reported only if the result of the run is committed."""
+
+
+async def _collect_skipped_request(url: str, reason: SkippedReason) -> None:
+    _run_skipped_requests.get().append((url, reason))
 
 
 class _NonPersistentStatistics(Statistics):
@@ -221,6 +234,13 @@ class AdaptivePlaywrightCrawler(
         static_crawler.post_navigation_hook(adaptive_post_navigation_hook_static)
         playwright_crawler.post_navigation_hook(adaptive_post_navigation_hook_pw)
 
+        # The sub crawlers check links against robots.txt in `enqueue_links`. They share the robots.txt cache of this
+        # crawler, so that each file is fetched once, and collect the links they skip in the current sub crawler run.
+        for sub_crawler in (static_crawler, playwright_crawler):
+            sub_crawler._robots_txt_file_cache = self._robots_txt_file_cache  # noqa: SLF001
+            sub_crawler._robots_txt_lock = self._robots_txt_lock  # noqa: SLF001
+            sub_crawler.on_skipped_request(_collect_skipped_request)
+
         self._additional_context_managers = [
             *self._additional_context_managers,
             self.rendering_type_predictor,
@@ -285,6 +305,17 @@ class AdaptivePlaywrightCrawler(
             **kwargs,
         )
 
+    async def _report_skipped_requests(
+        self, context: BasicCrawlingContext, skipped_requests: list[tuple[str, SkippedReason]]
+    ) -> None:
+        """Report the requests skipped by the sub crawler run whose result is committed."""
+        try:
+            for url, reason in skipped_requests:
+                await self._handle_skipped_request(url, reason)
+        except UserDefinedErrorHandlerError as e:
+            # Other crawlers call the callback inside the request handler, where its error fails the handler.
+            raise RequestHandlerError(e, context) from e
+
     async def _crawl_one(
         self,
         rendering_type: RenderingType,
@@ -296,7 +327,8 @@ class AdaptivePlaywrightCrawler(
         `SubCrawlerRun` contains either result of the crawl or the exception that was thrown during the crawl.
         Sub crawler pipeline call is dynamically created based on the `rendering_type`.
         A new context is created from passed `context` and `use_state` and is passed to sub crawler pipeline. The
-        original `request` is shared, so its mutations persist. Only `result` is isolated per sub crawler.
+        original `request` is shared, so its mutations persist. Only `result` and the skipped requests are isolated per
+        sub crawler.
         """
         # A fresh result is injected into the new context to isolate `add_requests`/`push_data`/`kvs` calls between
         # sub crawlers. The `request` itself is shared, so mutations to it persist.
@@ -315,6 +347,8 @@ class AdaptivePlaywrightCrawler(
             log=context.log,
             register_deferred_cleanup=context.register_deferred_cleanup,
         )
+        skipped_requests: list[tuple[str, SkippedReason]] = []
+        token = _run_skipped_requests.set(skipped_requests)
 
         try:
             await wait_for(
@@ -327,9 +361,11 @@ class AdaptivePlaywrightCrawler(
                 ),
                 logger=self._logger,
             )
-            return SubCrawlerRun(result=result)
+            return SubCrawlerRun(result=result, skipped_requests=skipped_requests)
         except Exception as e:
             return SubCrawlerRun(exception=e)
+        finally:
+            _run_skipped_requests.reset(token)
 
     def _pipeline_call_factory(
         self, rendering_type: RenderingType, context_linked_to_result: BasicCrawlingContext
@@ -385,6 +421,7 @@ class AdaptivePlaywrightCrawler(
                 static_run = await self._crawl_one(rendering_type='static', context=context)
                 if static_run.result and self.result_checker(static_run.result):
                     self._context_result_map[context] = static_run.result
+                    await self._report_skipped_requests(context, static_run.skipped_requests)
                     return
                 # The browser would hit the same rate-limited domain, so let the crawler defer the request.
                 if (
@@ -446,6 +483,7 @@ class AdaptivePlaywrightCrawler(
                 self.rendering_type_predictor.store_result(context.request, detection_result)
 
             self._context_result_map[context] = pw_run.result
+            await self._report_skipped_requests(context, pw_run.skipped_requests)
 
     def pre_navigation_hook(
         self,
@@ -512,3 +550,4 @@ class AdaptivePlaywrightCrawler(
 class SubCrawlerRun:
     result: RequestHandlerRunResult | None = None
     exception: Exception | None = None
+    skipped_requests: list[tuple[str, SkippedReason]] = field(default_factory=list)

@@ -4,7 +4,7 @@ from itertools import groupby
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from lxml import etree  # ty: ignore[import-not-found]
+from lxml import etree  # ty: ignore[missing-module-member]
 from typing_extensions import override
 
 from crawlee._utils.docs import docs_group

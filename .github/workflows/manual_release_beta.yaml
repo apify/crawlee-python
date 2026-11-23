@@ -21,7 +21,7 @@ jobs:
       checks: read
     steps:
       - name: Wait for checks
-        uses: apify/actions/wait-for-checks@v1.6.2
+        uses: apify/actions/wait-for-checks@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           ref: ${{ github.sha }}
           check-regexp: ^Checks
@@ -34,7 +34,7 @@ jobs:
       version_number: ${{ steps.release_prepare.outputs.version_number }}
       changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@v1.6.2
+      - uses: apify/actions/git-cliff-release@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         id: release_prepare
         name: Release prepare
         with:
@@ -46,7 +46,7 @@ jobs:
     needs: [release_prepare]
     permissions:
       contents: write
-    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@main
+    uses: apify/workflows/.github/workflows/python_bump_and_update_changelog.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
     with:
       version_number: ${{ needs.release_prepare.outputs.version_number }}
       changelog_artifact_name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
@@ -61,7 +61,7 @@ jobs:
       actions: write # Required by execute-workflow.
     steps:
       - name: Dispatch PyPI publish workflow
-        uses: apify/actions/execute-workflow@v1.6.2
+        uses: apify/actions/execute-workflow@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           workflow: publish_to_pypi.yaml
           inputs: >

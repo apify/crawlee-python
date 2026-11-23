@@ -30,15 +30,13 @@ permissions:
   contents: read
 
 jobs:
-  pypi_publish:
-    name: PyPI publish
+  # Runs without `id-token: write`, so the build (the composite actions and the project's dev dependencies) can't
+  # request a PyPI token. Only the `pypi_publish` job below can.
+  build:
+    name: Build
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Required for OIDC authentication.
-    environment:
-      name: pypi
-      url: https://pypi.org/project/crawlee
     steps:
       # Also pins the ref to a commit, so the checked commit is the one that gets built.
       - name: Check that the ref is on a release branch
@@ -60,7 +58,7 @@ jobs:
           exit 1
 
       - name: Prepare distribution
-        uses: apify/actions/prepare-pypi-distribution@v1.6.2
+        uses: apify/actions/prepare-pypi-distribution@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           package_name: crawlee
           is_prerelease: ${{ inputs.is_prerelease && 'yes' || '' }}
@@ -68,7 +66,7 @@ jobs:
           ref: ${{ steps.ref.outputs.sha }}
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@v1.6.2
+        uses: apify/actions/python-package-check@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
         with:
           package_name: crawlee
           dist_dir: dist
@@ -85,6 +83,30 @@ jobs:
             HttpCrawler()
             BeautifulSoupCrawler()
             ParselCrawler()
+
+      - name: Upload distribution
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  pypi_publish:
+    name: PyPI publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC authentication.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crawlee
+    steps:
+      - name: Download distribution
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
 
       # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
