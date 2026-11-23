@@ -1027,7 +1027,11 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     event=Event.PERSIST_STATE,
                     event_data=EventPersistStateData(is_migrating=False),
                 )
-                await wait_for_all_tasks_to_finish(tasks=listener_tasks, logger=self._logger)
+                await wait_for_all_tasks_to_finish(
+                    tasks=listener_tasks,
+                    logger=self._logger,
+                    timeout=event_manager.close_timeout,
+                )
 
     async def _pause_by_event(self) -> None:
         """Pause the crawl before the process migrates or is aborted, so that no request is left half-done."""

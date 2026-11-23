@@ -59,11 +59,11 @@ crawler = ParselCrawler()
 
 The event manager starts by itself on the first `on()` or `emit()` call in a running event loop, and keeps running until the event loop shuts down. In v1, it ran only while a crawler or your own `async with` block held it, so a request queue, a `RequestList` or a `use_state` dictionary used outside of them didn't save its state. Note that:
 
-- A crawler no longer enters the event manager. It emits a `PERSIST_STATE` event at the end of every run and waits for the listeners that event invokes.
+- A crawler no longer enters the event manager. It emits a `PERSIST_STATE` event at the end of every run and waits for the listeners that event invokes, up to the `close_timeout` of the event manager.
 - Listeners stay registered until `off()` removes them or the event loop shuts down. In v1, all of them were removed when the event manager stopped.
 - A `use_state` dictionary keeps listening until the event loop shuts down. If its storage backend is closed before that, such as a `SqlStorageBackend` or `RedisStorageBackend` used with `async with`, the final `PERSIST_STATE` event at the shutdown logs a warning that the state failed to persist. The state saved at the end of the crawler run stays in the store.
-- The event manager runs in one event loop at a time, and using it from another one while it runs raises a `RuntimeError`. Run parallel crawlers in one event loop or in separate processes, not in threads that each call `asyncio.run()`.
-- The event manager stops when its event loop cancels the remaining tasks on shutdown, as `asyncio.run()` does.
+- The event manager runs in one event loop at a time, and using it from another one while it runs raises a `RuntimeError`. That goes for anything that listens to events, such as a crawler, a request queue on the file system or a `use_state` dictionary. Run them in one event loop or in separate processes, not in threads with their own event loops.
+- The event manager stops when its event loop cancels the remaining tasks on shutdown, as `asyncio.run()` does. Cancelling all tasks of an event loop that keeps running stops it the same way, for the rest of that loop. It emits no more periodic events there, and `on()` in that loop registers nothing and logs a warning.
 - An event loop driven by `loop.run_until_complete()` that never shuts down leaves the tasks of the event manager pending. No final `PERSIST_STATE` event comes, and Python logs `Task was destroyed but it is pending!` for them at exit.
 - A process killed by a signal that `asyncio.run()` doesn't handle, such as `SIGTERM`, gets no final `PERSIST_STATE` event either.
 
@@ -74,7 +74,7 @@ Other changes:
 - `emit()` returns the tasks of the listeners it starts.
 - A stop waits for the listeners in two rounds, each limited by `close_timeout`, so it can take up to twice as long.
 
-Entering an inactive event manager with `async with` takes over its lifecycle, so it stops when the block exits. Entering an active one raises a `RuntimeError`, where v1 counted the entries. A manager that started by itself is active too, so check `active` before entering one. Code that registered listeners with `on()` and then entered the manager with `async with` worked in v1. In v2, `on()` called in a running event loop starts the manager, so that `async with` raises. Enter the manager before you register the listeners, or leave out the `async with`.
+Entering an inactive event manager with `async with` takes over its lifecycle, so it stops when the block exits. After the exit, the next `on()` or `emit()` starts it again, as it would start one that nobody entered. Entering an active one raises a `RuntimeError`, where v1 counted the entries. A manager that started by itself is active too, so check `active` before entering one. Code that registered listeners with `on()` and then entered the manager with `async with` worked in v1. In v2, `on()` called in a running event loop starts the manager, so that `async with` raises. Enter the manager before you register the listeners, or leave out the `async with`.
 
 A custom event manager that has to await something to start, such as a connection, sets the `supports_lazy_start` class attribute to `False`. Whoever enters it with `async with` owns it, and calling `on()` while nobody has entered it raises a `RuntimeError`. A crawler no longer enters the event manager, so enter such a manager yourself around every `run()`. A subclass that starts its work in `__aenter__()` doesn't get that work on a lazy start, so it needs `supports_lazy_start = False` too.
 
@@ -675,7 +675,7 @@ Every crawler logs to a logger named after its class under `crawlee.crawlers`, s
 
 The autoscaled pool of a crawler logs to the `autoscaled_pool` child of the crawler's logger, for example `crawlee.crawlers.ParselCrawler.autoscaled_pool`. A standalone `AutoscaledPool` logs to `crawlee.autoscaling._autoscaled_pool` unless you pass it a `logger`.
 
-When the wait for the `PERSIST_STATE` listeners at the end of a run is cancelled, the warning `Asyncio wait was cancelled; canceling unfinished tasks.` comes from the crawler's logger. In v1, it came from `crawlee.events._event_manager`, which ran that wait when the crawler exited the event manager.
+When the wait for the `PERSIST_STATE` listeners at the end of a run is cancelled, the warning `Asyncio wait was cancelled; canceling unfinished tasks.` comes from the crawler's logger, and so does `Waiting timeout reached; canceling unfinished tasks.` when that wait reaches the `close_timeout` of the event manager. In v1, both came from `crawlee.events._event_manager`, which ran that wait when the crawler exited the event manager.
 
 ### Custom crawler logger
 

@@ -3912,6 +3912,30 @@ async def test_run_end_waits_own_listeners() -> None:
     await blocked_task
 
 
+async def test_run_end_wait_uses_close_timeout() -> None:
+    """The wait for the listeners at the end of a run stops after the `close_timeout` of the event manager."""
+    service_locator.set_event_manager(LocalEventManager(close_timeout=timedelta(milliseconds=100)))
+    on_cancel = Mock()
+
+    async def never_ending_listener() -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            on_cancel()
+            raise
+
+    service_locator.get_event_manager().on(event=Event.PERSIST_STATE, listener=never_ending_listener)
+    crawler = BasicCrawler(request_handler=AsyncMock())
+    loop = asyncio.get_running_loop()
+    started_at = loop.time()
+
+    # The cap only keeps a regression from hanging the test, so the elapsed time is what shows the limit.
+    await asyncio.wait_for(crawler.run(['https://a.placeholder.com']), timeout=10)
+
+    assert loop.time() - started_at < 5
+    on_cancel.assert_called_once()
+
+
 async def test_failed_start_skips_persist_state(monkeypatch: pytest.MonkeyPatch) -> None:
     """A run whose components fail to start doesn't emit `PersistState` at its end."""
     monkeypatch.setattr(Statistics, '__aenter__', AsyncMock(side_effect=RuntimeError('Statistics failed to start.')))

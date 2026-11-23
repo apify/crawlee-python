@@ -1102,6 +1102,31 @@ async def test_owner_exit_during_close_no_restart(monkeypatch: pytest.MonkeyPatc
     assert recurring_task.done()
 
 
+async def test_on_after_close_warns_once(caplog: pytest.LogCaptureFixture) -> None:
+    """`on()` in an event loop that the manager closed with registers nothing and logs a warning, once."""
+    event_manager = EventManager()
+    event_manager.on(event=Event.PERSIST_STATE, listener=AsyncMock())
+    shutdown_task = event_manager._shutdown_task
+    assert shutdown_task is not None
+    # The guard starts waiting long before an app cancels the tasks of the event loop.
+    await asyncio.sleep(0)
+
+    # An app cancelling all tasks of an event loop that keeps running closes the manager, as a shutdown would.
+    shutdown_task.cancel()
+    await asyncio.gather(shutdown_task, return_exceptions=True)
+
+    with caplog.at_level(logging.WARNING, logger='crawlee.events._event_manager'):
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
+
+    assert event_manager._listeners_to_wrappers == {}
+    expected_message = (
+        'The event manager closed when the tasks of its event loop were cancelled, so it does not register the '
+        'listener for the systemInfo event in that loop.'
+    )
+    assert [record.message for record in caplog.records] == [expected_message]
+
+
 def test_late_owner_exit_is_noop() -> None:
     """An owner in a task cancelled by the shutdown exits without an error after the shutdown closed the manager."""
     event_manager = EventManager()

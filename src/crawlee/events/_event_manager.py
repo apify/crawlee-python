@@ -6,10 +6,11 @@ import os
 import weakref
 from collections import defaultdict
 from datetime import timedelta
-from logging import getLogger
+from logging import WARNING, getLogger
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
 
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.wait import wait_for_all_tasks_to_finish
 from crawlee.events._types import (
@@ -44,8 +45,9 @@ class EventManagerOptions(TypedDict):
 
     close_timeout: NotRequired[timedelta | None]
     """Optional timeout for canceling pending event listeners if they exceed this duration. `None` waits without
-    a limit, except at the shutdown of the event loop, where it waits for 30 seconds, and zero cancels them right
-    away. A stop waits in two rounds, so it can take up to twice as long.
+    a limit, or 30 seconds at the shutdown of the event loop. Zero cancels them right away. A stop waits in two
+    rounds, so it can take up to twice as long. A crawler waits for the listeners at the end of a run with the same
+    limit.
     """
 
 
@@ -85,9 +87,9 @@ class EventManager:
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
             close_timeout: Optional timeout for canceling pending event listeners if they exceed this duration.
-                `None` waits without a limit, except at the shutdown of the event loop, where it waits for 30
-                seconds, and zero cancels them right away. A stop waits in two rounds, so it can take up to twice as
-                long.
+                `None` waits without a limit, or 30 seconds at the shutdown of the event loop. Zero cancels them
+                right away. A stop waits in two rounds, so it can take up to twice as long. A crawler waits for the
+                listeners at the end of a run with the same limit.
         """
         self._persist_state_interval = persist_state_interval
         """Interval between the emitted `PersistState` events."""
@@ -138,6 +140,9 @@ class EventManager:
         manager again in that loop.
         """
 
+        self._logger_once = LoggerOnce(logger)
+        """Logs the warnings that would otherwise repeat, once per manager."""
+
         EventManager._instances.add(self)
 
     @property
@@ -155,6 +160,14 @@ class EventManager:
 
         # An event loop closed without a shutdown leaves the flag set.
         return not self._loop.is_closed()
+
+    @property
+    def close_timeout(self) -> timedelta | None:
+        """Timeout for the running listeners when the manager stops.
+
+        `None` waits without a limit, except at the shutdown of the event loop, where the manager waits for 30 seconds.
+        """
+        return self._close_timeout
 
     async def __aenter__(self) -> Self:
         """Start the manager and take over its lifecycle.
@@ -236,7 +249,15 @@ class EventManager:
             if self._loop is not None and self._loop.is_closed():
                 self._forget_loop()
         elif loop is self._closed_loop:
-            # A listener registered while its event loop shuts down would only outlive the loop.
+            # The manager closed with this event loop, at its shutdown or after an app cancelled all its tasks, and it
+            # doesn't start again in that loop.
+            self._logger_once.log(
+                'The event manager closed when the tasks of its event loop were cancelled, so it does not register '
+                'the listener for the %s event in that loop.',
+                event.value,
+                key='listener-after-close',
+                level=WARNING,
+            )
             return
         else:
             self._start_on_use(loop)
