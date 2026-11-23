@@ -839,6 +839,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         run handled, failed ones included, aren't processed again. To crawl them again, purge the request manager, or
         create a new crawler with a freshly opened request queue.
 
+        Cancelling the task that awaits `run()`, such as with a timeout around it, raises `CancelledError` once the
+        requests in progress finish. A repeated cancellation, which anyio cancel scopes keep sending, cancels them.
+        Ctrl+C also lets them finish, and then returns the final statistics.
+
         Args:
             requests: The requests to be enqueued before the crawler starts.
 
@@ -917,17 +921,26 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     )
                     remove_sigint_handler = partial(signal.signal, signal.SIGINT, previous_sigint_handler)
 
+            current_task = asyncio.current_task()
+            cancelling_before = current_task.cancelling() if current_task is not None else 0
+            cancellation: CancelledError | None = None
+
             try:
                 await run_task
-            except CancelledError:
-                # SIGINT cancels only `run_task`, and the crawl then ends gracefully. A cancellation of the task that
-                # awaits `run()`, such as a timeout around it, propagates.
-                current_task = asyncio.current_task()
-                if current_task is not None and current_task.cancelling() > 0:
-                    raise
+            except CancelledError as exc:
+                cancellation = exc
             finally:
                 if remove_sigint_handler is not None:
                     remove_sigint_handler()
+
+            # SIGINT cancels only `run_task`, and the crawl then ends gracefully. A cancellation of the task that awaits
+            # `run()`, such as a timeout around it, propagates, also when the crawl swallowed it. An earlier one that
+            # the caller caught doesn't count. The caught exception is raised again, since anyio cancel scopes
+            # recognize their cancellation by its message. A cancelled run counts as finished, so the next one starts
+            # afresh.
+            if current_task is not None and current_task.cancelling() > cancelling_before:
+                self._has_finished_before = True
+                raise cancellation or CancelledError()
 
             if self._statistics.error_tracker.total > 0:
                 self._logger.info(

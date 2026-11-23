@@ -12,6 +12,7 @@ import time
 from asyncio import Future
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import chain, product, repeat
@@ -2191,10 +2192,7 @@ async def test_stop_ends_paused_run() -> None:
     await asyncio.wait_for(pause_task, timeout=10)
 
     crawler.stop()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2221,10 +2219,7 @@ async def test_pause_after_stop_ends_run() -> None:
 
     release.set()
     await asyncio.wait_for(pause_task, timeout=10)
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2249,10 +2244,7 @@ async def test_pause_timeout_after_stop_ends_run() -> None:
         await crawler.pause(timeout=timedelta(milliseconds=50))
 
     release.set()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2279,10 +2271,7 @@ async def test_migration_after_stop_ends_run() -> None:
 
     release.set()
     await event_manager.wait_for_all_listeners_to_complete()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2311,10 +2300,7 @@ async def test_abort_on_error_ends_paused_run() -> None:
         await crawler.pause(timeout=timedelta(milliseconds=50))
 
     release.set()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2355,10 +2341,7 @@ async def test_pause_after_abort_on_error_ends_run() -> None:
 
     release.set()
     await asyncio.wait_for(pause_task, timeout=10)
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert len(visited) == 2
 
@@ -4459,8 +4442,81 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
 
 
-async def test_run_raises_when_cancelled() -> None:
-    """Cancelling the task that awaits `run()` raises `CancelledError` instead of returning the statistics."""
+async def test_run_raises_when_cancelled(caplog: pytest.LogCaptureFixture) -> None:
+    """Cancelling the task that awaits `run()` raises `CancelledError` once the requests in progress finish."""
+    caplog.set_level(logging.INFO, logger='crawlee')
+    crawler = BasicCrawler(configure_logging=False)
+    handler_started = asyncio.Event()
+    release_handler = asyncio.Event()
+    handler_finished = Mock()
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        handler_started.set()
+        await release_handler.wait()
+        handler_finished()
+
+    run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    await handler_started.wait()
+    # The message shows that the caller's own cancellation propagates, not a new one.
+    run_task.cancel('caller cancelled')
+    # The crawl lets the running request finish before it ends.
+    release_handler.set()
+
+    with pytest.raises(asyncio.CancelledError, match='caller cancelled'):
+        await run_task
+
+    handler_finished.assert_called_once()
+    assert 'Final request statistics' not in caplog.text
+
+
+async def test_run_raises_timeout_error_on_timeout() -> None:
+    """A timeout around `run()` raises `TimeoutError` once the requests in progress finish."""
+    crawler = BasicCrawler(configure_logging=False)
+    handler_finished = Mock()
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        # Expire the timeout while the request is in progress, and finish only once it has cancelled the run.
+        run_timeout.reschedule(asyncio.get_running_loop().time())
+        await poll_until_condition(run_timeout.expired)
+        handler_finished()
+
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(None) as run_timeout:
+            await crawler.run(['https://a.placeholder.com'])
+
+    handler_finished.assert_called_once()
+
+
+async def test_run_raises_when_crawl_swallows_cancellation() -> None:
+    """Cancelling the task that awaits `run()` raises `CancelledError` even when the crawl swallows the cancellation."""
+    crawler = BasicCrawler(configure_logging=False)
+    handler_started = asyncio.Event()
+    release_handler = asyncio.Event()
+    run_crawler = crawler._run_crawler
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        handler_started.set()
+        await release_handler.wait()
+
+    async def swallow_cancellation() -> None:
+        with suppress(asyncio.CancelledError):
+            await run_crawler()
+
+    with patch.object(crawler, '_run_crawler', swallow_cancellation):
+        run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+        await handler_started.wait()
+        run_task.cancel()
+        release_handler.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await run_task
+
+
+async def test_run_after_cancelled_run_resets_statistics() -> None:
+    """A `run()` after a cancelled one starts with fresh statistics."""
     crawler = BasicCrawler(configure_logging=False)
     handler_started = asyncio.Event()
     release_handler = asyncio.Event()
@@ -4473,11 +4529,42 @@ async def test_run_raises_when_cancelled() -> None:
     run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
     await handler_started.wait()
     run_task.cancel()
-    # The crawl lets the running request finish before it ends.
     release_handler.set()
 
     with pytest.raises(asyncio.CancelledError):
         await run_task
+
+    stats = await crawler.run(['https://b.placeholder.com'])
+
+    assert stats.requests_finished == 1
+
+
+async def test_sigint_after_caught_cancellation() -> None:
+    """SIGINT ends the crawl gracefully even when the task that awaits `run()` caught an earlier cancellation."""
+    crawler = BasicCrawler(
+        configure_logging=False,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        signal.raise_signal(signal.SIGINT)
+        # The pause lets the running request finish, so keep it running until the pause takes effect.
+        await asyncio.sleep(0.5)
+
+    async def run_after_caught_cancellation() -> FinalStatistics:
+        with suppress(asyncio.CancelledError):
+            await asyncio.Event().wait()
+
+        return await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com'])
+
+    run_task = asyncio.create_task(run_after_caught_cancellation())
+    await asyncio.sleep(0)
+    run_task.cancel()
+
+    stats = await run_task
+
+    assert stats.requests_finished == 1
 
 
 async def test_concurrency_system_excludes_settings() -> None:
