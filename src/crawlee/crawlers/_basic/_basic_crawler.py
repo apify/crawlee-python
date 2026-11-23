@@ -1859,9 +1859,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 # The request lets tiered proxies pick the tier of the URL's domain.
                 proxy_info = await self._get_proxy_info(Request.from_url(url), None)
 
-                return await RobotsTxtFile.find(
-                    url, self._robots_txt_http_client, proxy_info=proxy_info, raise_on_error=True
-                )
+                return await RobotsTxtFile.find(url, self._robots_txt_http_client, proxy_info=proxy_info)
             except Exception:  # noqa: PERF203
                 if attempt == self._ROBOTS_TXT_MAX_ATTEMPTS:
                     raise

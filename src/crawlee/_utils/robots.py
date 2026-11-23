@@ -46,22 +46,13 @@ class RobotsTxtFile:
         return cls(url, robots)
 
     @classmethod
-    async def load(
-        cls,
-        url: str,
-        http_client: HttpClient,
-        proxy_info: ProxyInfo | None = None,
-        *,
-        raise_on_error: bool = False,
-    ) -> Self:
+    async def load(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Load the robots.txt file for a given URL.
 
         Args:
             url: The direct URL of the robots.txt file to be loaded.
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            raise_on_error: Whether to raise the error of a failed fetch. If False, the error is logged and the returned
-                file has no restrictions.
         """
         try:
             response = await http_client.send_request(url, proxy_info=proxy_info)
@@ -80,34 +71,21 @@ class RobotsTxtFile:
 
         except Exception as e:
             logger.warning(f'Failed to fetch from robots.txt from "{url}" with error: "{e}"')
-
-            if raise_on_error:
-                raise
-
-            robots = Protego.parse('User-agent: *\nAllow: /')
+            raise
 
         return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
 
     @classmethod
-    async def find(
-        cls,
-        url: str,
-        http_client: HttpClient,
-        proxy_info: ProxyInfo | None = None,
-        *,
-        raise_on_error: bool = False,
-    ) -> Self:
+    async def find(cls, url: str, http_client: HttpClient, proxy_info: ProxyInfo | None = None) -> Self:
         """Determine the location of a robots.txt file for a URL and fetch it.
 
         Args:
             url: The URL whose domain will be used to find the corresponding robots.txt file.
             http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
             proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            raise_on_error: Whether to raise the error of a failed fetch. If False, the error is logged and the returned
-                file has no restrictions.
         """
         robots_url = URL(url).with_path('/robots.txt')
-        return await cls.load(str(robots_url), http_client, proxy_info, raise_on_error=raise_on_error)
+        return await cls.load(str(robots_url), http_client, proxy_info)
 
     def is_allowed(self, url: str, user_agent: str = '*') -> bool:
         """Check if the given URL is allowed for the given user agent.

@@ -733,10 +733,15 @@ async def _discover_for_hostname(
         return True
 
     # Try getting sitemaps from robots.txt first
-    robots = await RobotsTxtFile.find(url=hostname_urls[0], http_client=http_client, proxy_info=proxy_info)
-    for sitemap_url in robots.get_sitemaps(enqueue_strategy='same-hostname'):
-        if _check_and_add(sitemap_url):
-            yield sitemap_url
+    try:
+        robots = await RobotsTxtFile.find(url=hostname_urls[0], http_client=http_client, proxy_info=proxy_info)
+    except Exception:  # noqa: S110
+        # `RobotsTxtFile.load` already logged the error, and discovery goes on with the other sources.
+        pass
+    else:
+        for sitemap_url in robots.get_sitemaps(enqueue_strategy='same-hostname'):
+            if _check_and_add(sitemap_url):
+                yield sitemap_url
 
     # Check maybe provided URLs have sitemap url
     matching_sitemap_urls = [url for url in hostname_urls if SITEMAP_URL_PATTERN.search(url)]

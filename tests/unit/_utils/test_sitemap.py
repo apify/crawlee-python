@@ -463,6 +463,23 @@ async def test_discover_sitemap_from_robots_txt() -> None:
     assert urls == ['http://example.com/custom-sitemap.xml']
 
 
+async def test_discover_sitemap_continues_after_robots_txt_fetch_error() -> None:
+    """A failed robots.txt fetch does not stop the discovery, and common paths are still checked."""
+    http_client = _make_mock_client({'/sitemap.xml': (200, b'')})
+    common_paths_send_request = http_client.send_request.side_effect
+
+    async def send_request(url: str, **kwargs: Any) -> HttpResponse:
+        if url.endswith('/robots.txt'):
+            raise RuntimeError('The proxy failed.')
+        return await common_paths_send_request(url, **kwargs)
+
+    http_client.send_request.side_effect = send_request
+
+    urls = [url async for url in discover_valid_sitemaps(['http://example.com/page'], http_client=http_client)]
+
+    assert urls == ['http://example.com/sitemap.xml']
+
+
 async def test_discover_sitemap_from_common_paths() -> None:
     """Sitemap is found at common paths when robots.txt has none."""
     http_client = _make_mock_client(
