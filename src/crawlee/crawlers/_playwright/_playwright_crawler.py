@@ -567,19 +567,33 @@ class PlaywrightCrawler(
         yield context
 
     async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
-        # Session-backed HTTP clients read the session cookie jar inside the handler. Copy again after the handler returns
-        # so cookies created while it runs stay on the session.
-        await self._copy_browser_cookies_to_session(context)
+        # Session-backed HTTP clients read the session cookie jar inside the handler. Copy again after the handler
+        # returns so cookies created while it runs stay on the session.
+        browser_cookies = await self._copy_browser_cookies_to_session(context)
 
         yield self._build_crawling_context(context)
 
-        await self._copy_browser_cookies_to_session(context)
+        await self._copy_browser_cookies_to_session(context, skip=browser_cookies)
 
-    async def _copy_browser_cookies_to_session(self, context: TPostNavContext) -> None:
-        """Copy the browser cookies into the session, when the request has one."""
-        if context.session:
-            pw_cookies = await self._get_cookies(context.page)
-            context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
+    async def _copy_browser_cookies_to_session(
+        self,
+        context: TPostNavContext,
+        *,
+        skip: list[PlaywrightCookieParam] | None = None,
+    ) -> list[PlaywrightCookieParam]:
+        """Copy the browser cookies into the session, when the request has one.
+
+        Cookies equal to one in `skip` are not copied, so they cannot overwrite a session cookie that `send_request`
+        updated in the meantime. Returns all the browser cookies.
+        """
+        if not context.session:
+            return []
+
+        pw_cookies = await self._get_cookies(context.page)
+        skip = skip or []
+        changed_cookies = [cookie for cookie in pw_cookies if cookie not in skip]
+        context.session.cookies.set_cookies_from_playwright_format(changed_cookies)
+        return pw_cookies
 
     def pre_navigation_hook(self, hook: Callable[[TPreNavContext], Awaitable[None]]) -> None:
         """Register a hook to be called before each navigation.

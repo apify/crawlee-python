@@ -923,6 +923,23 @@ async def test_send_request_includes_cookies_set_during_navigation(server_url: U
     assert observed['sent'].get('basic') == '1'
 
 
+async def test_send_request_cookie_update_survives_handler(server_url: URL) -> None:
+    """A session cookie updated by `send_request` is not overwritten by the older browser cookie after the handler."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    sessions: list[Session] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        assert context.session is not None
+        sessions.append(context.session)
+        await context.send_request(str(server_url.with_path('set_cookies').extend_query(token='B')))
+
+    await crawler.run([str(server_url.with_path('set_cookies').extend_query(token='A'))])
+
+    assert len(sessions) == 1
+    assert sessions[0].cookies['token'] == 'B'
+
+
 async def test_extract_links(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
     extracted_links: list[str] = []
