@@ -327,6 +327,16 @@ async def test_invalid_record_raises_and_keeps_record(event_manager: EventManage
     await recoverable_state.teardown()
 
 
+async def test_record_cleared_by_v1_loads_default_state() -> None:
+    """A record that Crawlee v1 cleared by storing `None` loads the default state."""
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(KEY, b'', content_type='application/x-none')
+
+    state = await _build_state().initialize()
+
+    assert state == _State()
+
+
 async def test_unparsable_record_raises_with_fix_note() -> None:
     """A record that isn't valid JSON makes `initialize` raise `ValueError` with a note to fix or delete it."""
     kvs = await KeyValueStore.open()

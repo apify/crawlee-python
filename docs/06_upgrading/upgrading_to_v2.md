@@ -188,7 +188,7 @@ Key-value store values are serialized by `KeyValueStore` itself, the same way fo
 
 ### `set_value` with `None` deletes the record
 
-`set_value(key, None)` deletes the record, the same as `delete_value(key)`. In v1, it stored a record with the `application/x-none` content type, so `record_exists` returned `True` for it. A record stored that way by v1 is now read as empty `bytes`. Such records include the persisted state of `Statistics` and `SessionPool`, which v1 cleared this way when `run()` was called again after a finished run. If the process stopped before that state was saved again, the next start fails with a `ValidationError` for the record. Delete the record to start from the default state.
+`set_value(key, None)` deletes the record, the same as `delete_value(key)`. In v1, it stored a record with the `application/x-none` content type, so `record_exists` returned `True` for it. A record stored that way by v1 still reads as `None`, and `record_exists` still returns `True` for it.
 
 ### Values without a content type
 
@@ -217,6 +217,10 @@ Any other value can only be stored as JSON. Passing it with a content type that 
 `get_value` parses a record by its content type. `application/json` is parsed, `text/*` and `application/*xml` are decoded to `str` with the charset of the content type, or with UTF-8 when it has none, and any other content type is returned as `bytes`. A JSON or text record with a charset that Python doesn't know is returned as `bytes` too. In v1, `application/*xml` content types were returned as `bytes`, and the charset was ignored.
 
 A record with a JSON content type that isn't valid JSON raises `ValueError` from `get_value`, `iterate_values` and `iterate_entries`. In a text or JSON record, the bytes that its charset can't decode are replaced with the Unicode replacement character. In v1, the storage backend logged a warning in both cases, and the record was reported as missing. To read the stored bytes of such a record, use `KeyValueStore.get_record`.
+
+### Iteration lists the keys a page at a time
+
+`iterate_keys`, `iterate_values`, `iterate_entries` and `async for` over a store list the keys a page at a time, so a key set during the iteration can show up in it. In v1, `iterate_keys` listed all the keys when the iteration started. A page holds 1000 keys by default, and the new `chunk_size` argument of `iterate_keys`, `iterate_values` and `iterate_entries` changes that. With a `chunk_size` larger than the store, the keys are listed at once, as in v1. To keep your own writes out of an iteration, collect the keys first, for example with `keys = [key async for key in kvs]`, and write after that.
 
 ### Values set in a request handler
 

@@ -80,9 +80,6 @@ class KeyValueStore(Storage):
     ] = {}
     """Cache for recoverable (auto-saved) values."""
 
-    _LIST_KEYS_PAGE_SIZE = 1000
-    """Maximum number of keys listed with a single storage backend call."""
-
     _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
     """Maximum number of records read with a single storage backend call in `iterate_entries`."""
 
@@ -223,7 +220,10 @@ class KeyValueStore(Storage):
                 `text/plain` for `str` and `application/json` for other values.
 
         Raises:
-            TypeError: If `value` is neither `str` nor bytes, and `content_type` isn't JSON.
+            TypeError: If `value` is neither `str` nor bytes, and `content_type` isn't JSON, or if JSON can't represent
+                it, for example a `dict` with `tuple` keys.
+            ValueError: If `value` is stored as JSON and JSON can't serialize it, for example because of a circular
+                reference.
             LookupError: If `value` isn't bytes, and the charset of `content_type` is unknown.
             UnicodeEncodeError: If `value` isn't bytes, and the charset of `content_type` can't encode it.
         """
@@ -248,6 +248,7 @@ class KeyValueStore(Storage):
         prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
+        chunk_size: int = 1000,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
         """Iterate over the existing keys in the KVS.
 
@@ -258,6 +259,10 @@ class KeyValueStore(Storage):
             prefix: Iterate only over the keys that start with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of keys to return. None means no limit.
+            chunk_size: Maximum number of keys listed with a single storage backend call.
+
+        Raises:
+            ValueError: If `chunk_size` is less than 1.
 
         Yields:
             Information about the key.
@@ -266,6 +271,7 @@ class KeyValueStore(Storage):
             prefix=prefix,
             exclusive_start_key=exclusive_start_key,
             limit=limit,
+            chunk_size=chunk_size,
         ):
             for item in page:
                 yield item
@@ -276,19 +282,24 @@ class KeyValueStore(Storage):
         prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
+        chunk_size: int = 1000,
     ) -> AsyncIterator[Any]:
         """Iterate over the values of the existing records in the KVS.
 
         The records are fetched lazily as the iteration advances, in batches bounded by the record count and by the
-        total record size, so only a bounded number of values is held in memory at a time.
+        total record size, so only a bounded number of values is held in memory at a time. A record set while the
+        iteration is in progress may be yielded if its key follows the keys listed so far.
 
         Args:
             prefix: Iterate only over the records whose key starts with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of records to iterate over. None means no limit.
+            chunk_size: Maximum number of keys listed with a single storage backend call. The values are read in
+                separate batches, bounded by the record count and size.
 
         Raises:
-            ValueError: If a stored value has a JSON content type but isn't valid JSON.
+            ValueError: If a stored value has a JSON content type but isn't valid JSON, or if `chunk_size` is less
+                than 1.
 
         Yields:
             The value of each record.
@@ -297,6 +308,7 @@ class KeyValueStore(Storage):
             prefix=prefix,
             exclusive_start_key=exclusive_start_key,
             limit=limit,
+            chunk_size=chunk_size,
         ):
             yield value
 
@@ -306,6 +318,7 @@ class KeyValueStore(Storage):
         prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
+        chunk_size: int = 1000,
     ) -> AsyncIterator[tuple[str, Any]]:
         """Iterate over the existing records in the KVS as `(key, value)` pairs.
 
@@ -318,9 +331,12 @@ class KeyValueStore(Storage):
             prefix: Iterate only over the records whose key starts with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of records to iterate over. None means no limit.
+            chunk_size: Maximum number of keys listed with a single storage backend call. The values are read in
+                separate batches, bounded by the record count and size.
 
         Raises:
-            ValueError: If a stored value has a JSON content type but isn't valid JSON.
+            ValueError: If a stored value has a JSON content type but isn't valid JSON, or if `chunk_size` is less
+                than 1.
 
         Yields:
             A `(key, value)` tuple for each record.
@@ -329,6 +345,7 @@ class KeyValueStore(Storage):
             prefix=prefix,
             exclusive_start_key=exclusive_start_key,
             limit=limit,
+            chunk_size=chunk_size,
         ):
             batches = batch_records_by_size(
                 page,
@@ -460,12 +477,16 @@ class KeyValueStore(Storage):
         prefix: str | None,
         exclusive_start_key: str | None,
         limit: int | None,
+        chunk_size: int,
     ) -> AsyncIterator[list[KeyValueStoreRecordMetadata]]:
         """Iterate over the pages of keys listed by the storage backend, up to `limit` keys in total."""
+        if chunk_size < 1:
+            raise ValueError(f'`chunk_size` must be at least 1, got {chunk_size}.')
+
         remaining = limit
 
         while remaining is None or remaining > 0:
-            page_limit = self._LIST_KEYS_PAGE_SIZE
+            page_limit = chunk_size
             if remaining is not None:
                 page_limit = min(page_limit, remaining)
 

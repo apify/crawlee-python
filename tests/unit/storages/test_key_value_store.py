@@ -539,17 +539,13 @@ async def test_iterate_entries_skips_record_deleted_after_listing(
         pytest.param(3, 3, id='limit at a page boundary'),
     ],
 )
-async def test_iteration_spans_multiple_pages(
-    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch, limit: int | None, expected_count: int
-) -> None:
+async def test_iteration_spans_multiple_pages(kvs: KeyValueStore, limit: int | None, expected_count: int) -> None:
     """The keys and the entries are listed page by page, up to the limit, without skipping or repeating a key."""
     for i in range(10):
         await kvs.set_value(f'key{i}', i)
 
-    monkeypatch.setattr(KeyValueStore, '_LIST_KEYS_PAGE_SIZE', 3)
-
-    keys = [metadata.key async for metadata in kvs.iterate_keys(limit=limit)]
-    entries = [entry async for entry in kvs.iterate_entries(limit=limit)]
+    keys = [metadata.key async for metadata in kvs.iterate_keys(limit=limit, chunk_size=3)]
+    entries = [entry async for entry in kvs.iterate_entries(limit=limit, chunk_size=3)]
 
     assert keys == [f'key{i}' for i in range(expected_count)]
     assert entries == [(f'key{i}', i) for i in range(expected_count)]
@@ -601,14 +597,68 @@ async def test_iteration_with_prefix_spans_multiple_pages(kvs: KeyValueStore, mo
     for key in ['a', 'item-1', 'item-2', 'item-3', 'item-4', 'j']:
         await kvs.set_value(key, 'value')
 
-    monkeypatch.setattr(KeyValueStore, '_LIST_KEYS_PAGE_SIZE', 2)
     list_keys = AsyncMock(wraps=kvs._backend.list_keys)
     monkeypatch.setattr(kvs._backend, 'list_keys', list_keys)
 
-    keys = [metadata.key async for metadata in kvs.iterate_keys(prefix='item-')]
+    keys = [metadata.key async for metadata in kvs.iterate_keys(prefix='item-', chunk_size=2)]
 
     assert keys == ['item-1', 'item-2', 'item-3', 'item-4']
     assert list_keys.await_count == 2
+
+
+@pytest.mark.parametrize(
+    ('chunk_size', 'expected_limits'),
+    [
+        pytest.param(4, [4, 4, 4], id='three pages'),
+        pytest.param(100, [100], id='one page for the whole store'),
+    ],
+)
+async def test_chunk_size_sets_keys_per_backend_call(
+    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch, chunk_size: int, expected_limits: list[int]
+) -> None:
+    """`chunk_size` sets how many keys each storage backend call lists."""
+    for i in range(10):
+        await kvs.set_value(f'key{i}', i)
+
+    list_keys = AsyncMock(wraps=kvs._backend.list_keys)
+    monkeypatch.setattr(kvs._backend, 'list_keys', list_keys)
+
+    keys = [metadata.key async for metadata in kvs.iterate_keys(chunk_size=chunk_size)]
+
+    assert keys == [f'key{i}' for i in range(10)]
+    assert [call.kwargs['limit'] for call in list_keys.await_args_list] == expected_limits
+
+
+@pytest.mark.parametrize(
+    ('chunk_size', 'expected_keys'),
+    [
+        pytest.param(1, ['a', 'a-done', 'b'], id='pages smaller than the store'),
+        pytest.param(10, ['a', 'b'], id='one page for the whole store'),
+    ],
+)
+async def test_keys_set_during_iteration(kvs: KeyValueStore, chunk_size: int, expected_keys: list[str]) -> None:
+    """A key set during the iteration shows up in it, unless all keys were listed with the first page."""
+    for key in ['a', 'b']:
+        await kvs.set_value(key, 'value')
+
+    listed_keys = list[str]()
+    async for metadata in kvs.iterate_keys(chunk_size=chunk_size):
+        listed_keys.append(metadata.key)
+        if not metadata.key.endswith('-done'):
+            await kvs.set_value(f'{metadata.key}-done', 'value')
+
+    assert listed_keys == expected_keys
+
+
+async def test_chunk_size_below_one_raises(kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `chunk_size` below 1 raises before the storage backend is called."""
+    list_keys = AsyncMock(wraps=kvs._backend.list_keys)
+    monkeypatch.setattr(kvs._backend, 'list_keys', list_keys)
+
+    with pytest.raises(ValueError, match='at least 1'):
+        _ = [metadata async for metadata in kvs.iterate_keys(chunk_size=0)]
+
+    list_keys.assert_not_awaited()
 
 
 @pytest.mark.parametrize(

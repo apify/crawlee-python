@@ -39,6 +39,9 @@ _JSON_MEDIA_TYPE = 'application/json'
 
 _TEXT_MEDIA_TYPE_PATTERN = re.compile(r'text/.*|application/.*xml')
 
+_V1_NONE_MEDIA_TYPE = 'application/x-none'
+"""The content type Crawlee v1 stored a `None` value under, instead of deleting the record."""
+
 
 async def serialize_value(value: Any, content_type: str | None) -> tuple[bytes, str]:
     """Serialize a value into the bytes a KVS backend stores, and resolve its content type.
@@ -74,13 +77,17 @@ def parse_value(value: bytes, content_type: str) -> Any:
     """Parse the bytes read from a KVS backend according to their content type.
 
     JSON, text and XML are decoded with the charset of the content type, replacing the bytes it can't decode. JSON is
-    then parsed, and text and XML are returned as a string. A value with any other content type, or with a charset
-    Python can't decode text with, is returned as bytes.
+    then parsed, and text and XML are returned as a string. A record that Crawlee v1 stored for a `None` value is
+    read as `None`. A value with any other content type, or with a charset Python can't decode text with, is returned
+    as bytes.
 
     Raises:
         ValueError: If the value has a JSON content type but isn't valid JSON.
     """
     media_type = _get_media_type(content_type)
+    if media_type == _V1_NONE_MEDIA_TYPE:
+        return None
+
     is_json = media_type == _JSON_MEDIA_TYPE
 
     if not is_json and not _TEXT_MEDIA_TYPE_PATTERN.fullmatch(media_type):
@@ -89,7 +96,10 @@ def parse_value(value: bytes, content_type: str) -> Any:
     charset = parse_content_type_charset(content_type) or 'utf-8'
     try:
         # `bytes.decode` doesn't look the charset up for an empty value.
-        codecs.lookup(charset)
+        codec_name = codecs.lookup(charset).name
+        # A UTF-8 byte order mark isn't part of a JSON document.
+        if is_json and codec_name == 'utf-8':
+            charset = 'utf-8-sig'
         text = value.decode(charset, errors='replace')
     except LookupError:
         return value
