@@ -2956,6 +2956,17 @@ async def test_robots_txt_fetched_through_proxy(proxy_configuration_kwargs: dict
     assert http_client.send_request.call_args.kwargs['proxy_info'].url == 'http://proxy.placeholder.com:8000'
 
 
+async def test_robots_txt_fetched_without_proxy_when_not_configured() -> None:
+    """Without a proxy configuration, the robots.txt file is fetched directly."""
+    http_client = _create_robots_txt_http_client()
+    crawler = BasicCrawler(http_client=http_client, respect_robots_txt_file=True)
+
+    assert await crawler._is_allowed_based_on_robots_txt_file('https://site.placeholder.com/private') is False
+
+    http_client.send_request.assert_awaited_once()
+    assert http_client.send_request.call_args.kwargs['proxy_info'] is None
+
+
 async def test_robots_txt_fetch_timeout_allows_all_urls(monkeypatch: pytest.MonkeyPatch) -> None:
     """A robots.txt fetch that exceeds the timeout allows all URLs of the origin, and the fetch is not repeated."""
     monkeypatch.setattr(BasicCrawler, '_ROBOTS_TXT_TIMEOUT', timedelta(milliseconds=50))
