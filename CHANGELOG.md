@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
 
-## 1.11.3 - **not yet released**
+<!-- git-cliff-unreleased-end -->
+
+## [1.11.3](https://github.com/apify/crawlee-python/releases/tag/v1.11.3) (2026-11-23)
 
 ### 🐛 Bug Fixes
 
@@ -13,8 +15,7 @@ All notable changes to this project will be documented in this file.
 - Don't fail the request when a page has an unparsable link URL ([#2444](https://github.com/apify/crawlee-python/pull/2444)) ([45f219e](https://github.com/apify/crawlee-python/commit/45f219ed9df3ceb0c25311a24c7f047952a6d940)) by [@PrashanthLande](https://github.com/PrashanthLande)
 - **browsers:** Prevent a hang when closing a page never finishes ([#2441](https://github.com/apify/crawlee-python/pull/2441)) ([8670f7b](https://github.com/apify/crawlee-python/commit/8670f7b2a56fb3635ded29e11e45aa7244b07091)) by [@PrashanthLande](https://github.com/PrashanthLande)
 - **crawlers:** Report robots.txt skips in `AdaptivePlaywrightCrawler` sub crawlers ([#2452](https://github.com/apify/crawlee-python/pull/2452)) ([8755c6f](https://github.com/apify/crawlee-python/commit/8755c6f420b8fe811bbdf4fce7bb18b84987528c)) by [@Mantisus](https://github.com/Mantisus)
-
-<!-- git-cliff-unreleased-end -->
+- Fetch `robots.txt` through the configured proxy ([#2474](https://github.com/apify/crawlee-python/pull/2474)) ([0798173](https://github.com/apify/crawlee-python/commit/079817353850d76dbdba8fbe74a56930563b64f3)) by [@vdusek](https://github.com/vdusek)
 
 ## [1.11.2](https://github.com/apify/crawlee-python/releases/tag/v1.11.2) (2026-11-10)
 
