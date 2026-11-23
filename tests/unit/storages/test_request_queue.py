@@ -435,6 +435,25 @@ async def test_add_requests_mixed_forefront(rq: RequestQueue) -> None:
     assert requests[5].url == 'https://example.com/normal3'
 
 
+@pytest.mark.parametrize(
+    ('forefront', 'expected_order'),
+    [
+        pytest.param(False, list(range(8)), id='regular'),
+        pytest.param(True, list(reversed(range(8))), id='forefront'),
+    ],
+)
+async def test_batch_fetched_in_order_added(rq: RequestQueue, *, forefront: bool, expected_order: list[int]) -> None:
+    """Test that a batch is fetched in the order it was added, and a forefront batch in reverse order."""
+    await rq.add_requests([f'https://example.com/{i}' for i in range(8)], forefront=forefront)
+
+    fetched_urls = []
+    while (request := await rq.fetch_next_request()) is not None:
+        fetched_urls.append(request.url)
+        await rq.mark_request_as_handled(request)
+
+    assert fetched_urls == [f'https://example.com/{i}' for i in expected_order]
+
+
 async def test_fetch_next_request_and_mark_handled(rq: RequestQueue) -> None:
     """Test fetching and marking requests as handled."""
     # Add some requests

@@ -254,7 +254,7 @@ class SqlRequestQueueClient(
             existing_requests = {req.request_id: req for req in result.scalars()}
             insert_values: list[dict] = []
 
-            for request_id, request in sorted(unique_requests.items()):
+            for request_id, request in unique_requests.items():
                 existing_req_db = existing_requests.get(request_id)
                 # New Request, add it
                 if existing_req_db is None:
@@ -338,8 +338,12 @@ class SqlRequestQueueClient(
                     )
                     for value, sequence_number in zip(insert_values, sequence_numbers, strict=True):
                         value['sequence_number'] = sequence_number
-                    # Release the state row lock before inserting, so concurrent adds wait only for the reservation.
+                    # Release the state row lock before inserting, so concurrent adds wait only for the reservation. A
+                    # batch that reserved later numbers can then be inserted and fetched before an earlier one.
                     await session.commit()
+
+                    # Insert in `request_id` order, so concurrent batches lock their rows in the same order.
+                    insert_values.sort(key=lambda value: value['request_id'])
 
                     if forefront:
                         # If the request already exists in the database, we update the sequence_number
@@ -552,6 +556,8 @@ class SqlRequestQueueClient(
         async with self.get_session(with_simple_commit=True) as session:
             sequence_numbers = await self._reserve_sequence_numbers(session, count=1, forefront=forefront)
             new_sequence = sequence_numbers[0]
+            # Release the state row lock before updating the request, as in `add_batch_of_requests`.
+            await session.commit()
 
             # Update sequence number if changing priority
             if forefront:
@@ -689,9 +695,8 @@ class SqlRequestQueueClient(
             await session.execute(upsert_stmt)
             await session.execute(update_stmt)
 
-        new_counter = await session.scalar(select(counter).where(RequestQueueStateDb.request_queue_id == self._id))
-        if new_counter is None:
-            raise RuntimeError(f'Failed to create or retrieve state for queue {self._id}')
+        result = await session.execute(select(counter).where(RequestQueueStateDb.request_queue_id == self._id))
+        new_counter = result.scalar_one()
 
         return range(new_counter - step * count, new_counter, step)
 
