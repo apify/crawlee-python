@@ -35,7 +35,7 @@ from ._types import BlockRequestsFunction, GotoOptions
 from ._utils import NavigationRequestInterceptor, block_requests, infinite_scroll
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping, Sequence
     from pathlib import Path
 
     from playwright.async_api import Page, Response
@@ -157,6 +157,7 @@ class PlaywrightCrawler(
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
+        self._browser_cookies_after_navigation: dict[int, list[PlaywrightCookieParam]] = {}
 
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
@@ -413,7 +414,15 @@ class PlaywrightCrawler(
         # Set the loaded URL to the actual URL after redirection.
         context.request.loaded_url = context.page.url
 
-        yield self._build_post_nav_context(context, response=response)
+        # Session-backed HTTP clients read the session cookie jar, so the post-navigation hooks and the handler need
+        # the cookies the browser received during navigation.
+        request_id = id(context.request)
+        self._browser_cookies_after_navigation[request_id] = await self._copy_browser_cookies_to_session(context)
+
+        try:
+            yield self._build_post_nav_context(context, response=response)
+        finally:
+            self._browser_cookies_after_navigation.pop(request_id, None)
 
     def _create_extract_links_function(self, context: TPostNavContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.
@@ -567,9 +576,10 @@ class PlaywrightCrawler(
         yield context
 
     async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
-        # Session-backed HTTP clients read the session cookie jar inside the handler. Copy again after the handler
-        # returns so cookies created while it runs stay on the session.
-        browser_cookies = await self._copy_browser_cookies_to_session(context)
+        # Copy the browser cookies again before and after the handler, so cookies created by the post-navigation hooks
+        # and by the handler stay on the session.
+        browser_cookies_after_navigation = self._browser_cookies_after_navigation.get(id(context.request), [])
+        browser_cookies = await self._copy_browser_cookies_to_session(context, skip=browser_cookies_after_navigation)
 
         yield self._build_crawling_context(context)
 
@@ -577,20 +587,21 @@ class PlaywrightCrawler(
 
     async def _copy_browser_cookies_to_session(
         self,
-        context: TPostNavContext,
+        context: PlaywrightPreNavCrawlingContext,
         *,
-        skip: list[PlaywrightCookieParam] | None = None,
+        skip: Sequence[PlaywrightCookieParam] = (),
     ) -> list[PlaywrightCookieParam]:
         """Copy the browser cookies into the session, when the request has one.
 
-        Cookies equal to one in `skip` are not copied, so they cannot overwrite a session cookie that `send_request`
-        updated in the meantime. Returns all the browser cookies.
+        Cookies equal to one in `skip` did not change in the browser since that snapshot, so they are not copied and
+        cannot overwrite a session cookie that `send_request` updated in the meantime. A cookie that the server sets
+        again in the browser with the same value and attributes is skipped too, so the session keeps its own value.
+        Returns all the browser cookies.
         """
         if not context.session:
             return []
 
         pw_cookies = await self._get_cookies(context.page)
-        skip = skip or []
         changed_cookies = [cookie for cookie in pw_cookies if cookie not in skip]
         context.session.cookies.set_cookies_from_playwright_format(changed_cookies)
         return pw_cookies
