@@ -274,6 +274,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     """
 
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
+    # Limits the whole robots.txt fetch, including the proxy lookup. The fetch holds a lock that every robots.txt
+    # lookup waits for, so a stalled origin must not hold it for long.
+    _ROBOTS_TXT_TIMEOUT = timedelta(seconds=30)
+    _ROBOTS_TXT_MAX_ATTEMPTS = 3
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
 
@@ -408,6 +412,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
 
         self._http_client = http_client or ImpitHttpClient()
+        self._robots_txt_http_client: HttpClient = self._http_client
 
         # Request router setup
         self._router: Router[TCrawlingContext] | None = None
@@ -1826,17 +1831,40 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 return robots_txt_file
 
             # If not cached, fetch the robots.txt file
-            robots_txt_file = await self._find_txt_file_for_url(url)
+            try:
+                robots_txt_file = await asyncio.wait_for(
+                    self._find_txt_file_for_url(url), timeout=self._ROBOTS_TXT_TIMEOUT.total_seconds()
+                )
+            except Exception as exc:
+                reason = 'timed out' if isinstance(exc, asyncio.TimeoutError) else f'failed with {exc!r}'
+                self._logger.warning(
+                    f'Fetching the robots.txt file of {origin_url} {reason}, so all its URLs are allowed.'
+                )
+                robots_txt_file = await RobotsTxtFile.from_content(url, 'User-agent: *\nAllow: /')
+
             self._robots_txt_file_cache[origin_url] = robots_txt_file
             return robots_txt_file
 
     async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
         """Find the robots.txt file for a given URL.
 
+        A failed attempt is repeated with a new proxy. When all attempts fail, the error of the last one is raised.
+
         Args:
             url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
         """
-        return await RobotsTxtFile.find(url, self._http_client)
+        for attempt in range(1, self._ROBOTS_TXT_MAX_ATTEMPTS + 1):
+            try:
+                # The fetch is not tied to a session, because all sessions that crawl the origin share the file.
+                # The request lets tiered proxies pick the tier of the URL's domain.
+                proxy_info = await self._get_proxy_info(Request.from_url(url), None)
+
+                return await RobotsTxtFile.find(url, self._robots_txt_http_client, proxy_info=proxy_info)
+            except Exception:  # noqa: PERF203
+                if attempt == self._ROBOTS_TXT_MAX_ATTEMPTS:
+                    raise
+
+        raise RuntimeError('Unreachable code')
 
     def _log_status_message(self, message: str, level: LogLevel = 'DEBUG') -> None:
         """Log a status message for the crawler.

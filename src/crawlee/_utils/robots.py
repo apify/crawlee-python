@@ -71,8 +71,7 @@ class RobotsTxtFile:
 
         except Exception as e:
             logger.warning(f'Failed to fetch from robots.txt from "{url}" with error: "{e}"')
-
-            robots = Protego.parse('User-agent: *\nAllow: /')
+            raise
 
         return cls(url, robots, http_client=http_client, proxy_info=proxy_info)
 
@@ -82,8 +81,8 @@ class RobotsTxtFile:
 
         Args:
             url: The URL whose domain will be used to find the corresponding robots.txt file.
-            http_client: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
-            proxy_info: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
+            http_client: The `HttpClient` instance used to perform the network request for fetching the robots.txt file.
+            proxy_info: Optional `ProxyInfo` to be used when fetching the robots.txt file. If None, no proxy is used.
         """
         robots_url = URL(url).with_path('/robots.txt')
         return await cls.load(str(robots_url), http_client, proxy_info)

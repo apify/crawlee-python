@@ -16,7 +16,6 @@ from crawlee._request import Request, RequestOptions, RequestState
 from crawlee._types import BasicCrawlingContext, ConcurrencySettings
 from crawlee._utils.blocked import RETRY_CSS_SELECTORS
 from crawlee._utils.docs import docs_group
-from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.time import SharedTimeout
 from crawlee._utils.urls import is_url_absolute, to_absolute_url_iterator
 from crawlee.browsers import BrowserPool
@@ -228,6 +227,11 @@ class PlaywrightCrawler(
         self._goto_options = goto_options or GotoOptions()
 
         super().__init__(**kwargs)
+
+        # `PlaywrightHttpClient` sends requests from a browser page, which is not available for robots.txt fetching.
+        if isinstance(self._http_client, PlaywrightHttpClient):
+            self._robots_txt_http_client = ImpitHttpClient()
+            self._additional_context_managers = [*self._additional_context_managers, self._robots_txt_http_client]
 
     async def _manage_shared_navigation_timeout(
         self, context: BasicCrawlingContext
@@ -593,16 +597,6 @@ class PlaywrightCrawler(
     async def _update_cookies(self, page: Page, cookies: list[PlaywrightCookieParam]) -> None:
         """Update the cookies in the page context."""
         await page.context.add_cookies([{**cookie} for cookie in cookies])
-
-    async def _find_txt_file_for_url(self, url: str) -> RobotsTxtFile:
-        """Find the robots.txt file for a given URL.
-
-        Args:
-            url: The URL whose domain will be used to locate and fetch the corresponding robots.txt file.
-        """
-        http_client = ImpitHttpClient() if isinstance(self._http_client, PlaywrightHttpClient) else self._http_client
-
-        return await RobotsTxtFile.find(url, http_client=http_client)
 
 
 class _PlaywrightCrawlerAdditionalOptions(TypedDict):
