@@ -905,6 +905,81 @@ async def test_send_request_with_client(server_url: URL) -> None:
     assert check_data['default'] != check_data['send_request']
 
 
+async def test_send_request_includes_cookies_set_during_navigation(server_url: URL) -> None:
+    """A session-backed HTTP client sends cookies the browser stored during navigation."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    observed: dict[str, dict[str, str]] = {}
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        page_cookies = await context.page.context.cookies()
+        browser_cookies = {cookie['name']: cookie['value'] for cookie in page_cookies}
+        response = await context.send_request(str(server_url / 'cookies'))
+        observed['browser'] = browser_cookies
+        observed['sent'] = json.loads(await response.read())['cookies']
+
+    await crawler.run([str(server_url / 'set_complex_cookies')])
+
+    assert observed['browser'].get('basic') == '1'
+    assert observed['sent'].get('basic') == '1'
+
+
+async def test_send_request_cookie_update_survives_handler(server_url: URL) -> None:
+    """A session cookie updated by `send_request` is not overwritten by the older browser cookie after the handler."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    sessions: list[Session] = []
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        assert context.session is not None
+        sessions.append(context.session)
+        await context.send_request(str(server_url.with_path('set_cookies').extend_query(token='B')))
+
+    await crawler.run([str(server_url.with_path('set_cookies').extend_query(token='A'))])
+
+    assert len(sessions) == 1
+    assert sessions[0].cookies['token'] == 'B'
+
+
+async def test_send_request_cookie_update_in_post_navigation_hook_reaches_handler(server_url: URL) -> None:
+    """A session cookie updated by `send_request` in a post-navigation hook is still on the session in the handler."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    handler_tokens: list[str | None] = []
+
+    @crawler.post_navigation_hook
+    async def post_navigation_hook(context: PlaywrightPostNavCrawlingContext) -> None:
+        await context.send_request(str(server_url.with_path('set_cookies').extend_query(token='B')))
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        assert context.session is not None
+        handler_tokens.append(context.session.cookies['token'])
+
+    await crawler.run([str(server_url.with_path('set_cookies').extend_query(token='A'))])
+
+    assert handler_tokens == ['B']
+
+
+async def test_send_request_includes_cookies_set_in_post_navigation_hook(server_url: URL) -> None:
+    """A session-backed HTTP client sends cookies a post-navigation hook stored in the browser."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    sent_cookies: list[dict[str, str]] = []
+
+    @crawler.post_navigation_hook
+    async def post_navigation_hook(context: PlaywrightPostNavCrawlingContext) -> None:
+        await context.page.context.add_cookies([{'name': 'hook', 'value': '1', 'url': str(server_url)}])
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.send_request(str(server_url / 'cookies'))
+        sent_cookies.append(json.loads(await response.read())['cookies'])
+
+    await crawler.run([str(server_url)])
+
+    assert len(sent_cookies) == 1
+    assert sent_cookies[0].get('hook') == '1'
+
+
 async def test_extract_links(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
     extracted_links: list[str] = []

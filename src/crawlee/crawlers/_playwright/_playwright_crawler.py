@@ -35,7 +35,7 @@ from ._types import BlockRequestsFunction, GotoOptions
 from ._utils import NavigationRequestInterceptor, block_requests, infinite_scroll
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator, Mapping, Sequence
     from pathlib import Path
 
     from playwright.async_api import Page, Response
@@ -560,18 +560,47 @@ class PlaywrightCrawler(
     async def _execute_post_navigation_hooks(self, context: TPostNavContext) -> AsyncGenerator[TPostNavContext, None]:
         request_id = id(context.request)
 
+        # Session-backed HTTP clients read the session cookie jar, so the post-navigation hooks and the handler need the
+        # cookies the browser received during navigation. This runs before the status code and blocking checks, so
+        # cookies from a failed response reach the session too, as they do with session-backed HTTP clients.
+        browser_cookies = await self._copy_browser_cookies_to_session(context)
+
         for hook in self._post_navigation_hooks:
             async with self._shared_navigation_timeouts[request_id]:
                 await hook(context)
 
+        # Bring the browser cookie changes from the post-navigation hooks into the session before the handler, and the
+        # changes from the handler after it.
+        browser_cookies = await self._copy_browser_cookies_to_session(context, skip=browser_cookies)
+
         yield context
+
+        await self._copy_browser_cookies_to_session(context, skip=browser_cookies)
 
     async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
         yield self._build_crawling_context(context)
 
-        if context.session:
-            pw_cookies = await self._get_cookies(context.page)
-            context.session.cookies.set_cookies_from_playwright_format(pw_cookies)
+    async def _copy_browser_cookies_to_session(
+        self,
+        context: PlaywrightPreNavCrawlingContext,
+        *,
+        skip: Sequence[PlaywrightCookieParam] = (),
+    ) -> list[PlaywrightCookieParam]:
+        """Copy the browser cookies into the session, when the request has one.
+
+        Cookies equal to one in `skip` did not change in the browser since that snapshot, so they are not copied and
+        cannot overwrite a session cookie that `send_request` updated in the meantime. A cookie that the server sets
+        again in the browser with the same value and attributes is skipped too, so the session keeps its own value.
+        Returns all the browser cookies.
+        """
+        if not context.session:
+            return []
+
+        pw_cookies = await self._get_cookies(context.page)
+        skipped_cookies = {frozenset(cookie.items()) for cookie in skip}
+        changed_cookies = [cookie for cookie in pw_cookies if frozenset(cookie.items()) not in skipped_cookies]
+        context.session.cookies.set_cookies_from_playwright_format(changed_cookies)
+        return pw_cookies
 
     def pre_navigation_hook(self, hook: Callable[[TPreNavContext], Awaitable[None]]) -> None:
         """Register a hook to be called before each navigation.
