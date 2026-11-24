@@ -9,7 +9,7 @@ workflows:
         - 'actions/setup-python@v7.1.0'
         - 'apify/actions@v1.7.0'
         - 'apify/actions@v1.9.0'
-        - 'astral-sh/setup-uv@v10.3.3'
+        - 'astral-sh/setup-uv@v10.4.0'
         - 'codecov/codecov-action@v7.1.1'
         - 'crate-ci/typos@v1.52.2'
         - 'rhysd/actionlint@v1.7.12'
@@ -27,7 +27,7 @@ workflows:
         - 'actions/setup-python@v7.1.0'
         - 'actions/upload-pages-artifact@v5.0.0'
         - 'apify/actions@v1.7.0'
-        - 'astral-sh/setup-uv@v10.3.3'
+        - 'astral-sh/setup-uv@v10.4.0'
     '.github/workflows/manual_release_stable.yaml':
         - 'apify/actions@v1.7.0'
         - 'apify/actions@v1.9.0'
@@ -39,7 +39,7 @@ workflows:
         - 'actions/setup-python@v7.1.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'apify/actions@v1.7.0'
-        - 'astral-sh/setup-uv@v10.3.3'
+        - 'astral-sh/setup-uv@v10.4.0'
     '.github/workflows/on_issue.yaml':
         - 'actions/github-script@v9.0.0'
     '.github/workflows/on_master.yaml':
@@ -51,7 +51,7 @@ workflows:
         - 'actions/setup-node@v7.1.0'
         - 'actions/setup-python@v7.1.0'
         - 'apify/setup-apify-cli-action@v1.1.0'
-        - 'astral-sh/setup-uv@v10.3.3'
+        - 'astral-sh/setup-uv@v10.4.0'
         - 'slackapi/slack-github-action@v4.0.0'
     '.github/workflows/publish_to_pypi.yaml':
         - 'actions/download-artifact@v8.0.2'
@@ -240,9 +240,9 @@ dependencies:
         commit: 'sha1-68559e99cc807c1eb7e9238fd43a15bba460eec2'
         owner_id: 115962839
         repo_id: 846733598
-    'astral-sh/setup-uv@v10.3.3':
-        ref: 'v10.3.3'
-        commit: 'sha1-68559e99cc807c1eb7e9238fd43a15bba460eec2'
+    'astral-sh/setup-uv@v10.4.0':
+        ref: 'v10.4.0'
+        commit: 'sha1-1db35dd8eee11c5894872e0b383ae6c406cf738d'
         owner_id: 115962839
         repo_id: 846733598
     'codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5':
