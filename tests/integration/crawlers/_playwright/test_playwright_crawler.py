@@ -960,6 +960,26 @@ async def test_send_request_cookie_update_in_post_navigation_hook_reaches_handle
     assert handler_tokens == ['B']
 
 
+async def test_send_request_includes_cookies_set_in_post_navigation_hook(server_url: URL) -> None:
+    """A session-backed HTTP client sends cookies a post-navigation hook stored in the browser."""
+    crawler = PlaywrightCrawler(http_client=ImpitHttpClient())
+    sent_cookies: list[dict[str, str]] = []
+
+    @crawler.post_navigation_hook
+    async def post_navigation_hook(context: PlaywrightPostNavCrawlingContext) -> None:
+        await context.page.context.add_cookies([{'name': 'hook', 'value': '1', 'url': str(server_url)}])
+
+    @crawler.router.default_handler
+    async def request_handler(context: PlaywrightCrawlingContext) -> None:
+        response = await context.send_request(str(server_url / 'cookies'))
+        sent_cookies.append(json.loads(await response.read())['cookies'])
+
+    await crawler.run([str(server_url)])
+
+    assert len(sent_cookies) == 1
+    assert sent_cookies[0].get('hook') == '1'
+
+
 async def test_extract_links(server_url: URL) -> None:
     crawler = PlaywrightCrawler()
     extracted_links: list[str] = []

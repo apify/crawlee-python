@@ -157,7 +157,6 @@ class PlaywrightCrawler(
             kwargs: Additional keyword arguments to pass to the underlying `BasicCrawler`.
         """
         self._shared_navigation_timeouts: dict[int, SharedTimeout] = {}
-        self._browser_cookies_after_navigation: dict[int, list[PlaywrightCookieParam]] = {}
 
         if browser_pool:
             # Raise an exception if browser_pool is provided together with other browser-related arguments.
@@ -414,15 +413,7 @@ class PlaywrightCrawler(
         # Set the loaded URL to the actual URL after redirection.
         context.request.loaded_url = context.page.url
 
-        # Session-backed HTTP clients read the session cookie jar, so the post-navigation hooks and the handler need
-        # the cookies the browser received during navigation.
-        request_id = id(context.request)
-        self._browser_cookies_after_navigation[request_id] = await self._copy_browser_cookies_to_session(context)
-
-        try:
-            yield self._build_post_nav_context(context, response=response)
-        finally:
-            self._browser_cookies_after_navigation.pop(request_id, None)
+        yield self._build_post_nav_context(context, response=response)
 
     def _create_extract_links_function(self, context: TPostNavContext) -> ExtractLinksFunction:
         """Create a callback function for extracting links from context.
@@ -569,21 +560,25 @@ class PlaywrightCrawler(
     async def _execute_post_navigation_hooks(self, context: TPostNavContext) -> AsyncGenerator[TPostNavContext, None]:
         request_id = id(context.request)
 
+        # Session-backed HTTP clients read the session cookie jar, so the post-navigation hooks and the handler need the
+        # cookies the browser received during navigation. This runs before the status code and blocking checks, so
+        # cookies from a failed response reach the session too, as they do with session-backed HTTP clients.
+        browser_cookies = await self._copy_browser_cookies_to_session(context)
+
         for hook in self._post_navigation_hooks:
             async with self._shared_navigation_timeouts[request_id]:
                 await hook(context)
 
+        # Bring the browser cookie changes from the post-navigation hooks into the session before the handler, and the
+        # changes from the handler after it.
+        browser_cookies = await self._copy_browser_cookies_to_session(context, skip=browser_cookies)
+
         yield context
 
-    async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
-        # Copy the browser cookies again before and after the handler, so cookies created by the post-navigation hooks
-        # and by the handler stay on the session.
-        browser_cookies_after_navigation = self._browser_cookies_after_navigation.get(id(context.request), [])
-        browser_cookies = await self._copy_browser_cookies_to_session(context, skip=browser_cookies_after_navigation)
-
-        yield self._build_crawling_context(context)
-
         await self._copy_browser_cookies_to_session(context, skip=browser_cookies)
+
+    async def _create_crawling_context(self, context: TPostNavContext) -> AsyncGenerator[TCrawlingContext, None]:
+        yield self._build_crawling_context(context)
 
     async def _copy_browser_cookies_to_session(
         self,
@@ -602,7 +597,8 @@ class PlaywrightCrawler(
             return []
 
         pw_cookies = await self._get_cookies(context.page)
-        changed_cookies = [cookie for cookie in pw_cookies if cookie not in skip]
+        skipped_cookies = {frozenset(cookie.items()) for cookie in skip}
+        changed_cookies = [cookie for cookie in pw_cookies if frozenset(cookie.items()) not in skipped_cookies]
         context.session.cookies.set_cookies_from_playwright_format(changed_cookies)
         return pw_cookies
 
