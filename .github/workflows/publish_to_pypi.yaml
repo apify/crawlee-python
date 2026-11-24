@@ -58,7 +58,7 @@ jobs:
           exit 1
 
       - name: Prepare distribution
-        uses: apify/actions/prepare-pypi-distribution@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/prepare-pypi-distribution@v1.7.0
         with:
           package_name: crawlee
           is_prerelease: ${{ inputs.is_prerelease && 'yes' || '' }}
@@ -66,7 +66,7 @@ jobs:
           ref: ${{ steps.ref.outputs.sha }}
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/python-package-check@v1.7.0
         with:
           package_name: crawlee
           dist_dir: dist
@@ -85,7 +85,7 @@ jobs:
             ParselCrawler()
 
       - name: Upload distribution
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: dist
           path: dist/
@@ -103,11 +103,11 @@ jobs:
       url: https://pypi.org/project/crawlee
     steps:
       - name: Download distribution
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@v8.0.2
         with:
           name: dist
           path: dist/
 
       # Publish the package to PyPI using PyPA official GitHub action with OIDC authentication.
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+        uses: pypa/gh-action-pypi-publish@release/v1

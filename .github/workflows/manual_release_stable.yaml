@@ -37,7 +37,7 @@ jobs:
       checks: read
     steps:
       - name: Wait for checks
-        uses: apify/actions/wait-for-checks@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/wait-for-checks@v1.7.0
         with:
           ref: ${{ github.sha }}
           check-regexp: ^Checks
@@ -52,7 +52,7 @@ jobs:
       release_notes: ${{ steps.release_prepare.outputs.release_notes }}
       changelog_artifact_name: ${{ steps.release_prepare.outputs.changelog_artifact_name }}
     steps:
-      - uses: apify/actions/git-cliff-release@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+      - uses: apify/actions/git-cliff-release@v1.7.0
         name: Release prepare
         id: release_prepare
         with:
@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Bump version and update changelog
         id: changelog_update
-        uses: apify/actions/python-bump-and-update-changelog@994a3e5ec79a5575ac4d81365bab7549c9687c32 # v1.9.0
+        uses: apify/actions/python-bump-and-update-changelog@v1.9.0
         with:
           version-number: ${{ needs.release_prepare.outputs.version_number }}
           changelog-artifact-name: ${{ needs.release_prepare.outputs.changelog_artifact_name }}
@@ -90,7 +90,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: GitHub release
-        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        uses: softprops/action-gh-release@v3.0.4
         with:
           tag_name: ${{ needs.release_prepare.outputs.tag_name }}
           name: ${{ needs.release_prepare.outputs.version_number }}
@@ -106,7 +106,7 @@ jobs:
       actions: write # Required by execute-workflow.
     steps:
       - name: Dispatch PyPI publish workflow
-        uses: apify/actions/execute-workflow@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/execute-workflow@v1.7.0
         with:
           workflow: publish_to_pypi.yaml
           inputs: >

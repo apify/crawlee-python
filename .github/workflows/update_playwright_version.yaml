@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
           fetch-depth: 0
@@ -44,7 +44,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.15"
 
@@ -63,7 +63,7 @@ jobs:
       - name: Commit and push changes
         id: commit-and-push
         if: steps.changes.outputs.has-changes == 'true'
-        uses: apify/actions/signed-commit@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/signed-commit@v1.7.0
         with:
           message: "chore: Update Playwright version in project template"
           github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

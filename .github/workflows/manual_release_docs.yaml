@@ -45,7 +45,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
@@ -74,23 +74,23 @@ jobs:
 
       - name: Wait for checks
         if: ${{ !inputs.skip_checks }}
-        uses: apify/actions/wait-for-checks@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/wait-for-checks@v1.7.0
         with:
           ref: ${{ steps.sha.outputs.sha }}
           check-regexp: ^Checks
 
       - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -98,7 +98,7 @@ jobs:
         run: uv run poe install-dev
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/pnpm-install@v1.7.0
         with:
           working-directory: website
 
@@ -109,7 +109,7 @@ jobs:
           SEGMENT_TOKEN: ${{ secrets.SEGMENT_TOKEN }}
 
       - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: ./website/build
 
@@ -125,10 +125,10 @@ jobs:
 
     steps:
       - name: Set up GitHub Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        uses: actions/configure-pages@v6.0.0
 
       - name: Deploy artifact to GitHub Pages
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        uses: actions/deploy-pages@v5.0.1
 
   # The service account token is only used in a job that does not run the docs toolchain.
   invalidate_cloudfront_cache:
