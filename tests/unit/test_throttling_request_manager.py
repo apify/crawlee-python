@@ -81,6 +81,21 @@ async def two_domain_manager(
     )
 
 
+@pytest.fixture
+async def site_manager(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> ThrottlingRequestManager[RequestQueue]:
+    """Create a ThrottlingRequestManager that throttles `www.example.com` together with its whole site."""
+    return ThrottlingRequestManager(
+        inner_queue,
+        domains=['www.example.com'],
+        throttle_by='registrable_domain',
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+
+
 def _make_request(url: str) -> Request:
     """Helper to create a Request object."""
     return Request.from_url(url)
@@ -266,6 +281,53 @@ async def test_add_requests_routes_mixed_domains(
     # Sub-manager gets the listed domain request.
     assert THROTTLED_DOMAIN in manager._sub_managers
     assert await manager._sub_managers[THROTTLED_DOMAIN].get_total_count() == 1
+
+
+async def test_subdomains_apart_by_default(inner_queue: RequestQueue, service_locator: ServiceLocator) -> None:
+    """By default, a listed subdomain doesn't throttle the other hosts of its site."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=['www.example.com'],
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+    await manager.add_request('https://api.example.com/page1')
+
+    assert await inner_queue.get_total_count() == 1
+
+
+async def test_listed_subdomain_covers_site(site_manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """With `registrable_domain`, every host of a listed subdomain's site shares one sub-manager."""
+    await site_manager.add_requests(['https://api.example.com/page1', 'https://example.com/page2'])
+
+    assert list(site_manager._sub_managers) == ['example.com']
+    assert await site_manager._sub_managers['example.com'].get_total_count() == 2
+
+
+async def test_rate_limit_paces_whole_site(site_manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """With `registrable_domain`, a 429 from one subdomain holds back the rest of its site."""
+    await site_manager.add_request('https://api.example.com/page1')
+    site_manager.record_pacing_signal(RateLimitedSignal('https://www.example.com/page2'))
+
+    assert await site_manager.fetch_next_request() is None
+    assert (await site_manager.check_readiness()).status == 'waiting'
+
+
+@pytest.mark.parametrize(
+    ('url', 'key'),
+    [
+        pytest.param('http://127.0.0.1:8080/', '127.0.0.1', id='ipv4'),
+        pytest.param('http://[::1]/', '::1', id='ipv6'),
+        pytest.param('http://localhost/', 'localhost', id='single-label'),
+    ],
+)
+async def test_ip_and_localhost_per_hostname(
+    site_manager: ThrottlingRequestManager[RequestQueue],
+    url: str,
+    key: str,
+) -> None:
+    """With `registrable_domain`, a host without a registrable domain is keyed by its hostname."""
+    assert site_manager._extract_domain(url) == key
 
 
 # ── Core Throttling Tests ─────────────────────────────────
@@ -465,15 +527,26 @@ async def test_crawl_delay_integration(manager: ThrottlingRequestManager[Request
     assert state.crawl_delay == timedelta(seconds=5)
 
 
-async def test_min_interval_keeps_first_value(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """A later min-interval signal is accepted but doesn't change the crawl-delay."""
+@pytest.mark.parametrize(
+    ('later', 'expected'),
+    [
+        pytest.param(timedelta(seconds=9), timedelta(seconds=9), id='longer-raises'),
+        pytest.param(timedelta(seconds=2), timedelta(seconds=5), id='shorter-ignored'),
+    ],
+)
+async def test_min_interval_keeps_longest_value(
+    manager: ThrottlingRequestManager[RequestQueue],
+    later: timedelta,
+    expected: timedelta,
+) -> None:
+    """A later min-interval signal is accepted and can raise the crawl-delay, but never lowers it."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=5), scope='hostname'))
 
-    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=9), scope='hostname'))
+    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=later, scope='hostname'))
 
     assert accepted is True
-    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == timedelta(seconds=5)
+    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == expected
 
 
 async def test_min_interval_refused_unconfigured(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -521,6 +594,55 @@ async def test_unknown_reason_is_refused(manager: ThrottlingRequestManager[Reque
     signal = Mock(reason='future', scope='site', url=f'https://{THROTTLED_DOMAIN}/page1')
 
     assert manager.record_pacing_signal(signal) is False
+
+
+async def test_registrable_scope_hints_option(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Rejecting a `registrable_domain` scope points at `throttle_by`."""
+    signal = RateLimitedSignal(f'https://{THROTTLED_DOMAIN}/page1', scope='registrable_domain')
+
+    with pytest.raises(ValueError, match="throttle_by='registrable_domain'"):
+        manager.record_pacing_signal(signal)
+
+
+@pytest.mark.parametrize(
+    'scope',
+    [
+        pytest.param(None, id='no-scope'),
+        pytest.param('hostname', id='hostname'),
+        pytest.param('registrable_domain', id='registrable-domain'),
+    ],
+)
+async def test_site_scopes_are_honored(site_manager: ThrottlingRequestManager[RequestQueue], scope: str | None) -> None:
+    """With `registrable_domain`, a signal scoped to the site or to one of its hostnames is applied to the site."""
+    assert site_manager.record_pacing_signal(RateLimitedSignal('https://api.example.com/page1', scope=scope)) is True
+
+
+async def test_site_rejects_unknown_scope(site_manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """With `registrable_domain`, a scope the manager doesn't know is still rejected."""
+    signal = RateLimitedSignal('https://api.example.com/page1', scope='site')
+
+    with pytest.raises(ValueError, match='Cannot honor a pacing signal scoped to "site"'):
+        site_manager.record_pacing_signal(signal)
+
+
+async def test_site_widening_logged_for_paced_site(
+    site_manager: ThrottlingRequestManager[RequestQueue],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With `registrable_domain`, widening a hostname-scoped signal is logged only for a paced site, naming it."""
+    interval = timedelta(seconds=1)
+
+    with caplog.at_level('DEBUG', logger=MANAGER_MODULE):
+        site_manager.record_pacing_signal(
+            MinIntervalSignal(f'https://{NON_THROTTLED_DOMAIN}/page1', interval=interval, scope='hostname')
+        )
+        site_manager.record_pacing_signal(
+            MinIntervalSignal('https://api.example.com/page1', interval=interval, scope='hostname')
+        )
+
+    widened = [r.message for r in caplog.records if 'whole registrable domain' in r.message]
+    assert len(widened) == 1
+    assert '"example.com"' in widened[0]
 
 
 async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -1667,7 +1789,19 @@ async def test_delays_must_be_positive(
             domains=TEST_DOMAINS,
             request_manager_opener=RequestQueue.open,
             service_locator=service_locator,
-            **{option: delay},
+            **{option: delay},  # ty: ignore[invalid-argument-type]
+        )
+
+
+async def test_unknown_throttle_by_is_rejected(inner_queue: RequestQueue, service_locator: ServiceLocator) -> None:
+    """An unknown `throttle_by` is rejected."""
+    with pytest.raises(ValueError, match='throttle_by'):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=TEST_DOMAINS,
+            throttle_by='site',  # ty: ignore[invalid-argument-type]
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
         )
 
 

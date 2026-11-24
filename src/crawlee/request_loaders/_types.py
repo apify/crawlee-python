@@ -71,7 +71,7 @@ PacingScope = str
 
 The vocabulary is open, so a manager that paces by something else can be reported to in its own terms. Crawlee itself
 reports `'hostname'`, and `'registrable_domain'` names a whole site with its subdomains. `ThrottlingRequestManager`
-accepts only `'hostname'`.
+accepts `'hostname'`, and also `'registrable_domain'` when its `throttle_by` groups requests that way.
 """
 
 
