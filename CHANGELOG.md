@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
 
+## 1.11.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **playwright:** Send navigation cookies with `send_request` ([#2485](https://github.com/apify/crawlee-python/pull/2485)) ([b222b2b](https://github.com/apify/crawlee-python/commit/b222b2beb9b810da8ee47bddc5d8e1fa3cfca72b)) by [@rome-xi](https://github.com/rome-xi), closes [#2483](https://github.com/apify/crawlee-python/issues/2483)
+
 <!-- git-cliff-unreleased-end -->
 
 ## [1.11.3](https://github.com/apify/crawlee-python/releases/tag/v1.11.3) (2026-11-23)
