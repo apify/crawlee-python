@@ -235,6 +235,27 @@ async def test_data_persistence_across_reopens(configuration: Configuration) -> 
         await reopened_client.drop()
 
 
+async def test_push_data_empty_list(dataset_client: SqlDatasetClient) -> None:
+    """Test that pushing an empty list stores nothing and doesn't fail."""
+    await dataset_client.push_data({'id': 1})
+    await dataset_client.push_data([])
+
+    result = await dataset_client.get_data()
+    assert result.items == [{'id': 1}]
+    assert result.total == 1
+
+
+async def test_push_data_over_bind_limit(dataset_client: SqlDatasetClient) -> None:
+    """Test that one push stores more items than a single statement has bind parameters for."""
+    # SQLite allows 32766 bind parameters per statement by default, and each item takes two.
+    items = [{'id': i} for i in range(20_000)]
+    await dataset_client.push_data(items)
+
+    result = await dataset_client.get_data(limit=None)
+    assert result.total == 20_000
+    assert result.items == items
+
+
 async def test_error_handling_on_push_failure(dataset_client: SqlDatasetClient) -> None:
     """Test that push_data properly handles SQL errors and retries."""
     with patch(
