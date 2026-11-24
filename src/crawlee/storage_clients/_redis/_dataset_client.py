@@ -134,9 +134,11 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
         items = data if isinstance(data, Sequence) else [data]
 
         async with self._get_pipeline() as pipe:
-            # redis' `JsonType` types arrays as `list`, although `arrappend` only encodes them.
-            redis_items = cast('list[JsonType]', items)
-            pipe.json().arrappend(self._items_key, '$', *redis_items)
+            # `JSON.ARRAPPEND` fails without values, so an empty push only updates the metadata.
+            if items:
+                # redis' `JsonType` types arrays as `list`, although `arrappend` only encodes them.
+                redis_items = cast('list[JsonType]', items)
+                pipe.json().arrappend(self._items_key, '$', *redis_items)
             await self._update_metadata(
                 pipe,
                 **_DatasetMetadataUpdateParams(
@@ -186,6 +188,9 @@ class RedisDatasetClient(DatasetClient, RedisClientMixin):
 
         # Apply sorting and pagination
         match (desc, offset, limit):
+            case (_, _, 0):
+                # The descending slice `[-0:]` would select every item.
+                json_path += '[0:0]'
             case (True, 0, int()):
                 json_path += f'[-{limit}:]'
             case (True, 0, None):

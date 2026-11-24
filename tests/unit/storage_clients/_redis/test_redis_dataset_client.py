@@ -177,6 +177,16 @@ async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> No
     assert metadata.accessed_at > accessed_after_get
 
 
+async def test_push_data_empty_list(dataset_client: RedisDatasetClient) -> None:
+    """Test that pushing an empty list stores nothing and doesn't fail."""
+    await dataset_client.push_data({'id': 1})
+    await dataset_client.push_data([])
+
+    result = await dataset_client.get_data()
+    assert result.items == [{'id': 1}]
+    assert result.total == 1
+
+
 async def test_error_handling_on_push_failure(dataset_client: RedisDatasetClient) -> None:
     """Test that push_data properly handles Redis errors and retries."""
     mock_pipe = MagicMock()
