@@ -24,6 +24,7 @@ from crawlee.crawlers import (
     PlaywrightCrawler,
     PlaywrightCrawlingContext,
 )
+from crawlee.errors import SessionError
 from crawlee.fingerprint_suite import (
     DefaultFingerprintGenerator,
     FingerprintGenerator,
@@ -738,6 +739,19 @@ async def test_ignore_http_error_status_codes(server_url: URL) -> None:
     await crawler.run([target_url])
 
     mocked_handler.assert_called_once_with(target_url)
+
+
+async def test_blocked_status_codes(server_url: URL) -> None:
+    """Test that a status code in `blocked_status_codes` rotates the session and fails with a `SessionError`."""
+    crawler = PlaywrightCrawler(blocked_status_codes={402}, max_session_rotations=2)
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run([str(server_url / 'status/402')])
+
+    context, error = failed_request_handler.call_args.args
+    assert isinstance(error, SessionError)
+    assert context.request.session_rotation_count == 1
 
 
 async def test_additional_http_error_status_codes(server_url: URL) -> None:

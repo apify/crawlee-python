@@ -556,7 +556,7 @@ class PlaywrightCrawler(
             error._reported = True  # noqa: SLF001
             raise error
         if self._retry_on_blocked:
-            self._raise_for_session_blocked_status_code(context.session, status_code)
+            self._raise_for_session_blocked_status_code(status_code)
         self._raise_for_error_status_code(status_code)
         yield context
 

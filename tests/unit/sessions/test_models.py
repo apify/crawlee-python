@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from crawlee.sessions._cookies import CookieParam
-from crawlee.sessions._models import SessionModel
+from crawlee.sessions._models import SessionModel, SessionPoolModel
 
 SESSION_CREATED_AT = datetime.now(UTC)
 
@@ -24,7 +24,6 @@ def session_direct() -> SessionModel:
         max_usage_count=10,
         error_score=0.0,
         cookies=[CookieParam({'name': 'cookie_key', 'value': 'cookie_value'})],
-        blocked_status_codes=[401, 403, 429],
     )
 
 
@@ -42,7 +41,6 @@ def session_args_camel() -> dict:
         'maxUsageCount': 10,
         'errorScore': 0.0,
         'cookies': [CookieParam({'name': 'cookie_key', 'value': 'cookie_value'})],
-        'blockedStatusCodes': [401, 403, 429],
     }
 
 
@@ -60,7 +58,6 @@ def session_args_snake() -> dict:
         'max_usage_count': 10,
         'error_score': 0.0,
         'cookies': [CookieParam({'name': 'cookie_key', 'value': 'cookie_value'})],
-        'blocked_status_codes': [401, 403, 429],
     }
 
 
@@ -78,3 +75,12 @@ def test_session_model(
 
     # Check that max_age is correctly parsed into a timedelta object
     assert session_direct.max_age == session_camel.max_age == session_snake.max_age == timedelta(minutes=30)
+
+
+def test_pool_model_loads_v1_state(session_args_camel: dict) -> None:
+    """Test that a persisted session pool state with the v1 `blockedStatusCodes` session field still loads."""
+    state = {'maxPoolSize': 1, 'sessions': [{**session_args_camel, 'blockedStatusCodes': [401, 403, 429]}]}
+
+    model = SessionPoolModel.model_validate(state)
+
+    assert list(model.sessions) == ['test_session']

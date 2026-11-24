@@ -732,6 +732,22 @@ async with session_pool:
 response = await context.send_request(url, cookies=SessionCookies())
 ```
 
+## `blocked_status_codes` is a crawler option
+
+The `blocked_status_codes` argument of `Session` and the `Session.is_blocked_status_code()` method are removed. The crawler decides whether a response means the session is blocked, so pass `blocked_status_codes` to the crawler instead. It defaults to 401, 403 and 429, as before. An empty list marks no status code as blocked, while in v1 it fell back to the defaults.
+
+```python
+# v1
+crawler = ParselCrawler(
+    session_pool=SessionPool(create_session_settings={'blocked_status_codes': [403]}),
+)
+
+# v2
+crawler = ParselCrawler(blocked_status_codes=[403])
+```
+
+Session state, including the persisted session pool state, no longer has the `blocked_status_codes` field. Sessions saved by v1 still load, and the field is ignored.
+
 ## Session retirement is permanent
 
 In v1, `Session.retire()` only added `max_error_score` to the error score, so a later `mark_good()` could lower it again and make the retired session usable. In v2, a separate `retired` flag tracks retirement, exposed as the `Session.retired` property, and a retired session is never usable again. Create a new session to replace it.
