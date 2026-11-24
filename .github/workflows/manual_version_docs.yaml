@@ -46,13 +46,13 @@ jobs:
       # skipped when called from another workflow.
       - name: Wait for checks
         if: github.event_name == 'workflow_dispatch'
-        uses: apify/actions/wait-for-checks@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/wait-for-checks@v1.7.0
         with:
           ref: ${{ github.sha }}
           check-regexp: ^Checks
 
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -61,17 +61,17 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -79,7 +79,7 @@ jobs:
         run: uv run poe install-dev
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/pnpm-install@v1.7.0
         with:
           working-directory: website
 
@@ -130,7 +130,7 @@ jobs:
           uv run pnpm exec docusaurus api:version "$MAJOR_MINOR_VERSION"
 
       - name: Upload versioned docs
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: versioned-docs
           path: |
@@ -153,7 +153,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -168,13 +168,13 @@ jobs:
         run: rm -rf website/versioned_docs website/versioned_sidebars website/versions.json
 
       - name: Download versioned docs
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@v8.0.2
         with:
           name: versioned-docs
           path: website
 
       - name: Commit and push versioned docs
-        uses: apify/actions/signed-commit@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/signed-commit@v1.7.0
         with:
           message: "docs: Version docs for v${{ needs.version_docs.outputs.version }} [skip ci]"
           add: website/versioned_docs website/versioned_sidebars website/versions.json

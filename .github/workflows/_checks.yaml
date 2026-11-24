@@ -24,45 +24,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
       - name: Run actionlint
-        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+        uses: rhysd/actionlint@v1.7.12
 
   spell_check:
     name: Spell check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
       - name: Check spelling with typos
-        uses: crate-ci/typos@276087d9a4f06398b3e04825487805e2d7375888 # v1.52.2
+        uses: crate-ci/typos@v1.52.2
 
+  # The job names keep the `<caller> / <job>` shape of the reusable workflows they replace, which the rulesets require.
   lint_check:
-    name: Lint check
-    uses: apify/workflows/.github/workflows/python_lint_check.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
-    with:
-      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
+    name: Lint check / Lint check (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: apify/actions/python-lint-check@v1.9.0
+        with:
+          python-version: ${{ matrix.python-version }}
 
   type_check:
-    name: Type check
-    uses: apify/workflows/.github/workflows/python_type_check.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
-    with:
-      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
+    name: Type check / Type check (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: apify/actions/python-type-check@v1.9.0
+        with:
+          python-version: ${{ matrix.python-version }}
 
   markdown_lint_check:
     name: Markdown lint check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/pnpm-install@v1.7.0
         with:
           working-directory: website
 
@@ -75,15 +86,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/pnpm-install@v1.7.0
         with:
           working-directory: website
 
@@ -100,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
@@ -108,7 +119,7 @@ jobs:
       # images in another format so they get converted via `pnpm opt:images` first.
       - name: Get changed unoptimized images
         id: changed-files
-        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        uses: tj-actions/changed-files@v47.0.6
         with:
           files: |
             docs/**/*.{png,jpg,jpeg,gif,bmp,tif,tiff,avif}
@@ -130,16 +141,23 @@ jobs:
           exit 1
 
   unit_tests:
-    name: Unit tests
+    name: Unit tests / Unit tests (${{ matrix.os }}, ${{ matrix.python-version }})
     if: inputs.run_tests
-    uses: apify/workflows/.github/workflows/python_unit_tests.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
-    secrets: inherit
-    with:
-      python_versions: '["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]'
-      operating_systems: '["ubuntu-latest", "windows-latest", "macos-latest"]'
-      python_version_for_codecov: "3.15"
-      operating_system_for_codecov: ubuntu-latest
-      tests_concurrency: "8"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: apify/actions/python-unit-tests@v1.9.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          tests-concurrency: "8"
+          upload-coverage: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.15' }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
+          apify-httpbin-token: ${{ secrets.APIFY_HTTPBIN_TOKEN }}
 
   integration_tests:
     name: Integration tests (${{ matrix.python-version }}, ${{ matrix.os }})
@@ -165,7 +183,7 @@ jobs:
           sudo killall Finder spindump ecosystemanalyticsd SystemUIServer NotificationCenter mds mds_stores mds_worker mdworker mdworker_shared || true
 
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
 
       # The default Windows temp dir is a network disk, about 5x slower at small files than RUNNER_TEMP.
       - name: Use the runner's local disk for temp files
@@ -176,12 +194,12 @@ jobs:
           echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -199,7 +217,7 @@ jobs:
             matrix.python-version == '3.15' &&
             env.CODECOV_TOKEN != ''
           }}
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        uses: codecov/codecov-action@v7.1.1
         with:
           token: ${{ env.CODECOV_TOKEN }}
           files: coverage-integration.xml
@@ -210,10 +228,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
 
       - name: Set up uv package manager
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.14"
 
@@ -221,7 +239,7 @@ jobs:
         run: uv run poe build
 
       - name: Verify built package
-        uses: apify/actions/python-package-check@48ab27d3d0de7744c20dd783b83245dfae2cddfd # v1.7.0
+        uses: apify/actions/python-package-check@v1.7.0
         with:
           package_name: crawlee
           dist_dir: dist
@@ -248,5 +266,9 @@ jobs:
           .venv-pip/bin/python -m pip install --dry-run "$(ls dist/*.whl)[all]"
 
   doc_check:
-    name: Doc check
-    uses: apify/workflows/.github/workflows/python_docs_check.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
+    name: Doc check / Docs check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: apify/actions/python-docs-check@v1.9.0
+        with:
+          apify-signing-token: ${{ secrets.APIFY_SIGNING_TOKEN }}

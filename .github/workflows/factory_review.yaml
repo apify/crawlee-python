@@ -55,7 +55,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: apify-factory review
-        uses: apify/actions/factory-review@994a3e5ec79a5575ac4d81365bab7549c9687c32 # v1.9.0
+        uses: apify/actions/factory-review@v1.9.0
         with:
           apify-factory-github-token: ${{ secrets.APIFY_FACTORY_GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY_APIFY_FACTORY_REVIEW }}
