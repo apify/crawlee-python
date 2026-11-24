@@ -256,14 +256,33 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         await self._ensure_sub_managers()
 
         for domain in self._fetchable_domains():
-            request = await self._sub_managers[domain].fetch_next_request()
+            state = self._domain_states[domain]
+            # Another call may have armed the domain while an earlier fetch of this call was suspended.
+            if datetime.now(timezone.utc) < state.throttled_until:
+                continue
+            # Armed before the fetch suspends, so a concurrent call can't dispatch to the domain in the same window.
+            previous_crawl_delay_until = state.crawl_delay_until
+            self._mark_domain_dispatched(domain)
+            armed_crawl_delay_until = state.crawl_delay_until
+            request: Request | None = None
+            try:
+                request = await self._sub_managers[domain].fetch_next_request()
+            finally:
+                # Nothing was dispatched, so the domain keeps its turn, unless another call has armed it since.
+                if request is None and state.crawl_delay_until == armed_crawl_delay_until:
+                    state.crawl_delay_until = previous_crawl_delay_until
             if request is not None:
+                # The window runs from the dispatch, so a slow fetch doesn't shorten it.
                 self._mark_domain_dispatched(domain)
                 return request
 
         request = await self._fetch_from_inner()
-        if request is not None and self._extract_domain(request.url) in self._domain_states:
+        if request is None:
+            return None
+        domain = self._extract_domain(request.url)
+        if domain in self._domain_states:
             self._in_flight_from_inner.add((request.unique_key, request.url))
+            self._mark_domain_dispatched(domain)
         return request
 
     @override
@@ -617,10 +636,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return available
 
     def _mark_domain_dispatched(self, domain: str) -> None:
-        """Record that a request to this domain was just dispatched.
-
-        If a crawl-delay is configured, push `crawl_delay_until` forward by that amount.
-        """
+        """Push the domain's `crawl_delay_until` forward by its crawl-delay, if it has one."""
         state = self._domain_states.get(domain)
         if state is not None:
             state.apply_crawl_delay(datetime.now(timezone.utc))
