@@ -446,8 +446,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         A `RateLimitedSignal` backs the domain off for the signal's `wait` if it's positive, and exponentially from
         `base_delay` otherwise. Only the first refusal of a burst advances the backoff. A `MinIntervalSignal` becomes
-        the domain's crawl-delay, unless `min_crawl_delay` is longer. The first one wins, so a robots.txt re-fetch
-        can't change the dispatch cadence mid-crawl.
+        the domain's crawl-delay, unless `min_crawl_delay` is longer. The first one wins, so a robots.txt re-fetch can't
+        change the dispatch cadence mid-crawl.
 
         Returns:
             `True` if the URL's domain is in `domains`, so the manager paces it by the signal. `False` if the domain
@@ -698,10 +698,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return available
 
     def _mark_domain_dispatched(self, domain: str) -> None:
-        """Record that a request to this domain was just dispatched.
-
-        If a crawl-delay is configured, push `crawl_delay_until` forward by that amount.
-        """
+        """Push the domain's `crawl_delay_until` forward by the longer of its crawl-delay and `min_crawl_delay`."""
         state = self._domain_states.get(domain)
         if state is not None:
             state.apply_crawl_delay(datetime.now(UTC), self._min_crawl_delay)
