@@ -51,7 +51,8 @@ class SessionPool:
 
         Args:
             id: An identifier of the pool, used in the default `persist_state_key`. Defaults to a per-process counter
-                of `SessionPool` instances.
+                of `SessionPool` instances, which includes the pools that crawlers create. Pass an `id` to a pool you
+                persist, so that its key doesn't depend on the creation order.
             max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool
                 by using the `add_session` method.
             create_session_settings: Settings for creating new session instances. If None, default settings will
