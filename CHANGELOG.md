@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **playwright:** Send navigation cookies with `send_request` ([#2485](https://github.com/apify/crawlee-python/pull/2485)) ([b222b2b](https://github.com/apify/crawlee-python/commit/b222b2beb9b810da8ee47bddc5d8e1fa3cfca72b)) by [@rome-xi](https://github.com/rome-xi), closes [#2483](https://github.com/apify/crawlee-python/issues/2483)
+- **sql:** Avoid duplicate sequence numbers on concurrent adds ([#2494](https://github.com/apify/crawlee-python/pull/2494)) ([6c86dbf](https://github.com/apify/crawlee-python/commit/6c86dbfea4fc2017d13da084afe08e689eca731d)) by [@Mantisus](https://github.com/Mantisus)
 
 <!-- git-cliff-unreleased-end -->
 
