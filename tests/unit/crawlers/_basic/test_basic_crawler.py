@@ -1283,6 +1283,22 @@ async def test_default_statistics_use_crawler_id(crawler_id: str | None, expecte
     assert persisted_state['statsId'] == expected_id
 
 
+@pytest.mark.parametrize(
+    ('crawler_id', 'expected_id'),
+    [
+        pytest.param(None, '0', id='generated id'),
+        pytest.param('my-crawler', 'my-crawler', id='explicit id'),
+    ],
+)
+def test_default_session_pool_uses_crawler_id(crawler_id: str | None, expected_id: str) -> None:
+    """The session pool the crawler creates takes the crawler ID."""
+    # Advance the `SessionPool` counter, so an ID the pool generates itself can't match the crawler ID.
+    SessionPool()
+    crawler = BasicCrawler(id=crawler_id)
+
+    assert crawler._session_pool._id == expected_id
+
+
 def test_generated_id_follows_creation_order() -> None:
     """A crawler without an ID takes its creation index, which crawlers with an explicit ID advance too."""
     assert BasicCrawler()._id == '0'

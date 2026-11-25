@@ -433,7 +433,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Core components
         self._request_manager = request_manager
-        self._session_pool = self._own_or_borrow(session_pool, SessionPool)
+        self._session_pool = self._own_or_borrow(session_pool, lambda: SessionPool(id=self._id))
         self._proxy_configuration = proxy_configuration
 
         self._additional_http_error_status_codes = (

@@ -189,7 +189,7 @@ Crawlee keeps its internal state in the default key-value store. These records n
 
 Crawlers without an `id` now share one `use_state` state under `CRAWLEE_STATE`, the same as in Crawlee JS, and the crawler logs a warning when a second one of them calls `use_state`. In v1, each of them had its own state. To keep the states apart, pass a unique `id` to each crawler. A crawler with an `id` still uses `CRAWLEE_STATE_{id}`.
 
-`SessionPool` has a new `id` argument for its key. Without it, the pool gets a per-process counter of `SessionPool` instances, such as `'0'`. The counter includes the pools that crawlers create, so pass an `id` to a pool you persist. `DefaultRenderingTypePredictor` has a new `id` argument too, and the predictor that `AdaptivePlaywrightCrawler` builds gets the crawler's `id`. A `persist_state_key` you pass explicitly is used as it is.
+`SessionPool` has a new `id` argument for its key. Without it, the pool gets a per-process counter of `SessionPool` instances, such as `'0'`. The session pool a crawler creates gets the crawler's `id`. The counter includes the pools that crawlers create, so pass an `id` to a pool you persist. `DefaultRenderingTypePredictor` has a new `id` argument too, and the predictor that `AdaptivePlaywrightCrawler` builds gets the crawler's `id`. A `persist_state_key` you pass explicitly is used as it is.
 
 v2 doesn't read the v1 keys. If you resume a v1 run with `purge_on_start=False`, these components start from an empty state. To keep a record, copy it to the new key before the first v2 run.
 
