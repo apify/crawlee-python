@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock, call
 import pytest
 
 from crawlee.crawlers import HttpCrawler
+from crawlee.errors import HttpClientStatusCodeError
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import RateLimitedSignal, RequestList, RequestManagerTandem
 from crawlee.sessions import SessionPool
@@ -87,6 +88,57 @@ async def test_body_read_bound_by_navigation_timeout() -> None:
 
     handler.assert_not_called()
     assert isinstance(failed_request_handler.call_args.args[1], TimeoutError)
+
+
+@pytest.mark.parametrize(
+    ('crawler_kwargs', 'status_code'),
+    [
+        pytest.param({}, 403, id='default_codes'),
+        pytest.param({'blocked_status_codes': [402]}, 402, id='custom_code'),
+    ],
+)
+async def test_blocked_code_rotates_session(*, crawler_kwargs: dict[str, Any], status_code: int) -> None:
+    """Test that a status code in `blocked_status_codes` retires the session and retries with another one."""
+    url = 'https://a.placeholder.com'
+    http_client = AsyncMock(spec=HttpClient, active=True)
+    http_client.send_request.side_effect = [mock_response(status_code, url), mock_response(200, url)]
+    crawler = HttpCrawler(http_client=http_client, max_request_retries=0, **crawler_kwargs)
+    pre_navigation_hook = AsyncMock()
+    crawler.pre_navigation_hook(pre_navigation_hook)
+    handler = AsyncMock()
+    crawler.router.default_handler(handler)
+
+    await crawler.run([url])
+
+    handler.assert_awaited_once()
+    assert handler.call_args.args[0].request.session_rotation_count == 1
+    sessions = [hook_call.args[0].session for hook_call in pre_navigation_hook.call_args_list]
+    assert [session.retired for session in sessions] == [True, False]
+
+
+@pytest.mark.parametrize(
+    'blocked_status_codes',
+    [
+        pytest.param([402], id='custom_codes'),
+        pytest.param([], id='no_codes'),
+    ],
+)
+async def test_non_blocked_code_fails(blocked_status_codes: list[int]) -> None:
+    """Test that a 403 missing from `blocked_status_codes` fails the request as a client error."""
+    url = 'https://a.placeholder.com'
+    http_client = AsyncMock(spec=HttpClient, active=True)
+    http_client.send_request.return_value = mock_response(403, url)
+    crawler = HttpCrawler(http_client=http_client, blocked_status_codes=blocked_status_codes)
+    handler = AsyncMock()
+    crawler.router.default_handler(handler)
+    failed_request_handler = AsyncMock()
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run([url])
+
+    handler.assert_not_called()
+    error = failed_request_handler.call_args.args[1]
+    assert isinstance(error, HttpClientStatusCodeError)
 
 
 @pytest.mark.parametrize(
