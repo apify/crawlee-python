@@ -137,7 +137,7 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
         Args:
             detection_ratio: A number between 0 and 1 that determines the desired ratio of rendering type detections.
             persist_state_key: Key in the key-value storage where the trained model parameters will be saved.
-            If None, defaults to 'CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE'.
+                Defaults to `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE`.
             persistence_enabled: Whether to enable persistence of the trained model parameters for reuse.
 
         """
