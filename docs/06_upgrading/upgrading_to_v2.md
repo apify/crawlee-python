@@ -179,7 +179,7 @@ Data written by v1 still loads, so an existing storage directory, Redis instance
 Crawlee keeps its internal state in the default key-value store. These records now use the `CRAWLEE_` prefix and upper snake case, the same keys as in Crawlee JS:
 
 | Record | v1 key | v2 key |
-|---|---|---|
+| --- | --- | --- |
 | Crawler statistics | `__CRAWLER_STATISTICS_{id}` | `CRAWLEE_CRAWLER_STATISTICS_{id}` |
 | Session pool | `CRAWLEE_SESSION_POOL_STATE` | `CRAWLEE_SESSION_POOL_STATE_{id}` |
 | Request list progress | `SDK_REQUEST_LIST_STATE-{name}` | `CRAWLEE_REQUEST_LIST_STATE_{name}` |
