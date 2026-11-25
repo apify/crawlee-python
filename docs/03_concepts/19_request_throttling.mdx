@@ -22,7 +22,7 @@ The <ApiLink to="class/ThrottlingRequestManager">`ThrottlingRequestManager`</Api
 
 Requests for domains **not** in the configured list pass through to the main queue without any throttling.
 
-By default, each hostname is throttled on its own, so `www.example.com` and `api.example.com` get separate delays. To pace a site together with its subdomains, set `throttle_by='registrable_domain'`. Listing `www.example.com` then also throttles `example.com` and `api.example.com` together with it. IP addresses and hosts such as `localhost` stay per hostname.
+By default, each hostname is throttled on its own, so `www.example.com` and `api.example.com` get separate delays. To pace a site together with its subdomains, set `throttle_by='registrable_domain'`. Listing `www.example.com` then also throttles `example.com` and `api.example.com` together with it. Sites come from the ICANN section of the [Public Suffix List](https://publicsuffix.org/), so sites on a shared hosting domain, such as `alice.github.io` and `bob.github.io`, are throttled as one. IP addresses and hosts such as `localhost` stay per hostname.
 
 ## Basic usage
 
@@ -62,12 +62,12 @@ Note that:
 
 ## Sub-manager storage
 
-Each configured domain gets its own sub-manager, opened through the `request_manager_opener` callback under the alias `throttled-<domain>`. All of them are opened the first time you use the manager, so a domain that never receives a request still gets an empty store.
+Each configured domain gets its own sub-manager, opened through the `request_manager_opener` callback under the alias `throttled-<domain>`. With `throttle_by='registrable_domain'`, `<domain>` is the site, so `www.example.com` gets `throttled-example.com`. All of them are opened the first time you use the manager, so a domain that never receives a request still gets an empty store.
 
 Opening the sub-managers up front also makes requests that a previous run left behind visible again. Whether they're resumed or discarded depends on <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>:
 
 - With the default `purge_on_start=True`, the leftover requests are purged when the sub-manager opens, just like the requests in an unnamed inner queue.
-- With `purge_on_start=False`, the leftover requests are picked up and crawled.
+- With `purge_on_start=False`, the leftover requests are picked up and crawled. Keep `throttle_by` the same between such runs. A site's sub-manager holds the requests of all its hosts, and a manager that throttles by hostname can't mark the ones for other hosts as handled.
 
 :::warning
 

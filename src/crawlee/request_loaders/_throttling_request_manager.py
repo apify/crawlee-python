@@ -4,7 +4,7 @@ import asyncio
 import ipaddress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from logging import getLogger
+from logging import DEBUG, getLogger
 from typing import TYPE_CHECKING, Generic, Literal, Protocol, TypeVar
 
 from typing_extensions import override
@@ -13,6 +13,7 @@ from yarl import URL
 from crawlee._service_locator import ServiceLocator
 from crawlee._service_locator import service_locator as global_service_locator
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.public_suffix import public_suffix_list
 from crawlee.request_loaders._request_manager import RequestManager
 
@@ -111,13 +112,16 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
                 the domain, of which only the hostname is used. Blank entries are ignored, so a list built by
                 splitting a string needs no pruning. Only requests matching these domains will be routed to
-                per-domain sub-managers. Matching is exact but spelling-insensitive: casing, punycode versus Unicode,
-                and a trailing root dot are all normalized away. Subdomain wildcards such as `*.example.com` are not
-                supported. List each subdomain explicitly, or set `throttle_by='registrable_domain'`.
-            throttle_by: What counts as one domain. `'hostname'` paces each hostname on its own.
-                `'registrable_domain'` gives a site and its subdomains, such as `example.com` and `www.example.com`,
-                one delay and one sub-manager, and makes each `domains` entry cover its whole site. Hosts without a
-                registrable domain, such as IP addresses and `localhost`, stay per hostname.
+                per-domain sub-managers. Matching is spelling-insensitive: casing, punycode versus Unicode, and a
+                trailing root dot are all normalized away. With the default `throttle_by`, it's also exact. Subdomain
+                wildcards such as `*.example.com` are not supported. List each subdomain explicitly, or set
+                `throttle_by='registrable_domain'`.
+            throttle_by: What counts as one domain. `'hostname'` paces each hostname on its own. `'registrable_domain'`
+                gives a site and its subdomains, such as `example.com` and `www.example.com`, one delay and one
+                sub-manager, and makes each `domains` entry cover its whole site. Sites come from the ICANN section of
+                the Public Suffix List, so sites on a shared hosting domain, such as `alice.github.io` and
+                `bob.github.io`, count as one. Hosts without a registrable domain, such as IP addresses and `localhost`,
+                stay per hostname.
             request_manager_opener: Async callable used to open one sub-manager per configured domain on first use.
                 Must accept `alias`, `storage_backend`, and `configuration` keyword arguments and return the same
                 concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`). Without
@@ -157,6 +161,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._max_domain_stall = max_domain_stall
         self._request_manager_opener = request_manager_opener
         self._throttle_by = throttle_by
+        self._logger_once = LoggerOnce(logger)
         # Padding on an entry would otherwise survive parsing into a key no crawled hostname can match.
         domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
         self._domain_states: dict[str, _DomainState] = {key: _DomainState(domain=key) for key in domain_keys}
@@ -449,8 +454,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         A `RateLimitedSignal` backs the domain off for the signal's `wait` if it's positive, and exponentially from
         `base_delay` otherwise. Only the first refusal of a burst advances the backoff. A `MinIntervalSignal` becomes
-        the domain's crawl-delay unless the domain already has a longer one, so the slowest robots.txt among the hosts
-        it covers sets the pace.
+        the domain's crawl-delay. The first one wins, so a robots.txt re-fetch can't change the dispatch cadence
+        mid-crawl.
 
         Returns:
             `True` if the URL's domain is in `domains`, so the manager paces it by the signal. `False` if the domain
@@ -478,11 +483,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         if scope == 'hostname' and self._throttle_by == 'registrable_domain':
             state = self._get_domain_state(url)
-            if state is not None:
-                logger.debug(
+            # A host without a registrable domain is paced on its own, so the signal isn't widened.
+            if state is not None and public_suffix_list.get_registrable_domain(state.domain) is not None:
+                self._logger_once.log(
                     'Applying a pacing signal scoped to "hostname" to the whole registrable domain "%s", as '
                     '`throttle_by` groups requests that way. Sibling subdomains are paced with it.',
                     state.domain,
+                    key=state.domain,
+                    level=DEBUG,
                 )
             return
 
@@ -555,12 +563,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return True
 
     def _record_declared_interval(self, url: str, interval: timedelta) -> bool:
-        """Record a declared minimum interval as the crawl-delay of the URL's domain, unless it has a longer one."""
+        """Record a declared minimum interval as the crawl-delay of the URL's domain, unless it already has one."""
         state = self._get_domain_state(url)
         if state is None:
             return False
 
-        if state.crawl_delay is None or interval > state.crawl_delay:
+        if state.crawl_delay is None:
             state.crawl_delay = interval
             logger.debug('Set crawl-delay for domain "%s" to %.1fs', state.domain, interval.total_seconds())
 

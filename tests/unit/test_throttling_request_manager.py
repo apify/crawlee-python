@@ -316,17 +316,18 @@ async def test_rate_limit_paces_whole_site(site_manager: ThrottlingRequestManage
 @pytest.mark.parametrize(
     ('url', 'key'),
     [
+        pytest.param('https://a.example.co.uk/', 'example.co.uk', id='multi-label-suffix'),
         pytest.param('http://127.0.0.1:8080/', '127.0.0.1', id='ipv4'),
         pytest.param('http://[::1]/', '::1', id='ipv6'),
         pytest.param('http://localhost/', 'localhost', id='single-label'),
     ],
 )
-async def test_ip_and_localhost_per_hostname(
+async def test_site_grouping_key(
     site_manager: ThrottlingRequestManager[RequestQueue],
     url: str,
     key: str,
 ) -> None:
-    """With `registrable_domain`, a host without a registrable domain is keyed by its hostname."""
+    """With `registrable_domain`, a URL is keyed by its registrable domain, or by its hostname if it has none."""
     assert site_manager._extract_domain(url) == key
 
 
@@ -527,26 +528,29 @@ async def test_crawl_delay_integration(manager: ThrottlingRequestManager[Request
     assert state.crawl_delay == timedelta(seconds=5)
 
 
-@pytest.mark.parametrize(
-    ('later', 'expected'),
-    [
-        pytest.param(timedelta(seconds=9), timedelta(seconds=9), id='longer-raises'),
-        pytest.param(timedelta(seconds=2), timedelta(seconds=5), id='shorter-ignored'),
-    ],
-)
-async def test_min_interval_keeps_longest_value(
-    manager: ThrottlingRequestManager[RequestQueue],
-    later: timedelta,
-    expected: timedelta,
-) -> None:
-    """A later min-interval signal is accepted and can raise the crawl-delay, but never lowers it."""
+async def test_min_interval_keeps_first_value(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A later min-interval signal is accepted but doesn't change the crawl-delay."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=5), scope='hostname'))
 
-    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=later, scope='hostname'))
+    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=9), scope='hostname'))
 
     assert accepted is True
-    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == expected
+    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == timedelta(seconds=5)
+
+
+async def test_site_keeps_first_crawl_delay(site_manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """With `registrable_domain`, the first crawl-delay from any host of a site paces the whole site."""
+    site_manager.record_pacing_signal(
+        MinIntervalSignal('https://www.example.com/page1', interval=timedelta(seconds=5), scope='hostname')
+    )
+
+    accepted = site_manager.record_pacing_signal(
+        MinIntervalSignal('https://api.example.com/page1', interval=timedelta(seconds=9), scope='hostname')
+    )
+
+    assert accepted is True
+    assert site_manager._domain_states['example.com'].crawl_delay == timedelta(seconds=5)
 
 
 async def test_min_interval_refused_unconfigured(manager: ThrottlingRequestManager[RequestQueue]) -> None:
@@ -625,24 +629,50 @@ async def test_site_rejects_unknown_scope(site_manager: ThrottlingRequestManager
         site_manager.record_pacing_signal(signal)
 
 
-async def test_site_widening_logged_for_paced_site(
+async def test_site_widening_logged_once(
     site_manager: ThrottlingRequestManager[RequestQueue],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """With `registrable_domain`, widening a hostname-scoped signal is logged only for a paced site, naming it."""
+    """With `registrable_domain`, widening a hostname-scoped signal is logged once per paced site, naming it."""
     interval = timedelta(seconds=1)
+    urls = [
+        f'https://{NON_THROTTLED_DOMAIN}/page1',
+        'https://api.example.com/page1',
+        'https://www.example.com/page2',
+    ]
 
     with caplog.at_level('DEBUG', logger=MANAGER_MODULE):
-        site_manager.record_pacing_signal(
-            MinIntervalSignal(f'https://{NON_THROTTLED_DOMAIN}/page1', interval=interval, scope='hostname')
-        )
-        site_manager.record_pacing_signal(
-            MinIntervalSignal('https://api.example.com/page1', interval=interval, scope='hostname')
-        )
+        for url in urls:
+            site_manager.record_pacing_signal(MinIntervalSignal(url, interval=interval, scope='hostname'))
 
     widened = [r.message for r in caplog.records if 'whole registrable domain' in r.message]
     assert len(widened) == 1
     assert '"example.com"' in widened[0]
+
+
+async def test_host_without_site_not_logged(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With `registrable_domain`, a hostname-scoped signal for an IP or `localhost` isn't logged as widened."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=['127.0.0.1', 'localhost'],
+        throttle_by='registrable_domain',
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+    )
+    interval = timedelta(seconds=1)
+
+    with caplog.at_level('DEBUG', logger=MANAGER_MODULE):
+        accepted = [
+            manager.record_pacing_signal(MinIntervalSignal(url, interval=interval, scope='hostname'))
+            for url in ('http://127.0.0.1/', 'http://localhost/')
+        ]
+
+    assert accepted == [True, True]
+    assert not [r for r in caplog.records if 'whole registrable domain' in r.message]
 
 
 async def test_crawl_delay_throttles_after_dispatch(manager: ThrottlingRequestManager[RequestQueue]) -> None:
