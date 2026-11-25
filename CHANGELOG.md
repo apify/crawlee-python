@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - **playwright:** Send navigation cookies with `send_request` ([#2485](https://github.com/apify/crawlee-python/pull/2485)) ([b222b2b](https://github.com/apify/crawlee-python/commit/b222b2beb9b810da8ee47bddc5d8e1fa3cfca72b)) by [@rome-xi](https://github.com/rome-xi), closes [#2483](https://github.com/apify/crawlee-python/issues/2483)
 - **sql:** Avoid duplicate sequence numbers on concurrent adds ([#2494](https://github.com/apify/crawlee-python/pull/2494)) ([6c86dbf](https://github.com/apify/crawlee-python/commit/6c86dbfea4fc2017d13da084afe08e689eca731d)) by [@Mantisus](https://github.com/Mantisus)
 - **sitemap:** Ignore a UTF-8 byte order mark in text sitemaps ([#2497](https://github.com/apify/crawlee-python/pull/2497)) ([f9e9c7a](https://github.com/apify/crawlee-python/commit/f9e9c7a7255c1d9c1fef8ca234c11dbb57814b74)) by [@goranai](https://github.com/goranai), closes [#2496](https://github.com/apify/crawlee-python/issues/2496)
+- **redis:** Accept empty pushes and a zero limit in datasets ([b128d6e](https://github.com/apify/crawlee-python/commit/b128d6e6fc8d2eae6c0018fcf801665f05d759f2)) by [@Mantisus](https://github.com/Mantisus)
+- **sql:** Fix dataset pushes and `skip_empty` paging ([a68fbb9](https://github.com/apify/crawlee-python/commit/a68fbb9f798f5115b6a31ffae5f00e6f0ed24c31)) by [@Mantisus](https://github.com/Mantisus)
 
 <!-- git-cliff-unreleased-end -->
 
