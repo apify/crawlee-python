@@ -73,8 +73,13 @@ def _make_flaky_stream_client(body: bytes, *, fail_times: int) -> tuple[AsyncMoc
     return client, attempts
 
 
-def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMock, list[str]]:
-    """Create a mock client whose `stream` serves `body_for_url(url)` in a single chunk and records fetched URLs."""
+def _make_stream_client(
+    body_for_url: 'Callable[[str], bytes]', *, chunk_size: int | None = None
+) -> tuple[AsyncMock, list[str]]:
+    """Create a mock client whose `stream` serves `body_for_url(url)` and records fetched URLs.
+
+    The body is served in chunks of `chunk_size` bytes, or in a single chunk when `chunk_size` is `None`.
+    """
     fetched: list[str] = []
 
     @asynccontextmanager
@@ -82,7 +87,12 @@ def _make_stream_client(body_for_url: 'Callable[[str], bytes]') -> tuple[AsyncMo
         fetched.append(url)
 
         async def read_stream() -> 'AsyncIterator[bytes]':
-            yield body_for_url(url)
+            body = body_for_url(url)
+            if chunk_size is None:
+                yield body
+                return
+            for start in range(0, len(body), chunk_size):
+                yield body[start : start + chunk_size]
 
         response = MagicMock(spec=HttpResponse)
         response.status_code = 200
@@ -429,18 +439,22 @@ async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> No
 
 
 @pytest.mark.parametrize(
-    'compressed',
+    ('compressed', 'chunk_size'),
     [
-        pytest.param(False, id='plain'),
-        pytest.param(True, id='gzip'),
+        pytest.param(False, None, id='plain'),
+        pytest.param(True, None, id='gzip'),
+        pytest.param(False, 1, id='split across chunks'),
     ],
 )
-async def test_text_sitemap_ignores_utf8_byte_order_mark(*, compressed: bool) -> None:
+async def test_text_sitemap_ignores_utf8_byte_order_mark(*, compressed: bool, chunk_size: int | None) -> None:
     """A UTF-8 byte order mark at the start of a text sitemap must not end up in the first URL."""
     urls = [f'{DEFAULT_URL}page-{i}' for i in range(3)]
     body = b'\xef\xbb\xbf' + '\n'.join(urls).encode()
     sitemap_url = f'{DEFAULT_URL}sitemap.txt{".gz" if compressed else ""}'
-    client, _ = _make_stream_client(lambda _url: gzip.compress(body) if compressed else body)
+    client, _ = _make_stream_client(
+        lambda _url: gzip.compress(body) if compressed else body,
+        chunk_size=chunk_size,
+    )
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': sitemap_url}], client)]
 
