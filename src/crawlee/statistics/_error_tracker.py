@@ -6,6 +6,7 @@ import traceback
 from collections import Counter, defaultdict
 from itertools import zip_longest
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from crawlee.statistics._error_snapshotter import ErrorSnapshotter
@@ -111,7 +112,7 @@ class ErrorTracker:
                 # The exception has no traceback (e.g. it was never raised).
                 return ''
             # Show only the most specific frame.
-            return f'{error_traceback[-1].filename.split("/")[-1]}:{error_traceback[-1].lineno}'
+            return f'{Path(error_traceback[-1].filename).name}:{error_traceback[-1].lineno}'
         return ''
 
     def _get_error_message(self, error: Exception) -> str:
