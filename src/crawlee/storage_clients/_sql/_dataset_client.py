@@ -208,7 +208,7 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
             items=items,
             count=len(items),
             desc=desc,
-            limit=limit or metadata.item_count - offset,
+            limit=limit if limit is not None else max(metadata.item_count - offset, 0),
             offset=offset or 0,
             total=metadata.item_count,
         )

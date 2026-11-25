@@ -246,14 +246,38 @@ async def test_push_data_empty_list(dataset_client: SqlDatasetClient) -> None:
 
 
 async def test_push_data_over_bind_limit(dataset_client: SqlDatasetClient) -> None:
-    """Test that one push stores more items than a single statement has bind parameters for."""
-    # SQLite allows 32766 bind parameters per statement by default, and each item takes two.
-    items = [{'id': i} for i in range(20_000)]
+    """Test that one push stores items that need more bind parameters than a single statement allows."""
+    # Each item takes two bind parameters. SQLite allows 32766 per statement by default, and Debian and Ubuntu builds
+    # raise the limit to 250000.
+    item_count = 250_000 // 2 + 1
+    items = [{'id': i} for i in range(item_count)]
     await dataset_client.push_data(items)
 
     result = await dataset_client.get_data(limit=None)
-    assert result.total == 20_000
+    assert result.total == item_count
     assert result.items == items
+
+
+@pytest.mark.parametrize(
+    ('offset', 'limit', 'expected_limit'),
+    [
+        pytest.param(0, 0, 0, id='zero limit'),
+        pytest.param(10, None, 0, id='offset past the end'),
+    ],
+)
+async def test_get_data_page_limit(
+    dataset_client: SqlDatasetClient,
+    offset: int,
+    limit: int | None,
+    expected_limit: int,
+) -> None:
+    """Test that the page reports the requested zero limit and never a negative one."""
+    await dataset_client.push_data([{'id': i} for i in range(5)])
+
+    result = await dataset_client.get_data(offset=offset, limit=limit)
+
+    assert result.items == []
+    assert result.limit == expected_limit
 
 
 async def test_error_handling_on_push_failure(dataset_client: SqlDatasetClient) -> None:
