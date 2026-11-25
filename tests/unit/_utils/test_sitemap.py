@@ -428,7 +428,13 @@ async def test_gzip_text_sitemap_parsed_by_extension_when_served_as_gzip() -> No
     assert {item.loc for item in items} == urls
 
 
-@pytest.mark.parametrize('compressed', [False, True], ids=['plain', 'gzip'])
+@pytest.mark.parametrize(
+    'compressed',
+    [
+        pytest.param(False, id='plain'),
+        pytest.param(True, id='gzip'),
+    ],
+)
 async def test_text_sitemap_ignores_utf8_byte_order_mark(*, compressed: bool) -> None:
     """A UTF-8 byte order mark at the start of a text sitemap must not end up in the first URL."""
     urls = [f'{DEFAULT_URL}page-{i}' for i in range(3)]
