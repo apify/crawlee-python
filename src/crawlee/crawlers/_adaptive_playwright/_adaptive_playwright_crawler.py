@@ -458,7 +458,7 @@ class AdaptivePlaywrightCrawler(
             kvs = await context.get_key_value_store()
             default_value: MutableMapping[str, JsonSerializable] = {}
             old_state: MutableMapping[str, JsonSerializable] = await kvs.get_value(
-                self._CRAWLEE_STATE_KEY, default_value
+                f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value
             )
             old_state_copy = deepcopy(old_state)
 

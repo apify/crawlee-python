@@ -482,21 +482,20 @@ async def test_adaptive_crawling_result_use_state_isolation(
         rendering_type_predictor=static_only_predictor_enforce_detection,
     )
     await key_value_store.set_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0', {'counter': 0})
-    request_handler_calls = 0
+    seen_states = list[dict[str, int]]()
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        nonlocal request_handler_calls
         state = cast('dict[str, int]', await context.use_state())
-        request_handler_calls += 1
+        seen_states.append(dict(state))
         state['counter'] += 1
 
     await crawler.run(test_urls[:1])
 
     await key_value_store.persist_autosaved_values()
 
-    # Request handler was called twice
-    assert request_handler_calls == 2
+    # Both sub crawlers started from the persisted state.
+    assert seen_states == [{'counter': 0}, {'counter': 0}]
     # Increment of global state happened only once
     assert (await key_value_store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0'))['counter'] == 1
 

@@ -140,6 +140,16 @@ async def test_persistent_no_learning_data_prediction() -> None:
     assert persisted_data['model']['is_fitted'] is False
 
 
+async def test_default_persist_state_key() -> None:
+    """Without a `persist_state_key`, the model is saved under the default key."""
+    async with DefaultRenderingTypePredictor(persistence_enabled=True):
+        pass
+
+    kvs = await KeyValueStore.open()
+
+    assert await kvs.get_value('CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE') is not None
+
+
 async def test_persistent_prediction() -> None:
     """Test that the model and resources is saved after train in KeyValueStore."""
     persist_key = 'test-persistent-state'

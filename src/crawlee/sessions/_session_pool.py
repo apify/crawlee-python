@@ -33,20 +33,25 @@ class SessionPool:
     lifecycle, and optionally persist the state to enable recovery.
     """
 
+    __next_id = 0
+
     def __init__(
         self,
         *,
+        id: str | None = None,
         max_pool_size: int = 1000,
         create_session_settings: dict | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
         event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
-        persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
+        persist_state_key: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
         Args:
+            id: An identifier of the pool, used in the default `persist_state_key`. Defaults to a per-process counter
+                of `SessionPool` instances.
             max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool
                 by using the `add_session` method.
             create_session_settings: Settings for creating new session instances. If None, default settings will
@@ -57,7 +62,11 @@ class SessionPool:
             persistence_enabled: Flag to enable or disable state persistence of the pool.
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
+                Defaults to `CRAWLEE_SESSION_POOL_STATE_{id}`.
         """
+        self._id = str(SessionPool.__next_id) if id is None else id
+        SessionPool.__next_id += 1
+
         if event_manager:
             service_locator.set_event_manager(event_manager)
 
@@ -69,7 +78,7 @@ class SessionPool:
             logger=logger,
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
-            persist_state_key=persist_state_key or 'CRAWLEE_SESSION_POOL_STATE',
+            persist_state_key=persist_state_key or f'CRAWLEE_SESSION_POOL_STATE_{self._id}',
         )
 
         self._max_pool_size = max_pool_size

@@ -1254,7 +1254,7 @@ async def test_default_statistics_use_crawler_id(crawler_id: str | None, expecte
     assert crawler._id == expected_id
     assert crawler.statistics.state.stats_id == expected_id
     kvs = await crawler.get_key_value_store()
-    persisted_state = await kvs.get_value(f'__CRAWLER_STATISTICS_{expected_id}')
+    persisted_state = await kvs.get_value(f'CRAWLEE_CRAWLER_STATISTICS_{expected_id}')
     assert persisted_state['statsId'] == expected_id
 
 

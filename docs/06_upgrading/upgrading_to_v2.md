@@ -174,6 +174,25 @@ The storage backends now write their JSON data with camelCase keys, the same as 
 
 Data written by v1 still loads, so an existing storage directory, Redis instance or database keeps working. Any tooling that reads these files directly needs to handle the camelCase keys.
 
+## Internal key-value store records are renamed
+
+Crawlee keeps its internal state in the default key-value store. These records now use the `CRAWLEE_` prefix and upper snake case, the same keys as in Crawlee JS:
+
+| Record | v1 key | v2 key |
+|---|---|---|
+| Crawler statistics | `__CRAWLER_STATISTICS_{id}` | `CRAWLEE_CRAWLER_STATISTICS_{id}` |
+| Session pool | `CRAWLEE_SESSION_POOL_STATE` | `CRAWLEE_SESSION_POOL_STATE_{id}` |
+| Request list progress | `SDK_REQUEST_LIST_STATE-{name}` | `CRAWLEE_REQUEST_LIST_STATE_{name}` |
+| Request list requests | not persisted | `CRAWLEE_REQUEST_LIST_REQUESTS_{name}` |
+| Rendering type predictor | `rendering-type-predictor-state` | `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE` |
+| File system request queue state | `__RQ_STATE_{id}` | `CRAWLEE_REQUEST_QUEUE_STATE_{id}` |
+
+`SessionPool` has a new `id` argument for its key. Without it, the pool gets a per-process counter of `SessionPool` instances, such as `'0'`. A `persist_state_key` you pass explicitly is used as it is.
+
+A `RequestList` with a `name` now also persists its requests, the same as with an explicit `persist_requests_key`.
+
+v2 doesn't read the v1 keys. If you resume a v1 run with `purge_on_start=False`, these components start from an empty state. To keep a record, copy it to the new key before the first v2 run.
+
 ## `MemoryStorageBackend` stores copies
 
 `MemoryStorageBackend` stores a JSON snapshot of each dataset item and of each key-value store value with a JSON content type, serialized the same way as by `FileSystemStorageBackend`. Changing an object after you push or set it doesn't change the stored data, and pushing the same object twice stores two independent items. Reads return fresh copies too, so changing a returned item or value doesn't change the store.

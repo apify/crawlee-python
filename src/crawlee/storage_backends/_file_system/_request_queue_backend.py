@@ -143,7 +143,7 @@ class FileSystemRequestQueueBackend(RequestQueueBackend):
 
         return RecoverableState[RequestQueueState](
             default_state=RequestQueueState(),
-            persist_state_key=f'__RQ_STATE_{id}',
+            persist_state_key=f'CRAWLEE_REQUEST_QUEUE_STATE_{id}',
             persist_state_kvs_factory=kvs_factory,
             persistence_enabled=True,
             logger=logger,

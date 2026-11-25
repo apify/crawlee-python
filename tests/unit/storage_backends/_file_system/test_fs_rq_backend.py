@@ -11,6 +11,7 @@ from crawlee import Request, service_locator
 from crawlee.configuration import Configuration
 from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
 from crawlee.storage_backends.models import RequestQueueMetadata
+from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -276,6 +277,17 @@ async def test_in_progress_requests_recovered_after_crash() -> None:
     assert await reopened_backend.fetch_next_request() is None
 
     await reopened_backend.drop()
+
+
+async def test_state_persisted_under_rq_id(rq_backend: FileSystemRequestQueueBackend) -> None:
+    """The queue state is persisted in the default key-value store under a key derived from the queue ID."""
+    await rq_backend.add_batch_of_requests([Request.from_url('https://example.com/1')])
+    await rq_backend._state.persist_state()
+
+    rq_id = (await rq_backend.get_metadata()).id
+    kvs = await KeyValueStore.open(storage_backend=FileSystemStorageBackend())
+
+    assert await kvs.get_value(f'CRAWLEE_REQUEST_QUEUE_STATE_{rq_id}') is not None
 
 
 async def test_get_request_does_not_mark_in_progress(rq_backend: FileSystemRequestQueueBackend) -> None:
