@@ -74,7 +74,7 @@ jobs:
 
       - name: Wait for checks
         if: ${{ !inputs.skip_checks }}
-        uses: apify/actions/wait-for-checks@v1.7.0
+        uses: apify/actions/wait-for-checks@v1.9.0
         with:
           ref: ${{ steps.sha.outputs.sha }}
           check-regexp: ^Checks
@@ -98,7 +98,7 @@ jobs:
         run: uv run poe install-dev
 
       - name: Install pnpm and website dependencies
-        uses: apify/actions/pnpm-install@v1.7.0
+        uses: apify/actions/pnpm-install@v1.9.0
         with:
           working-directory: website
 
