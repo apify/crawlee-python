@@ -57,7 +57,7 @@ service_locator.set_event_manager(event_manager)
 crawler = ParselCrawler()
 ```
 
-The event manager starts by itself on the first `on()` or `emit()` call in a running event loop, and keeps running until the event loop shuts down. In v1, it ran only while a crawler or your own `async with` block held it, so a request queue, a `RequestList` or a `use_state` dictionary used outside of them didn't save its state. Note that:
+The event manager starts by itself on the first `on()` call in a running event loop, and keeps running until the event loop shuts down. `emit()` never starts it. In v1, it ran only while a crawler or your own `async with` block held it, so a request queue, a `RequestList` or a `use_state` dictionary used outside of them didn't save its state. Note that:
 
 - A crawler no longer enters the event manager. It emits a `PERSIST_STATE` event at the end of every run and waits for the listeners that event invokes, up to the `close_timeout` of the event manager.
 - Listeners stay registered until `off()` removes them or the event loop shuts down. In v1, all of them were removed when the event manager stopped.
@@ -74,7 +74,7 @@ Other changes:
 - `emit()` returns the tasks of the listeners it starts.
 - A stop waits for the listeners in two rounds, each limited by `close_timeout`, so it can take up to twice as long.
 
-Entering an inactive event manager with `async with` takes over its lifecycle, so it stops when the block exits. After the exit, the next `on()` or `emit()` starts it again, as it would start one that nobody entered. Entering an active one raises a `RuntimeError`, where v1 counted the entries. A manager that started by itself is active too, so check `active` before entering one. Code that registered listeners with `on()` and then entered the manager with `async with` worked in v1. In v2, `on()` called in a running event loop starts the manager, so that `async with` raises. Enter the manager before you register the listeners, or leave out the `async with`.
+Entering the event manager with `async with` takes over its lifecycle, also when it already started by itself, so it stops when the block exits. After the exit, the next `on()` starts it again. Entering it again while someone has entered it raises a `RuntimeError`, where v1 counted the entries.
 
 A custom event manager that has to await something to start, such as a connection, sets the `supports_lazy_start` class attribute to `False`. Whoever enters it with `async with` owns it, and calling `on()` while nobody has entered it raises a `RuntimeError`. A crawler no longer enters the event manager, so enter such a manager yourself around every `run()`. A subclass that starts its work in `__aenter__()` doesn't get that work on a lazy start, so it needs `supports_lazy_start = False` too.
 

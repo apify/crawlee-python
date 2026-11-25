@@ -347,7 +347,7 @@ async def test_close_after_emit_processes_event(
 async def test_enter_twice_raises() -> None:
     """A manager can be entered only once at a time."""
     async with EventManager() as event_manager:
-        with pytest.raises(RuntimeError, match=r'EventManager is already active'):
+        with pytest.raises(RuntimeError, match=r'EventManager is already entered'):
             await event_manager.__aenter__()
 
 
@@ -360,13 +360,48 @@ async def test_exit_emits_final_persist_state(async_listener: AsyncMock) -> None
     assert event_manager.active is False
 
 
-async def test_enter_after_lazy_start_raises(async_listener: AsyncMock) -> None:
-    """A manager that started by itself is active, so it can't be entered."""
+async def test_enter_after_lazy_start_takes_over(async_listener: AsyncMock) -> None:
+    """Entering a manager that started by itself takes over its lifecycle, so the exit stops it."""
     event_manager = EventManager()
     event_manager.on(event=Event.PERSIST_STATE, listener=async_listener)
 
-    with pytest.raises(RuntimeError, match=r'EventManager is already active'):
-        await event_manager.__aenter__()
+    async with event_manager:
+        assert event_manager.active is True
+
+    assert event_manager.active is False
+    async_listener.assert_called_once()
+
+
+async def test_emit_after_exit_does_not_restart(async_listener: AsyncMock) -> None:
+    """An event emitted after the owner's exit reaches the listeners without starting the manager again."""
+    event_manager = EventManager()
+
+    async with event_manager:
+        event_manager.on(event=Event.SYSTEM_INFO, listener=async_listener)
+
+    await asyncio.gather(*event_manager.emit(event=Event.SYSTEM_INFO, event_data=None))
+
+    async_listener.assert_called_once()
+    assert event_manager.active is False
+
+
+def test_on_during_exit_restarts(async_listener: AsyncMock) -> None:
+    """A listener registered while the owner's exit waits for the listeners starts the manager again."""
+    event_manager = EventManager()
+
+    async def register_listener() -> None:
+        event_manager.off(event=Event.PERSIST_STATE, listener=register_listener)
+        event_manager.on(event=Event.PERSIST_STATE, listener=async_listener)
+
+    async def use() -> bool:
+        async with event_manager:
+            event_manager.on(event=Event.PERSIST_STATE, listener=register_listener)
+
+        return event_manager.active
+
+    assert asyncio.run(use()) is True
+    # Registered after the final event of the exit, so the call comes from the shutdown of the event loop.
+    async_listener.assert_called_once()
 
 
 async def test_context_is_left_even_if_closing_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -821,7 +856,7 @@ async def test_on_starts_manager(async_listener: AsyncMock) -> None:
 
 
 def test_on_outside_loop_only_registers(async_listener: AsyncMock) -> None:
-    """A listener registered outside an event loop is kept, and the manager starts on its first use within one."""
+    """A listener registered outside an event loop is kept, and emitting to it within one doesn't start the manager."""
     event_manager = EventManager()
     event_manager.on(event=Event.SYSTEM_INFO, listener=async_listener)
 
@@ -829,6 +864,7 @@ def test_on_outside_loop_only_registers(async_listener: AsyncMock) -> None:
 
     async def emit() -> None:
         listener_tasks = event_manager.emit(event=Event.SYSTEM_INFO, event_data=None)
+        assert event_manager.active is False
         await asyncio.gather(*listener_tasks)
 
     asyncio.run(emit())
@@ -913,7 +949,7 @@ def test_restart_after_exit_closes_once(async_listener: AsyncMock) -> None:
         async with event_manager:
             event_manager.on(event=Event.PERSIST_STATE, listener=async_listener)
 
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=None)
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
 
     asyncio.run(exit_and_restart())
 
@@ -936,12 +972,31 @@ def test_abandoned_loop_leaves_nothing(async_listener: AsyncMock) -> None:
         loop.close()
 
     async def use() -> bool:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=None)
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
         return event_manager.active
 
     assert asyncio.run(use()) is True
     # The listener of the gone event loop is dropped, so not even the final `PersistState` event reaches it.
     assert async_listener.call_count == 0
+
+
+def test_abandoned_owner_loop_can_be_entered() -> None:
+    """A manager entered in an event loop closed without a shutdown can be entered after it starts in the next one."""
+    event_manager = EventManager()
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(event_manager.__aenter__())
+    finally:
+        loop.close()
+
+    async def use() -> bool:
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
+
+        async with event_manager:
+            return event_manager.active
+
+    assert asyncio.run(use()) is True
 
 
 def test_abandoned_guard_spares_next_loop() -> None:
@@ -958,7 +1013,7 @@ def test_abandoned_guard_spares_next_loop() -> None:
         loop.close()
 
     async def use() -> bool:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=None)
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
         # Finalizes the guard of the closed event loop while this one runs.
         gc.collect()
         await asyncio.sleep(0)
@@ -1029,9 +1084,9 @@ async def test_first_persist_state_delayed(async_listener: AsyncMock) -> None:
     assert async_listener.call_count == 0
 
 
-async def _wait_until_inactive(event_manager: EventManager) -> None:
+async def _wait_until_closed(event_manager: EventManager) -> None:
     for _ in range(1000):
-        if not event_manager.active:
+        if event_manager._loop is None:
             return
         await asyncio.sleep(0)
 
@@ -1047,7 +1102,7 @@ def test_use_at_loop_end_no_restart() -> None:
             await asyncio.Event().wait()
         finally:
             # Like the teardown of a crawler, which emits its final event once the rest of the cleanup is done.
-            await _wait_until_inactive(event_manager)
+            await _wait_until_closed(event_manager)
             event_manager.on(event=Event.PERSIST_STATE, listener=AsyncMock())
             event_data = EventPersistStateData(is_migrating=False)
             record_emission(event_manager.emit(event=Event.PERSIST_STATE, event_data=event_data))
@@ -1065,8 +1120,8 @@ def test_use_at_loop_end_no_restart() -> None:
     assert event_manager._listeners_to_wrappers == {}
 
 
-async def test_owner_exit_during_close_no_restart(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An owner that stops the manager while its event loop starts closing it doesn't make the close start it again."""
+async def test_close_during_owner_exit_stops_too(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A close by the event loop during an owner's exit runs its own stop, as it may cancel the owner's one."""
     spy = ListenerWaitSpy(monkeypatch)
     release_save = asyncio.Event()
 
@@ -1137,7 +1192,7 @@ def test_late_owner_exit_is_noop() -> None:
             try:
                 await asyncio.Event().wait()
             finally:
-                await _wait_until_inactive(event_manager)
+                await _wait_until_closed(event_manager)
 
     async def main() -> None:
         owner_tasks.append(asyncio.create_task(own_the_manager()))
@@ -1158,7 +1213,7 @@ def test_enter_at_loop_end_is_noop() -> None:
         try:
             await asyncio.Event().wait()
         finally:
-            await _wait_until_inactive(event_manager)
+            await _wait_until_closed(event_manager)
             async with event_manager:
                 record_active(event_manager.active)
 
@@ -1178,7 +1233,7 @@ def test_on_after_closed_loop_registers(async_listener: AsyncMock) -> None:
     event_manager = EventManager()
 
     async def use() -> None:
-        event_manager.emit(event=Event.SYSTEM_INFO, event_data=None)
+        event_manager.on(event=Event.SYSTEM_INFO, listener=AsyncMock())
 
     asyncio.run(use())
     event_manager.on(event=Event.PERSIST_STATE, listener=async_listener)

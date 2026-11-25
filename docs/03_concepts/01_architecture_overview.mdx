@@ -367,7 +367,7 @@ Crawlee defines several built-in event types:
 
 Additional specialized events for browser and session management are also available.
 
-The whole process shares one event manager. It starts by itself on the first `on()` or `emit()` call in a running event loop and runs until the event loop shuts down. Event listeners can be either synchronous or asynchronous functions and are executed safely without blocking the main event loop.
+The whole process shares one event manager. It starts by itself on the first `on()` call in a running event loop and runs until the event loop shuts down. Event listeners can be either synchronous or asynchronous functions and are executed safely without blocking the main event loop.
 
 ```mermaid
 ---

@@ -82,10 +82,17 @@ class LocalEventManager(EventManager):
 
     @override
     async def _stop(self, *, timeout: timedelta | None) -> None:
+        # Cancelled before the parent class awaits anything, so that a start during its waits keeps the new task.
+        system_info_task = self._emit_system_info_event_rec_task.task
+
+        if system_info_task is not None:
+            system_info_task.cancel()
+
         try:
-            await self._emit_system_info_event_rec_task.stop()
-        finally:
             await super()._stop(timeout=timeout)
+        finally:
+            if system_info_task is not None:
+                await asyncio.gather(system_info_task, return_exceptions=True)
 
     async def _emit_system_info_event(self) -> None:
         """Emit a system info event with the current CPU and memory usage, if anyone listens to it."""

@@ -59,16 +59,16 @@ class EventManager:
     in its own task - the sync ones in a separate thread so that they cannot block the event loop. On top of that,
     it emits `PersistState` events at regular intervals and can wait for all the running listeners to complete.
 
-    The manager starts by itself on the first `on` or `emit` call in a running event loop, and keeps running until
-    that loop shuts down, when it emits a final `PersistState` event and drops the listeners. Whoever enters an
-    inactive manager with `async with` owns it instead, and it stops on the exit. A manager that has to await something
-    to start, such as connecting somewhere, sets `supports_lazy_start` to `False`, and calling `on` while it isn't
-    active raises an error. Once its event loop starts shutting down, nothing starts the manager again in that loop,
-    and `on` and `async with` do nothing there.
+    The manager starts by itself on the first `on` call in a running event loop, and keeps running until that loop
+    shuts down, when it emits a final `PersistState` event and drops the listeners. `emit` never starts it. Whoever
+    enters the manager with `async with` owns it instead, also after it started by itself, and it stops on the exit. A
+    manager that has to await something to start, such as connecting somewhere, sets `supports_lazy_start` to `False`,
+    and calling `on` while it isn't active raises an error. Once its event loop starts shutting down, nothing starts the
+    manager again in that loop, and `on` and `async with` do nothing there.
     """
 
     supports_lazy_start: ClassVar[bool] = True
-    """Whether the manager starts by itself on the first `on` or `emit` call, instead of being entered first."""
+    """Whether the manager starts by itself on the first `on` call, instead of being entered first."""
 
     _SHUTDOWN_TIMEOUT = timedelta(seconds=30)
     """Time limit for each wait for the listeners when the event loop shuts down, unless `close_timeout` sets one."""
@@ -135,6 +135,12 @@ class EventManager:
         self._active = False
         """Whether the manager runs in `_loop`. An event loop that stops or closes without a shutdown leaves it set."""
 
+        self._entered = False
+        """Whether an owner entered the running manager with `async with`."""
+
+        self._stops_in_progress = 0
+        """Number of stops still waiting for the listeners."""
+
         self._closed_loop: asyncio.AbstractEventLoop | None = None
         """The event loop whose shutdown closes the manager, set once that shutdown begins, so that nothing starts the
         manager again in that loop.
@@ -170,22 +176,26 @@ class EventManager:
         return self._close_timeout
 
     async def __aenter__(self) -> Self:
-        """Start the manager and take over its lifecycle.
+        """Take over the lifecycle of the manager, starting it unless it already started by itself.
 
         Raises:
-            RuntimeError: If the manager is already active, including when it started by itself, or if it belongs to
-                another event loop that is still running.
+            RuntimeError: If an owner has already entered the manager, or if it belongs to another event loop that is
+                still running.
         """
         loop = asyncio.get_running_loop()
 
         if loop is self._closed_loop:
             return self
 
-        if self._active and self._loop is loop:
-            raise RuntimeError(f'The {self.__class__.__name__} is already active.')
+        if self._entered and self._loop is loop:
+            raise RuntimeError(f'The {self.__class__.__name__} is already entered.')
 
         self._leave_other_loop(loop)
-        self._start(loop)
+
+        if not self._active:
+            self._start(loop)
+
+        self._entered = True
         return self
 
     async def __aexit__(
@@ -260,7 +270,10 @@ class EventManager:
             )
             return
         else:
-            self._start_on_use(loop)
+            self._leave_other_loop(loop)
+
+            if self.supports_lazy_start and not self._active:
+                self._start(loop)
 
         if not self.supports_lazy_start and not self._active:
             raise RuntimeError(
@@ -310,8 +323,8 @@ class EventManager:
     def emit(self, *, event: Event, event_data: EventData) -> list[asyncio.Task[None]]:
         """Emit an event with the associated data to all registered listeners.
 
-        Each listener is invoked in its own task, so this method only starts them. It also starts the manager if it
-        starts by itself.
+        Each listener is invoked in its own task, so this method only starts them. The manager itself doesn't start
+        here, and an event emitted while it's stopped still reaches the registered listeners.
 
         Args:
             event: The event which will be emitted.
@@ -325,7 +338,7 @@ class EventManager:
             RuntimeError: If called outside a running event loop, or if the manager belongs to another event loop that
                 is still running.
         """
-        self._start_on_use(asyncio.get_running_loop())
+        self._leave_other_loop(asyncio.get_running_loop())
 
         listener_tasks: list[asyncio.Task[None]] = []
 
@@ -380,22 +393,6 @@ class EventManager:
         """Emit a persist state event."""
         self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
 
-    def _start_on_use(self, loop: asyncio.AbstractEventLoop) -> None:
-        """Move the manager to the event loop it's used from, and start it there if it starts by itself.
-
-        Nothing starts the manager in an event loop that is shutting down.
-
-        A manager that doesn't start by itself has to be entered only for `on`. Its listeners were registered while it
-        was active, so they still get the events emitted after the owner stopped it.
-
-        Raises:
-            RuntimeError: If the manager belongs to another event loop that is still running.
-        """
-        self._leave_other_loop(loop)
-
-        if self.supports_lazy_start and not self._active and loop is not self._closed_loop:
-            self._start(loop)
-
     def _leave_other_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Forget the event loop the manager ran in, if it's another one than `loop`.
 
@@ -427,6 +424,12 @@ class EventManager:
 
     async def _stop(self, *, timeout: timedelta | None) -> None:
         """Stop the recurring work, emit the final `PersistState` event and wait for all the running listeners."""
+        # Marked as stopped before anything is awaited, so that an `on` call or an owner entering during the waits
+        # below starts the manager again.
+        self._active = False
+        self._entered = False
+        self._stops_in_progress += 1
+
         try:
             # Stop the periodic emission first, so that the event emitted below really is the last one.
             await self._emit_persist_state_event_rec_task.stop()
@@ -436,8 +439,7 @@ class EventManager:
             self._emit_persist_state_event()
             await self.wait_for_all_listeners_to_complete(timeout=timeout)
         finally:
-            # The manager has to stop even if stopping fails, be it a cancellation or a failed emission.
-            self._active = False
+            self._stops_in_progress -= 1
 
     async def _close_with_loop(self) -> None:
         """Wait until cancelled, which `asyncio.run` does when the event loop shuts down, then close the manager.
@@ -450,12 +452,12 @@ class EventManager:
             # A guard left in an event loop that the manager moved away from no longer closes it. The garbage collector
             # finalizes a guard left pending by a closed event loop with `GeneratorExit`, which isn't caught here.
             if self._shutdown_task is asyncio.current_task():
-                # Set before the stop, so that an owner stopping the manager at the same time can't make the final event
-                # below start it again.
+                # Set before the stop, so that nothing starts the manager again in this loop while it stops.
                 self._closed_loop = asyncio.get_running_loop()
 
                 try:
-                    if self._active:
+                    # A stop in progress may not have emitted its final event yet, and the shutdown may cancel it.
+                    if self._active or self._stops_in_progress:
                         timeout = self._SHUTDOWN_TIMEOUT if self._close_timeout is None else self._close_timeout
                         await self._stop(timeout=timeout)
                 finally:
@@ -468,6 +470,7 @@ class EventManager:
         self._loop = None
         self._shutdown_task = None
         self._active = False
+        self._entered = False
         self._listeners_to_wrappers.clear()
         self._listener_tasks.clear()
         self._waiting_listener_tasks.clear()
