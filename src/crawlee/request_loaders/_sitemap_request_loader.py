@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from contextlib import aclosing, suppress
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -136,6 +137,8 @@ class SitemapRequestLoader(RequestLoader):
         include: list[re.Pattern[Any] | Glob] | None = None,
         exclude: list[re.Pattern[Any] | Glob] | None = None,
         enqueue_strategy: EnqueueStrategy = 'same-hostname',
+        sitemap_retries: int = 3,
+        sitemap_timeout: timedelta | None = timedelta(seconds=30),
         max_buffer_size: int = 200,
         persist_state_key: str | None = None,
         transform_request_function: Callable[[RequestOptions], RequestOptions | RequestTransformAction] | None = None,
@@ -153,6 +156,9 @@ class SitemapRequestLoader(RequestLoader):
                 the sitemap protocol's same-host expectation and the `enqueue_links` default; pass `'all'` to
                 disable filtering. Note: regardless of `enqueue_strategy`, entries with non-`http(s)` schemes are
                 always filtered out.
+            sitemap_retries: Maximum number of retries of a failed sitemap fetch.
+            sitemap_timeout: Timeout for each attempt to fetch a sitemap, including reading its body. Reading pauses
+                while the buffer is full, so a slow crawl of a large sitemap needs a higher timeout. `None` disables it.
             max_buffer_size: Maximum number of URLs to buffer in memory.
             http_client: the instance of `HttpClient` to use for fetching sitemaps.
             persist_state_key: A key for persisting the loader's state in the KeyValueStore.
@@ -167,6 +173,8 @@ class SitemapRequestLoader(RequestLoader):
         self._include = include
         self._exclude = exclude
         self._enqueue_strategy = enqueue_strategy
+        self._sitemap_retries = sitemap_retries
+        self._sitemap_timeout = sitemap_timeout
         self._proxy_info = proxy_info
         self._max_buffer_size = max_buffer_size
         self._transform_request_function = transform_request_function
@@ -403,8 +411,9 @@ class SitemapRequestLoader(RequestLoader):
                 parse_options = ParseSitemapOptions(
                     max_depth=0,
                     emit_nested_sitemaps=True,
-                    sitemap_retries=3,
+                    sitemap_retries=self._sitemap_retries,
                     enqueue_strategy=self._enqueue_strategy,
+                    timeout=self._sitemap_timeout,
                 )
                 parsed_sitemap_url = URL(sitemap_url)
 

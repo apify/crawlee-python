@@ -671,7 +671,7 @@ async def parse_sitemap(
                     depth=depth,
                     visited_sitemap_urls=visited_sitemap_urls,
                     sources=sources,
-                    retries_left=sitemap_retries,
+                    retries_left=sitemap_retries + 1,
                     emit_nested_sitemaps=emit_nested_sitemaps,
                     enqueue_strategy=enqueue_strategy,
                     proxy_info=proxy_info,

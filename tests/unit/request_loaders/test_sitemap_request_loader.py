@@ -1,4 +1,5 @@
 import gzip
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -92,7 +93,32 @@ async def test_sitemap_http_error_is_skipped_after_retries_exhausted(monkeypatch
 
     assert await loader.fetch_next_request() is None
 
+    assert attempts == [503, 503, 503, 503]
+
+
+@pytest.mark.parametrize(
+    'sitemap_timeout',
+    [
+        pytest.param(timedelta(seconds=5), id='timeout'),
+        pytest.param(None, id='no-timeout'),
+    ],
+)
+async def test_sitemap_timeout_and_retries(monkeypatch: pytest.MonkeyPatch, sitemap_timeout: timedelta | None) -> None:
+    """`sitemap_timeout` and `sitemap_retries` apply to each sitemap fetch."""
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, attempts = make_status_stream_client({sitemap_url: [(503, b'')]})
+    loader = SitemapRequestLoader(
+        [sitemap_url],
+        http_client=client,
+        sitemap_retries=2,
+        sitemap_timeout=sitemap_timeout,
+    )
+
+    assert await loader.fetch_next_request() is None
+
     assert attempts == [503, 503, 503]
+    assert client.send_request.call_args.kwargs['timeout'] == sitemap_timeout
 
 
 async def test_sitemap_loader_drains_requests_after_later_source_fails(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -201,7 +201,7 @@ async def test_sitemap_fetch_raises_after_retries_exhausted(monkeypatch: pytest.
     with pytest.raises(ConnectionError):
         _ = [item async for item in parse_sitemap([{'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'}], client)]
 
-    assert len(attempts) == 3
+    assert len(attempts) == 4
 
 
 async def test_sitemap_fetch_retries_retryable_http_status(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -226,7 +226,7 @@ async def test_sitemap_fetch_skips_http_error_after_retries_exhausted(monkeypatc
 
     items = [item async for item in parse_sitemap([{'type': 'url', 'url': sitemap_url}], client)]
 
-    assert attempts == [503, 503, 503]
+    assert attempts == [503, 503, 503, 503]
     assert items == []
 
 
@@ -287,7 +287,7 @@ async def test_sitemap_partial_http_failure_keeps_healthy_source() -> None:
 async def test_sitemap_partial_fetch_failure_keeps_healthy_source(monkeypatch: pytest.MonkeyPatch) -> None:
     """A fetch exception in one source is suppressed when another source succeeds."""
     monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
-    client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=3)
+    client, attempts = _make_flaky_stream_client(get_basic_sitemap().encode(), fail_times=4)
     sources: list[SitemapSource] = [
         {'type': 'url', 'url': f'{DEFAULT_URL}broken.xml'},
         {'type': 'url', 'url': f'{DEFAULT_URL}sitemap.xml'},
@@ -295,7 +295,7 @@ async def test_sitemap_partial_fetch_failure_keeps_healthy_source(monkeypatch: p
 
     items = [item async for item in parse_sitemap(sources, client)]
 
-    assert len(attempts) == 4
+    assert len(attempts) == 5
     assert {item.loc for item in items} == get_basic_results()
 
 
