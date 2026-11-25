@@ -429,7 +429,9 @@ async def _fetch_and_process_sitemap(
                 # Determine content type and compression
                 content_type = response.headers.get('content-type', '')
 
-                decoder = getincrementaldecoder('utf-8')(errors='replace')
+                # `utf-8-sig` drops a leading byte order mark, which would otherwise stick to the first line of a text
+                # sitemap and make its first URL fail the scheme check.
+                decoder = getincrementaldecoder('utf-8-sig')(errors='replace')
 
                 # Create appropriate parser
                 parser = _get_parser(content_type, sitemap_url)
