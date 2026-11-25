@@ -76,6 +76,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         KeyValueStore._autosaved_values = {}
         Statistics._Statistics__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
         BasicCrawler._BasicCrawler__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
+        BasicCrawler._BasicCrawler__use_state_anonymous_ids = set()  # ty:ignore[unresolved-attribute] # Mangled attribute
         SessionPool._SessionPool__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
         ThrottlingRequestManager._ThrottlingRequestManager__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
         DefaultRenderingTypePredictor._DefaultRenderingTypePredictor__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute

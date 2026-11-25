@@ -180,11 +180,14 @@ Crawlee keeps its internal state in the default key-value store. These records n
 
 | Record | v1 key | v2 key |
 | --- | --- | --- |
+| `use_state` of a crawler without an `id` | `CRAWLEE_STATE_{id}` | `CRAWLEE_STATE` |
 | Crawler statistics | `__CRAWLER_STATISTICS_{id}` | `CRAWLEE_CRAWLER_STATISTICS_{id}` |
 | Session pool | `CRAWLEE_SESSION_POOL_STATE` | `CRAWLEE_SESSION_POOL_STATE_{id}` |
 | Request list progress | `SDK_REQUEST_LIST_STATE-{name}` | `CRAWLEE_REQUEST_LIST_STATE_{name}` |
 | Rendering type predictor | `rendering-type-predictor-state` | `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE_{id}` |
 | File system request queue state | `__RQ_STATE_{id}` | `CRAWLEE_REQUEST_QUEUE_STATE_{id}` |
+
+Crawlers without an `id` now share one `use_state` state under `CRAWLEE_STATE`, the same as in Crawlee JS, and the crawler logs a warning when a second one of them calls `use_state`. In v1, each of them had its own state. To keep the states apart, pass a unique `id` to each crawler. A crawler with an `id` still uses `CRAWLEE_STATE_{id}`.
 
 `SessionPool` has a new `id` argument for its key. Without it, the pool gets a per-process counter of `SessionPool` instances, such as `'0'`. The counter includes the pools that crawlers create, so pass an `id` to a pool you persist. `DefaultRenderingTypePredictor` has a new `id` argument too, and the predictor that `AdaptivePlaywrightCrawler` builds gets the crawler's `id`. A `persist_state_key` you pass explicitly is used as it is.
 
@@ -267,7 +270,7 @@ The `id` argument of `BasicCrawler` and its subclasses is now a `str`, so pass a
 
 The statistics a crawler creates by default now use the crawler's `id`. Crawlers that share an `id` therefore share both the state returned by `use_state` and the persisted statistics. In v1, they shared only the state.
 
-A crawler without an `id` gets its creation index, such as `'0'`, and crawlers with an explicit `id` now count towards that index too. If you resume a v1 run with `purge_on_start=False` and mix both kinds of crawlers, a generated `id` can differ from the one v1 assigned, and the crawler won't find the state that `use_state` stored under the old one.
+A crawler without an `id` gets its creation index, such as `'0'`, and crawlers with an explicit `id` now count towards that index too. If you resume a v1 run with `purge_on_start=False` and mix both kinds of crawlers, a generated `id` can differ from the one v1 assigned, and the crawler won't find the statistics stored under the old one.
 
 ## Concurrency is managed by `ConcurrencySystem`
 
@@ -718,6 +721,8 @@ The crawler logs the first message once per run, the next time it looks for a ne
 When the statistics, the session pool or another component fails to persist its state on a `PERSIST_STATE` event, it now logs a WARNING `Failed to persist the state under key '<key>'.` with the traceback. The WARNING comes from the component's own logger, such as `crawlee.statistics._statistics`. In v1, the `crawlee.events._event_manager` logger logged the ERROR `Exception in the event listener`. A failed persist when the component is exited logs the same WARNING, where v1 raised the error.
 
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
+
+When a second crawler without an `id` calls `use_state`, the crawler logs a new warning. It starts with `Multiple crawler instances are calling use_state() without an explicit` and is logged once per process.
 
 Messages that mentioned a storage client name the storage backend instead. The DEBUG message about the implicit default backend now reads `No storage backend set, implicitly creating and using default FileSystemStorageBackend.` The warning about unsupported arguments of a dataset backend ends with the backend class name, for example `... of get_data are not supported by MemoryDatasetBackend.`
 

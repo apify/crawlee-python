@@ -17,7 +17,7 @@ from functools import cached_property, partial
 from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, ParamSpec, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, NotRequired, ParamSpec, TypedDict, Unpack, cast
 from weakref import WeakKeyDictionary
 
 from cachetools import LRUCache
@@ -287,6 +287,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _CRAWLEE_STATE_KEY = 'CRAWLEE_STATE'
     _request_handler_timeout_text = 'Request handler timed out after'
     __next_id = 0
+    __use_state_anonymous_ids: ClassVar[set[str]] = set()
+    """IDs of the crawlers without an explicit `id` that called `use_state`, to warn once they share the state."""
 
     _SAFE_MIGRATION_WAIT = timedelta(seconds=20)
     """How long a migration or an abort waits for the requests in progress."""
@@ -400,11 +402,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 provided in the parameters. Returning `None` suppresses the status message.
             id: Identifier of the crawler. Crawlers with the same ID share the `use_state` state and the default
                 statistics, and every crawler but the first uses it in the alias of its default request queue. Without
-                it, the ID follows the order in which crawlers are created.
+                it, the ID follows the order in which crawlers are created, and the crawler shares the `use_state`
+                state with the other crawlers without an `id`.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
         """
         self._id = str(BasicCrawler.__next_id) if id is None else id
+        self._has_explicit_id = id is not None
         self._default_rq_alias = None if BasicCrawler.__next_id == 0 else f'__default_{self._id}__'
         BasicCrawler.__next_id += 1
         self._consumer = ConcurrencyConsumer(id=self._id)
@@ -1144,7 +1148,21 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         default_value: MutableMapping[str, JsonSerializable] | None = None,
     ) -> MutableMapping[str, JsonSerializable]:
         kvs = await self.get_key_value_store()
-        return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value)
+
+        if self._has_explicit_id:
+            return await kvs.get_auto_saved_value(f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value)
+
+        anonymous_ids = BasicCrawler.__use_state_anonymous_ids
+        if self._id not in anonymous_ids:
+            anonymous_ids.add(self._id)
+            if len(anonymous_ids) == 2:  # noqa: PLR2004
+                self._logger.warning(
+                    'Multiple crawler instances are calling use_state() without an explicit `id` argument. They share '
+                    'the same state object, which is likely unintended. To fix this, pass a unique `id` to each '
+                    "crawler instance, for example `BasicCrawler(id='my-crawler-1')`."
+                )
+
+        return await kvs.get_auto_saved_value(self._CRAWLEE_STATE_KEY, default_value)
 
     async def _save_crawler_state(self) -> None:
         store = await self.get_key_value_store()

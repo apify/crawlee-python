@@ -52,7 +52,7 @@ State persistence builds on the `PERSIST_STATE` event. Components that need to s
 
 - `CRAWLEE_CRAWLER_STATISTICS_<id>` holds the crawler's [statistics](./statistics). The crawler's default `Statistics` instance has persistence enabled.
 - `CRAWLEE_REQUEST_QUEUE_STATE_<id>` holds the ordering and in-progress information of a request queue backed by the file system storage client. The requests themselves are stored as individual files.
-- `CRAWLEE_STATE_<id>` holds the state you manage with `use_state`, as described in [Crawler state](#crawler-state).
+- `CRAWLEE_STATE`, or `CRAWLEE_STATE_<id>` for a crawler with an `id`, holds the state you manage with `use_state`, as described in [Crawler state](#crawler-state).
 
 Other components persist their state when you ask them to. The <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> does so with `persistence_enabled=True`, and the <ApiLink to="class/RequestList">`RequestList`</ApiLink> with a `persist_state_key`. For details, see [Request loaders](./request-loaders).
 
@@ -64,7 +64,7 @@ Persisted state only helps if it's still there on the next run. Crawlee purges t
 
 The `use_state` helper of the crawling context returns a dictionary that's saved automatically. Every call within a crawler returns the same dictionary, so you can read and update it from any request handler. Crawlee saves it to the default key-value store on every `PERSIST_STATE` event and when the run finishes, and loads it back from there when the crawler starts again with existing storage. The optional argument sets the initial value when no saved state exists yet.
 
-The dictionary is stored under the `CRAWLEE_STATE_<id>` key, where the id is the crawler's `id` argument or, without one, a per-process counter of crawler instances. Pass the same `id` to the constructors of several crawlers to make them share their state. Outside request handlers, use <ApiLink to="class/BasicCrawler#use_state">`crawler.use_state()`</ApiLink>. Values have to be JSON serializable.
+For a crawler with an `id` argument, the dictionary is stored under the `CRAWLEE_STATE_<id>` key. Pass the same `id` to the constructors of several crawlers to make them share their state. Crawlers without an `id` share one dictionary under the `CRAWLEE_STATE` key, and the crawler logs a warning when a second one of them calls `use_state`. To give each crawler its own state, pass a unique `id` to each one. Outside request handlers, use <ApiLink to="class/BasicCrawler#use_state">`crawler.use_state()`</ApiLink>. Values have to be JSON serializable.
 
 The following example stores the page title of every visited URL in the crawler state and reads it after the run:
 
