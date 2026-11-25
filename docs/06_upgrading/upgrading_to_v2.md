@@ -356,6 +356,25 @@ for urls in batches:
 
 `Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened. With `SqlStorageBackend` and `RedisStorageBackend`, each instance now opens its own storages, so it purges them once per instance.
 
+## A timeout or cancellation around `run()` raises
+
+In v1, `crawler.run()` caught the cancellation of the task that awaited it and returned the final statistics. A timeout around `run()`, such as `asyncio.wait_for()` or `asyncio.timeout()`, that expired during the crawl didn't raise `TimeoutError`, and a task running `run()` returned the statistics even after `task.cancel()`. In v2, `run()` lets the requests in progress finish and then raises `CancelledError`, which a timeout turns into `TimeoutError`. A repeated cancellation, which anyio cancel scopes keep sending, cancels the requests in progress. A cancelled run doesn't log the final statistics or the error analysis, the same as a failed run. Ctrl+C still ends the crawl gracefully and returns the statistics.
+
+To limit how long a crawl runs and still get the statistics, stop the crawler when the time is up. The requests in progress still finish, so the crawl can end after the limit:
+
+```python
+# v1
+stats = await asyncio.wait_for(crawler.run(urls), timeout=600)
+
+# v2
+stop_handle = asyncio.get_running_loop().call_later(600, crawler.stop)
+try:
+    stats = await crawler.run(urls)
+finally:
+    # A stop called after the run ends would stop the next run.
+    stop_handle.cancel()
+```
+
 ## `RequestQueue.purge` raises when the storage backend can't purge
 
 In v1, `RequestQueue.purge()` worked around a storage backend that didn't support purging. It dropped an unnamed queue and opened the default queue in its place, and it skipped a named queue with a warning. In v2, it raises the backend's `NotImplementedError`, the same as Crawlee JS. The Apify platform's storage backend doesn't support purging, so on the platform, call `drop()` or open a new queue instead.
@@ -687,6 +706,8 @@ When a crawl processes no requests because its request manager holds only handle
 Messages that mentioned a storage client name the storage backend instead. The DEBUG message about the implicit default backend now reads `No storage backend set, implicitly creating and using default FileSystemStorageBackend.` The warning about unsupported arguments of a dataset backend ends with the backend class name, for example `... of get_data are not supported by MemoryDatasetBackend.`
 
 `RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage backend can't purge](#requestqueuepurge-raises-when-the-storage-backend-cant-purge).
+
+A cancelled `run()` doesn't log `Final request statistics` or `Error analysis`. For details, see [A timeout or cancellation around `run()` raises](#a-timeout-or-cancellation-around-run-raises).
 
 The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."
 
