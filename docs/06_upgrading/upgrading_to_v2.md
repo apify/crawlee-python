@@ -504,6 +504,8 @@ If you have a custom request manager, implement `record_pacing_signal`. Return `
 
 `ThrottlingRequestManager` now rejects a `base_delay` or `max_delay` that isn't positive, so a zero `base_delay` no longer works as a way to honor only `Retry-After`.
 
+A domain's crawl-delay now follows the longest `MinIntervalSignal` it gets. In v1, `set_crawl_delay` kept the first value and ignored later ones.
+
 A `RequestThrottledError` you raise yourself now starts the domain's backoff, and the request is deferred if the request manager paces its domain. In v1, it was an ordinary error unless you had called `record_domain_delay` first. A deferred request never fails, so raise the error only when the server has refused the request. In `AdaptivePlaywrightCrawler`, such an error from the static run now defers the request instead of falling back to the browser.
 
 ## `ThrottlingRequestManager.inner` is optional
