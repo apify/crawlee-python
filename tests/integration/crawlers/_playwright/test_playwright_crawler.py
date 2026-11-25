@@ -743,7 +743,7 @@ async def test_ignore_http_error_status_codes(server_url: URL) -> None:
 
 async def test_blocked_status_codes(server_url: URL) -> None:
     """Test that a status code in `blocked_status_codes` rotates the session and fails with a `SessionError`."""
-    crawler = PlaywrightCrawler(blocked_status_codes={402}, max_session_rotations=2)
+    crawler = PlaywrightCrawler(blocked_status_codes={402}, max_request_retries=1)
     failed_request_handler = AsyncMock()
     crawler.failed_request_handler(failed_request_handler)
 
@@ -751,7 +751,8 @@ async def test_blocked_status_codes(server_url: URL) -> None:
 
     context, error = failed_request_handler.call_args.args
     assert isinstance(error, SessionError)
-    assert context.request.session_rotation_count == 1
+    assert context.request.retry_count == 1
+    assert context.session.retired
 
 
 async def test_additional_http_error_status_codes(server_url: URL) -> None:
@@ -1542,7 +1543,7 @@ async def test_error_handler_can_access_page(server_url: URL) -> None:
 
 
 async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
+    """A throttled 429 is retried later without spending a retry or session reputation."""
     url = 'https://throttled.placeholder.com/page'
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     record_pacing_signal = Mock(wraps=throttler.record_pacing_signal)
@@ -1553,7 +1554,6 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
         request_manager=throttler,
         session_pool=session_pool,
         max_request_retries=0,
-        max_session_rotations=0,
     )
     crawler.failed_request_handler(failed_request_handler)
     statuses = [429, 200]
@@ -1575,6 +1575,5 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
     failed_request_handler.assert_not_called()
     record_pacing_signal.assert_called_once()
     assert handled[0].request.retry_count == 0
-    assert (handled[0].request.session_rotation_count or 0) == 0
     session = handled[0].session
     assert session.error_score == 0

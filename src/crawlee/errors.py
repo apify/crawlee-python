@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Generic
 
-from typing_extensions import TypeVar
+from typing_extensions import TypeVar, override
 
 from crawlee._types import BasicCrawlingContext
 from crawlee._utils.docs import docs_group
@@ -37,10 +37,16 @@ class UserHandlerTimeoutError(UserDefinedErrorHandlerError):
 
 @docs_group('Errors')
 class SessionError(Exception):
-    """Errors of `SessionError` type will trigger a session rotation.
+    """Errors of `SessionError` type retire the session of the request and trigger a regular retry.
 
-    This error doesn't respect the `max_request_retries` option and has a separate limit of `max_session_rotations`.
+    The retry counts towards the `max_request_retries` limit, like a retry after any other error.
     """
+
+    @override
+    def __str__(self) -> str:
+        prefix = 'Detected a session error, retiring session...'
+        message = super().__str__()
+        return f'{prefix} {message}' if message else prefix
 
 
 @docs_group('Errors')

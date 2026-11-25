@@ -1054,7 +1054,6 @@ async def test_throttled_429_is_deferred(monkeypatch: pytest.MonkeyPatch) -> Non
         ),
         request_manager=throttler,
         max_request_retries=0,
-        max_session_rotations=0,
     )
     crawler.failed_request_handler(failed_request_handler)
     statuses = [429, 200]
@@ -1100,7 +1099,6 @@ async def test_throttled_static_429_is_deferred(monkeypatch: pytest.MonkeyPatch)
         request_manager=throttler,
         http_client=http_client,
         max_request_retries=0,
-        max_session_rotations=0,
     )
     browser_navigations = Mock()
 

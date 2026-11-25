@@ -6,9 +6,8 @@ from crawlee.errors import ProxyError
 
 
 async def main() -> None:
-    # Set how many session rotations will happen before calling the error handler
-    # when ProxyError occurs
-    crawler = HttpCrawler(max_session_rotations=5, max_request_retries=6)
+    # Set how many retries will happen before calling the failed request handler
+    crawler = HttpCrawler(max_request_retries=5)
 
     # For this example, we'll create a proxy error in our handler
     @crawler.router.default_handler
@@ -19,7 +18,7 @@ async def main() -> None:
     # This handler runs after all retry attempts are exhausted
     @crawler.failed_request_handler
     async def failed_handler(context: BasicCrawlingContext, error: Exception) -> None:
-        context.log.error('Failed request %s, after 5 rotations', context.request.url)
+        context.log.error('Failed request %s, after 5 retries', context.request.url)
         request = context.request
         # For proxy errors, we can add a new `Request` to try again
         if isinstance(error, ProxyError) and not request.unique_key.startswith('retry'):

@@ -77,8 +77,7 @@ async def test_session_rotation(server_url: URL) -> None:
     session_ids: list[str | None] = []
 
     crawler = BasicCrawler(
-        max_session_rotations=7,
-        max_request_retries=1,
+        max_request_retries=6,
     )
 
     @crawler.router.default_handler

@@ -257,7 +257,7 @@ class HttpxHttpClient(HttpClient):
             raise TimeoutError from exc
         except httpx2.TransportError as exc:
             if self._is_proxy_error(exc):
-                raise ProxyError from exc
+                raise ProxyError(f'Proxy error: {exc}') from exc
             raise
 
         return _HttpxResponse(response, deadline=deadline)

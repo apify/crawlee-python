@@ -47,9 +47,6 @@ class CrawleeRequestData(BaseModel):
     state: RequestState = RequestState.UNPROCESSED
     """Describes the request's current lifecycle state."""
 
-    session_rotation_count: int | None = None
-    """The number of finished session rotations for this request."""
-
     skip_navigation: bool = False
 
     crawl_depth: int = 0
@@ -385,15 +382,6 @@ class Request(BaseModel):
     def max_retries(self) -> int | None:
         """Crawlee-specific limit on the number of retries of the request."""
         return self.crawlee_data.max_retries
-
-    @property
-    def session_rotation_count(self) -> int | None:
-        """Crawlee-specific number of finished session rotations for the request."""
-        return self.crawlee_data.session_rotation_count
-
-    @session_rotation_count.setter
-    def session_rotation_count(self, new_session_rotation_count: int) -> None:
-        self.crawlee_data.session_rotation_count = new_session_rotation_count
 
     @property
     def enqueue_strategy(self) -> EnqueueStrategy:

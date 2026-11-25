@@ -48,7 +48,7 @@ The crawler reports 429 responses and crawl-delays through <ApiLink to="class/Re
 
 ## Persistent rate limiting
 
-A 429 from a throttled domain doesn't fail the request. The request goes back to its queue and waits out the backoff, while the crawler keeps crawling other domains. The retry doesn't count towards `max_request_retries` or `max_session_rotations`, and the session isn't marked as bad. The 429 doesn't reach `error_handler` or `failed_request_handler`. Setting `ignore_http_error_status_codes={429}` doesn't pass the response to your request handler either, because the request is retried once the backoff ends.
+A 429 from a throttled domain doesn't fail the request. The request goes back to its queue and waits out the backoff, while the crawler keeps crawling other domains. The retry doesn't count towards `max_request_retries`, and the session isn't marked as bad. The 429 doesn't reach `error_handler` or `failed_request_handler`. Setting `ignore_http_error_status_codes={429}` doesn't pass the response to your request handler either, because the request is retried once the backoff ends.
 
 Some domains keep rate-limiting every request no matter how long the crawler waits. A domain that has done so for longer than the manager's `max_domain_stall` (15 minutes by default) counts as stalled. The crawler still finishes every other domain first, including domains waiting out a backoff or a crawl-delay. Once only stalled domains have requests left, `crawler.run()` raises <ApiLink to="class/PersistentRateLimitError">`PersistentRateLimitError`</ApiLink> instead of waiting forever. The error message names the stalled domains. To fix the stall, lower the crawler's concurrency or drop those domains.
 
