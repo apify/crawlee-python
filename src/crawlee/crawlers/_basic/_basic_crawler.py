@@ -210,6 +210,10 @@ class _BasicCrawlerOptions(TypedDict):
     ignore_http_error_status_codes: NotRequired[Iterable[int]]
     """HTTP status codes that are typically considered errors but should be treated as successful responses."""
 
+    blocked_status_codes: NotRequired[Iterable[int]]
+    """HTTP status codes that mean the website blocked the session. With `retry_on_blocked`, such a response retires the
+    session and the request is retried with another one. Defaults to 401, 403 and 429."""
+
     respect_robots_txt_file: NotRequired[bool]
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
     and skip those that are not allowed. This also prevents disallowed URLs to be added via `EnqueueLinksFunction`."""
@@ -293,6 +297,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _ERROR_HANDLING_LOCK_MARGIN = timedelta(minutes=1)
     """How much longer than its timeouts the crawler keeps a request locked, so the error handling still holds it."""
 
+    _DEFAULT_BLOCKED_STATUS_CODES = frozenset({401, 403, 429})
+    """Status codes that mean the website blocked the session, unless `blocked_status_codes` says otherwise."""
+
     def __init__(
         self,
         *,
@@ -311,6 +318,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         retry_on_blocked: bool = True,
         additional_http_error_status_codes: Iterable[int] | None = None,
         ignore_http_error_status_codes: Iterable[int] | None = None,
+        blocked_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         concurrency_system: ConcurrencySystemInterface | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
@@ -362,6 +370,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
                 as successful responses. Doesn't apply to a 429 from a domain the crawler's request manager paces, which
                 is retried later.
+            blocked_status_codes: HTTP status codes that mean the website blocked the session. With `retry_on_blocked`,
+                such a response retires the session and the request is retried with another one, limited by
+                `max_session_rotations`. Defaults to 401, 403 and 429. Doesn't apply to codes in
+                `ignore_http_error_status_codes` or to a 429 from a domain the crawler's request manager paces.
             concurrency_settings: Settings to fine-tune concurrency levels.
             concurrency_system: A concurrency system to use instead of the default one, e.g. one shared between
                 crawlers to cap their combined concurrency. Keep it open with `async with` until every crawler using it
@@ -426,6 +438,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._ignore_http_error_status_codes = (
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
+        self._blocked_status_codes = (
+            self._DEFAULT_BLOCKED_STATUS_CODES if blocked_status_codes is None else frozenset(blocked_status_codes)
+        ) - self._ignore_http_error_status_codes
 
         self._http_client = self._own_or_borrow(http_client, ImpitHttpClient)
 
@@ -839,6 +854,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         run handled, failed ones included, aren't processed again. To crawl them again, purge the request manager, or
         create a new crawler with a freshly opened request queue.
 
+        Cancelling the task that awaits `run()`, such as with a timeout around it, raises `CancelledError` once the
+        requests in progress finish. A repeated cancellation, which anyio cancel scopes keep sending, cancels them.
+        Ctrl+C also lets them finish, and then returns the final statistics.
+
         Args:
             requests: The requests to be enqueued before the crawler starts.
 
@@ -917,13 +936,26 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     )
                     remove_sigint_handler = partial(signal.signal, signal.SIGINT, previous_sigint_handler)
 
+            current_task = asyncio.current_task()
+            cancelling_before = current_task.cancelling() if current_task is not None else 0
+            cancellation: CancelledError | None = None
+
             try:
                 await run_task
-            except CancelledError:
-                pass
+            except CancelledError as exc:
+                cancellation = exc
             finally:
                 if remove_sigint_handler is not None:
                     remove_sigint_handler()
+
+            # SIGINT cancels only `run_task`, and the crawl then ends gracefully. A cancellation of the task that awaits
+            # `run()`, such as a timeout around it, propagates, also when the crawl swallowed it. An earlier one that
+            # the caller caught doesn't count. The caught exception is raised again, since anyio cancel scopes
+            # recognize their cancellation by its message. A cancelled run counts as finished, so the next one starts
+            # afresh.
+            if current_task is not None and current_task.cancelling() > cancelling_before:
+                self._has_finished_before = True
+                raise cancellation or CancelledError()
 
             if self._statistics.error_tracker.total > 0:
                 self._logger.info(
@@ -2018,20 +2050,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         return False
 
-    def _raise_for_session_blocked_status_code(self, session: Session, status_code: int) -> None:
+    def _raise_for_session_blocked_status_code(self, status_code: int) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
 
         Args:
-            session: The session used for the request.
             status_code: The HTTP status code to check.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if session.is_blocked_status_code(
-            status_code=status_code,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        ):
+        if status_code in self._blocked_status_codes:
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
     async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:

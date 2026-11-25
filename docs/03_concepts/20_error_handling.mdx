@@ -29,7 +29,7 @@ You can use this same approach when testing different proxy providers. To better
 
 ## Changing how error status codes are handled
 
-By default, when <ApiLink to="class/Session">`Sessions`</ApiLink> get status codes like [401](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/401), [403](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/403), or [429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429), Crawlee marks the <ApiLink to="class/Session">`Session`</ApiLink> as `retire` and switches to a new one. This might not be what you want, especially when working with [authentication](../guides/logging-in-with-a-crawler). You can learn more on the [Session management](./session-management) page.
+By default, when a response has a status code like [401](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/401), [403](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/403), or [429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429), the crawler retires the <ApiLink to="class/Session">`Session`</ApiLink> and switches to a new one. This might not be what you want, especially when working with [authentication](../guides/logging-in-with-a-crawler). The crawler's `blocked_status_codes` option sets which status codes retire the session. You can learn more on the [Session management](./session-management) page.
 
 Here's an example of how to change this behavior:
 
