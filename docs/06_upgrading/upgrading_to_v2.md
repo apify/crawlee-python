@@ -440,7 +440,7 @@ A `RequestThrottledError` you raise yourself now starts the domain's backoff, an
 
 The `inner` argument of `ThrottlingRequestManager` is now optional, the same as in Crawlee JS. Without it, `request_manager_opener` opens the default store on first use, such as the default request queue for `RequestQueue.open`. Until then, the `inner` property returns `None`, so its type is now `TRequestManager | None`. If you pass `inner`, the property returns it as before.
 
-Every throttler without `inner` opens the process-wide default request queue. Crawlers with such a throttler share that queue and crawl each other's requests. So does the first crawler created in the process if it has no `request_manager`. Every later crawler without one opens a queue of its own, as described in [Only the first crawler uses the default request queue](#only-the-first-crawler-uses-the-default-request-queue). To keep crawlers apart, pass `inner`. Throttlers that list the same domain still share its queue, since they all open it under the alias `throttled-{domain}`.
+Every throttler without `inner` opens the process-wide default request queue. Crawlers with such a throttler share that queue and crawl each other's requests. So does the first crawler created in the process if it has no `request_manager`. Every later crawler without one opens a queue of its own, as described in [Only the first crawler uses the default request queue](#only-the-first-crawler-uses-the-default-request-queue). To keep crawlers apart, pass `inner`. Each throttler opens its per-domain queues under the alias `throttled-{id}-{domain}`, where `{id}` is its new `id` argument or a per-process counter, so throttlers that list the same domain no longer share its queue.
 
 ## HTTP clients
 
