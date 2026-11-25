@@ -845,3 +845,11 @@ On a retired session, `mark_good()` does nothing, so its error score and usage c
 When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
 
 Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.
+
+## `error_handler` doesn't replace the request
+
+In v1, a request with a different `unique_key` returned from the `error_handler` replaced the failed one. The crawler added the returned request to the request queue and marked the failed one as handled. The replacement led to incorrect behavior, so v2 removes it. The error handler returns `None`, the same as `errorHandler` in Crawlee JS, and the crawler ignores a returned value. The failed request is retried as usual.
+
+When the error handler sets `context.request.no_retry`, the request now fails right away and goes to the failed request handler. In v1, the crawler still tried it once more.
+
+In the error handler, `context.request.retry_count` is the number of retries before the failed attempt. In v1, for errors other than `SessionError`, the crawler increased it before it called the error handler.

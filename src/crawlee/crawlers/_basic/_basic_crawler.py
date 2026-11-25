@@ -112,10 +112,9 @@ TCrawlingContext = TypeVar('TCrawlingContext', bound=BasicCrawlingContext, defau
 TStatisticsState = TypeVar('TStatisticsState', bound=StatisticsState, default=StatisticsState)
 TRequestIterator = TypeVar('TRequestIterator', str, Request)
 TParams = ParamSpec('TParams')
-T = TypeVar('T')
 TCollaborator = TypeVar('TCollaborator', bound=Collaborator)
 
-ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[Request | None]]
+ErrorHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 FailedRequestHandler = Callable[[TCrawlingContext, Exception], Awaitable[None]]
 SkippedRequestCallback = Callable[[Request, SkippedReason], Awaitable[None]]
 
@@ -681,12 +680,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._dispatching_run.resume()
 
     def _wrap_handler_with_error_context(
-        self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]
-    ) -> Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[T]]:
+        self, handler: Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[None]]
+    ) -> Callable[[TCrawlingContext | BasicCrawlingContext, Exception], Awaitable[None]]:
         """Decorate error handlers to make their context helpers usable."""
 
         @functools.wraps(handler)
-        async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> T:
+        async def wrapped_handler(context: TCrawlingContext | BasicCrawlingContext, exception: Exception) -> None:
             # Original context helpers that are from `RequestHandlerRunResult` will not be committed as the request
             # failed. Modified context provides context helpers with direct access to the storages.
             error_context = context.create_modified_copy(
@@ -694,7 +693,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 get_key_value_store=self.get_key_value_store,
                 add_requests=functools.partial(self._add_requests, context),
             )
-            return await handler(error_context, exception)
+            await handler(error_context, exception)
 
         return wrapped_handler
 
@@ -824,7 +823,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> ErrorHandler[TCrawlingContext]:
         """Register a function to handle errors occurring in request handlers.
 
-        The error handler is invoked after a request handler error occurs and before a retry attempt.
+        The error handler is invoked after a request handler error occurs and before a retry attempt. To fail the
+        request without a retry, set `context.request.no_retry` in the error handler.
         """
         self._error_handler = self._wrap_handler_with_error_context(handler)
         return handler
@@ -1376,55 +1376,15 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if check_url_patterns(target_url, kwargs.get('include'), kwargs.get('exclude')):
                 yield request
 
-    async def _handle_error_handler_replacement(
-        self,
-        context: TCrawlingContext | BasicCrawlingContext,
-        error: Exception,
-        *,
-        request_manager: RequestManager,
-        retire_session: bool = False,
-    ) -> bool:
-        """Invoke the user `error_handler` and enqueue a replacement request when appropriate.
-
-        A returned request with the same `unique_key` as the original is treated as no
-        replacement: `add_request` would be a no-op while the original is still in progress,
-        and marking the original handled would drop the work.
-
-        Args:
-            context: Current crawling context.
-            error: Exception that triggered the error handler.
-            request_manager: Request manager used to enqueue the replacement.
-            retire_session: When True, retire `context.session` before awaiting I/O so a
-                known-blocked session cannot stay in the pool if a later await fails.
-
-        Returns:
-            True if the original request was replaced and marked handled; False to continue
-            with the normal retry or failure path.
-        """
+    async def _call_error_handler(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         if not self._error_handler:
-            return False
+            return
 
         try:
-            new_request = await self._error_handler(context, error)
+            await self._error_handler(context, error)
         except Exception as e:
             context.request.state = RequestState.ERROR
             raise UserDefinedErrorHandlerError('Exception thrown in user-defined request error handler') from e
-
-        if new_request is None or new_request.unique_key == context.request.unique_key:
-            return False
-
-        # Preserve counters so a handler minting a fresh unique_key each time cannot loop forever.
-        new_request.retry_count = context.request.retry_count
-        if context.request.session_rotation_count is not None:
-            new_request.session_rotation_count = context.request.session_rotation_count
-
-        if retire_session:
-            context.session.retire()
-
-        await request_manager.add_request(new_request)
-        await self._mark_request_as_handled(context.request)
-        self._statistics.record_request_processing_finish(context.request.unique_key)
-        return True
 
     async def _handle_request_retries(
         self,
@@ -1438,26 +1398,28 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
             self._run.fail()
 
-        if self._should_retry_request(context, error):
-            request.retry_count += 1
-            reduced_error = str(error).split('\n')[0]
-            self.log.warning(
-                'Retrying request to %s due to: %s. %s',
-                context.request.url,
-                reduced_error,
-                get_one_line_error_summary_if_possible(error),
-            )
-            await self._statistics.error_tracker.add(error=error, context=context)
+        await self._statistics.error_tracker.add(error=error, context=context)
 
-            if await self._handle_error_handler_replacement(context, error, request_manager=request_manager):
+        if self._should_retry_request(context, error):
+            await self._call_error_handler(context, error)
+
+            # The error handler can set `no_retry` to fail the request without another attempt.
+            if not request.no_retry:
+                request.retry_count += 1
+                reduced_error = str(error).split('\n')[0]
+                self.log.warning(
+                    'Retrying request to %s due to: %s. %s',
+                    context.request.url,
+                    reduced_error,
+                    get_one_line_error_summary_if_possible(error),
+                )
+                await request_manager.reclaim_request(request)
                 return
 
-            await request_manager.reclaim_request(request)
-        else:
-            request.state = RequestState.ERROR
-            await self._mark_request_as_handled(request)
-            await self._handle_failed_request(context, error)
-            self._statistics.record_request_processing_failure(request.unique_key)
+        request.state = RequestState.ERROR
+        await self._mark_request_as_handled(request)
+        await self._handle_failed_request(context, error)
+        self._statistics.record_request_processing_failure(request.unique_key)
 
     async def _handle_request_error(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         try:
@@ -1490,7 +1452,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.request.url,
             self._get_message_from_error(error),
         )
-        await self._statistics.error_tracker.add(error=error, context=context)
 
         if self._failed_request_handler:
             try:
@@ -1838,43 +1799,31 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         except SessionError as session_error:
             request.state = RequestState.ERROR_HANDLER
+            should_retry = self._should_retry_request(context, session_error)
 
-            if self._should_retry_request(context, session_error):
+            if should_retry:
                 await self._statistics.error_tracker_retry.add(error=session_error, context=context)
 
-                # Replacement requests are only honored while rotations remain, so exhausted rotations
-                # still go through failed_request_handler instead of being silently replaced.
-                if await self._handle_error_handler_replacement(
-                    context,
-                    session_error,
-                    request_manager=request_manager,
-                    retire_session=True,
-                ):
-                    return
+            await self._call_error_handler(context, session_error)
 
+            # Retire before checking `no_retry`, so the blocked session leaves the pool even when the error handler
+            # stops the retries.
+            if should_retry:
+                session.retire()
+
+            if should_retry and not request.no_retry:
                 exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
                 self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
-
-                session.retire()
 
                 # Increment session rotation count.
                 request.session_rotation_count = (request.session_rotation_count or 0) + 1
 
                 await request_manager.reclaim_request(request)
             else:
-                # Still invoke the error_handler for side effects, but never replace once rotations are exhausted.
-                if self._error_handler:
-                    try:
-                        await self._error_handler(context, session_error)
-                    except Exception as e:
-                        request.state = RequestState.ERROR
-                        raise UserDefinedErrorHandlerError(
-                            'Exception thrown in user-defined request error handler'
-                        ) from e
-
                 request.state = RequestState.ERROR
                 await self._mark_request_as_handled(request)
 
+                await self._statistics.error_tracker.add(error=session_error, context=context)
                 await self._handle_failed_request(context, session_error)
                 self._statistics.record_request_processing_failure(request.unique_key)
 

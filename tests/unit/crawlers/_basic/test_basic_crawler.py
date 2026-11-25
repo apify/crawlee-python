@@ -360,6 +360,7 @@ async def test_calls_error_handler() -> None:
     class Call:
         url: str
         error: Exception
+        retry_count: int
 
     # List to store the information of calls to the error handler.
     calls = list[Call]()
@@ -372,10 +373,9 @@ async def test_calls_error_handler() -> None:
             raise RuntimeError('Arbitrary crash for testing purposes')
 
     @crawler.error_handler
-    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request:
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> None:
         # Append the current call information.
-        calls.append(Call(context.request.url, error))
-        return context.request
+        calls.append(Call(context.request.url, error, context.request.retry_count))
 
     await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com', 'https://c.placeholder.com'])
 
@@ -386,6 +386,9 @@ async def test_calls_error_handler() -> None:
     for error_call in calls:
         assert error_call.url == 'https://b.placeholder.com'
         assert isinstance(error_call.error, RuntimeError)
+
+    # The error handler sees the number of retries before the failed attempt.
+    assert [error_call.retry_count for error_call in calls] == [0, 1]
 
 
 async def test_calls_error_handler_for_session_errors() -> None:
@@ -408,97 +411,82 @@ async def test_calls_error_handler_for_session_errors() -> None:
     assert error_handler_mock.call_count == 1
 
 
-async def test_session_error_handler_can_replace_request() -> None:
-    """`error_handler` return value must be honored for SessionError while rotations remain."""
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(RuntimeError('Arbitrary crash for testing purposes'), id='regular-error'),
+        pytest.param(SessionError('Arbitrary session error for testing purposes'), id='session-error'),
+    ],
+)
+async def test_error_handler_return_ignored(error: Exception) -> None:
+    """A request returned by the error handler isn't added, and the original request is retried until it fails."""
     queue = await RequestQueue.open()
-    crawler = BasicCrawler(request_manager=queue, max_session_rotations=3)
-
+    crawler = BasicCrawler(request_manager=queue, max_request_retries=1, max_session_rotations=2)
     request = Request.from_url('https://a.placeholder.com')
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        if '|recovered' in context.request.unique_key:
-            return
-        raise SessionError('blocked')
-
-    @crawler.error_handler
-    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
-        return Request.from_url(
-            context.request.url,
-            unique_key=f'{context.request.unique_key}|recovered',
-        )
+    returned_request = Request.from_url('https://a.placeholder.com', unique_key='returned')
+    handler_mock = AsyncMock(side_effect=error)
+    error_handler_mock = AsyncMock(return_value=returned_request)
+    crawler.router.default_handler(handler_mock)
+    crawler.error_handler(error_handler_mock)
 
     await crawler.run([request])
 
-    original_request = await queue.get_request(request.unique_key)
-    recovered_request = await queue.get_request(f'{request.unique_key}|recovered')
-
-    assert original_request is not None
-    assert original_request.was_already_handled
-    assert recovered_request is not None
-    assert recovered_request.state == RequestState.DONE
-    assert recovered_request.was_already_handled
-
-
-async def test_session_error_handler_same_unique_key_rotates() -> None:
-    """Returning a request with the same unique_key must rotate, not drop the original."""
-    handler_calls = 0
-    failed_calls = 0
-    crawler = BasicCrawler(max_session_rotations=3)
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        nonlocal handler_calls
-        handler_calls += 1
-        raise SessionError('blocked')
-
-    @crawler.error_handler
-    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
-        return Request.from_url(context.request.url)
-
-    @crawler.failed_request_handler
-    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
-        nonlocal failed_calls
-        failed_calls += 1
-
-    stats = await crawler.run(['https://a.placeholder.com'])
-
-    assert handler_calls == 3
-    assert failed_calls == 1
-    assert stats.requests_failed == 1
+    handled_keys = [call.args[0].request.unique_key for call in handler_mock.await_args_list]
+    assert handled_keys == [request.unique_key, request.unique_key]
+    error_handler_mock.assert_awaited()
+    assert await queue.get_request(returned_request.unique_key) is None
+    stored_request = await queue.get_request(request.unique_key)
+    assert stored_request is not None
+    assert stored_request.state == RequestState.ERROR
 
 
-async def test_session_error_handler_replacement_ignored_when_rotations_exhausted() -> None:
-    """When rotations are exhausted, replacement requests must not skip failed_request_handler."""
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(RuntimeError('Arbitrary crash for testing purposes'), id='regular-error'),
+        pytest.param(SessionError('Arbitrary session error for testing purposes'), id='session-error'),
+    ],
+)
+async def test_error_handler_no_retry_fails(error: Exception) -> None:
+    """Setting `no_retry` in the error handler fails the request without another attempt."""
     queue = await RequestQueue.open()
-    failed_handler_mock = AsyncMock()
-    crawler = BasicCrawler(request_manager=queue, max_session_rotations=1)
-
+    crawler = BasicCrawler(request_manager=queue)
     request = Request.from_url('https://a.placeholder.com')
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        raise SessionError('blocked')
+    handler_mock = AsyncMock(side_effect=error)
+    failed_request_handler_mock = AsyncMock()
+    crawler.router.default_handler(handler_mock)
+    crawler.failed_request_handler(failed_request_handler_mock)
 
     @crawler.error_handler
-    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
-        return Request.from_url(
-            context.request.url,
-            unique_key=f'{context.request.unique_key}|should-not-run',
-        )
-
-    @crawler.failed_request_handler
-    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
-        await failed_handler_mock(context, error)
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        context.request.no_retry = True
 
     await crawler.run([request])
 
-    failed_handler_mock.assert_awaited_once()
-    assert await queue.get_request(f'{request.unique_key}|should-not-run') is None
-    original_request = await queue.get_request(request.unique_key)
-    assert original_request is not None
-    assert original_request.state == RequestState.ERROR
-    assert original_request.was_already_handled
+    handler_mock.assert_awaited_once()
+    failed_request_handler_mock.assert_awaited_once()
+    assert crawler.statistics.error_tracker.total == 1
+    stored_request = await queue.get_request(request.unique_key)
+    assert stored_request is not None
+    assert stored_request.retry_count == 0
+    assert stored_request.session_rotation_count is None
+
+
+async def test_no_retry_still_retires_session() -> None:
+    """A `SessionError` retires the session also when the error handler stops the retries with `no_retry`."""
+    crawler = BasicCrawler()
+    handler_mock = AsyncMock(side_effect=SessionError('Arbitrary session error for testing purposes'))
+    crawler.router.default_handler(handler_mock)
+
+    @crawler.error_handler
+    async def error_handler(context: BasicCrawlingContext, _error: Exception) -> None:
+        context.request.no_retry = True
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    handler_mock.assert_awaited_once()
+    session = handler_mock.await_args_list[0].args[0].session
+    assert session.retired
 
 
 async def test_session_error_handler_exception_is_wrapped() -> None:
@@ -3851,7 +3839,7 @@ async def test_request_and_session_mutations_persist() -> None:
         )
 
         @crawler.error_handler
-        async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
+        async def error_handler(context: BasicCrawlingContext, error: Exception) -> None:
             if isinstance(context.request.user_data['request_state'], list):
                 context.request.user_data['request_state'].append('error')
 
@@ -3884,42 +3872,6 @@ async def test_request_and_session_mutations_persist() -> None:
         assert session.cookies['modified_1'] == 'yes'
 
         await request_queue.drop()
-
-
-async def test_new_request_error_handler() -> None:
-    """Test that error in new_request_handler is handled properly."""
-    queue = await RequestQueue.open()
-    crawler = BasicCrawler(
-        request_manager=queue,
-    )
-
-    request = Request.from_url('https://a.placeholder.com')
-
-    @crawler.router.default_handler
-    async def handler(context: BasicCrawlingContext) -> None:
-        if '|test' in context.request.unique_key:
-            return
-        raise ValueError('This error should not be handled by error handler')
-
-    @crawler.error_handler
-    async def error_handler(context: BasicCrawlingContext, error: Exception) -> Request | None:
-        return Request.from_url(
-            context.request.url,
-            unique_key=f'{context.request.unique_key}|test',
-        )
-
-    await crawler.run([request])
-
-    original_request = await queue.get_request(request.unique_key)
-    error_request = await queue.get_request(f'{request.unique_key}|test')
-
-    assert original_request is not None
-    assert original_request.state == RequestState.ERROR_HANDLER
-    assert original_request.was_already_handled
-
-    assert error_request is not None
-    assert error_request.state == RequestState.DONE
-    assert error_request.was_already_handled
 
 
 async def test_multiple_crawlers_with_global_event_manager() -> None:
