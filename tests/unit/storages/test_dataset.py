@@ -246,6 +246,16 @@ async def test_get_data_descending_with_unlimited_limit(dataset: Dataset) -> Non
     assert result.items == [{'id': 3}, {'id': 2}, {'id': 1}]
 
 
+async def test_get_data_descending_with_zero_limit(dataset: Dataset) -> None:
+    """Test that get_data with desc=True and limit=0 returns no items."""
+    await dataset.push_data([{'id': i} for i in range(1, 4)])
+
+    result = await dataset.get_data(desc=True, limit=0)
+
+    assert result.count == 0
+    assert result.items == []
+
+
 async def test_get_data_skip_empty(dataset: Dataset) -> None:
     """Test getting data with skip_empty option filters out empty items."""
     # Add some items including an empty one
