@@ -31,7 +31,7 @@ Access the jar through <ApiLink to="class/Session#cookies">`context.session.cook
     {ReadWriteCookies}
 </RunnableCodeBlock>
 
-A cookie has a `name`, a `value`, and optional parameters such as `domain`. If a cookie has no `domain`, it applies to any domain, so a login cookie set that way is sent to every host you crawl. Set `domain` on anything sensitive. For the full set of parameters, see <ApiLink to="class/CookieParam">`CookieParam`</ApiLink>. To dump the whole jar, use <ApiLink to="class/SessionCookies#get_cookies_as_dicts">`get_cookies_as_dicts()`</ApiLink>, and to load several cookies at once, use <ApiLink to="class/SessionCookies#set_cookies">`set_cookies()`</ApiLink>.
+A cookie has a `name`, a `value`, and optional parameters such as `domain`. If a cookie has no `domain`, it applies to any domain, so a login cookie set that way is sent to every host you crawl. Set `domain` on anything sensitive. A `domain` such as `example.com` limits the cookie to that host, the same as in Playwright. To send it to the subdomains as well, start the domain with a dot, as in `.example.com`. For the full set of parameters, see <ApiLink to="class/CookieParam">`CookieParam`</ApiLink>. To dump the whole jar, use <ApiLink to="class/SessionCookies#get_cookies_as_dicts">`get_cookies_as_dicts()`</ApiLink>, and to load several cookies at once, use <ApiLink to="class/SessionCookies#set_cookies">`set_cookies()`</ApiLink>.
 
 ## Seeding cookies on new sessions
 
