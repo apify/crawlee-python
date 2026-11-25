@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from redis.exceptions import RedisError
 
 from crawlee.storage_clients import RedisStorageClient
+from crawlee.storage_clients._redis import _client_mixin
 from crawlee.storage_clients._redis._utils import await_redis_response
 
 if TYPE_CHECKING:
@@ -177,10 +179,16 @@ async def test_metadata_record_updates(dataset_client: RedisDatasetClient) -> No
     assert metadata.accessed_at > accessed_after_get
 
 
-async def test_push_data_empty_list(dataset_client: RedisDatasetClient) -> None:
-    """Test that pushing an empty list stores nothing and doesn't fail."""
+async def test_push_data_empty_list(dataset_client: RedisDatasetClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that pushing an empty list stores nothing, doesn't fail, and updates `modified_at`."""
     await dataset_client.push_data({'id': 1})
+    initial_modified = (await dataset_client.get_metadata()).modified_at
+
+    later = initial_modified + timedelta(seconds=1)
+    monkeypatch.setattr(_client_mixin, 'datetime', Mock(now=Mock(return_value=later)))
     await dataset_client.push_data([])
+
+    assert (await dataset_client.get_metadata()).modified_at == later
 
     result = await dataset_client.get_data()
     assert result.items == [{'id': 1}]
