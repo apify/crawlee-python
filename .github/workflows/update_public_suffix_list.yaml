@@ -63,7 +63,7 @@ jobs:
       - name: Commit and push changes
         id: commit-and-push
         if: steps.changes.outputs.has-changes == 'true'
-        uses: apify/actions/signed-commit@v1.7.0
+        uses: apify/actions/signed-commit@v1.9.0
         with:
           message: "chore: Update public suffix list snapshot"
           github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
