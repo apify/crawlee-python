@@ -11,7 +11,13 @@ from bs4 import BeautifulSoup, Tag
 from parsel import Selector
 from typing_extensions import override
 
-from crawlee._types import BasicCrawlingContext, ConcurrencySettings, JsonSerializable, RequestHandlerRunResult
+from crawlee._types import (
+    BasicCrawlingContext,
+    ConcurrencySettings,
+    JsonSerializable,
+    RequestHandlerRunResult,
+    UseStateFunction,
+)
 from crawlee._utils.docs import docs_group
 from crawlee._utils.wait import wait_for_extendable
 from crawlee.crawlers import (
@@ -76,6 +82,31 @@ class _NonPersistentStatistics(Statistics):
         exc_traceback: TracebackType | None,
     ) -> None:
         self._active = False
+
+
+class _StateSnapshot:
+    """Copy of the `use_state` value, taken before the browser run of a rendering type detection changes it."""
+
+    def __init__(self, use_state: UseStateFunction) -> None:
+        self._use_state = use_state
+        self._copy: MutableMapping[str, JsonSerializable] | None = None
+
+    async def use_live_state(
+        self, default_value: MutableMapping[str, JsonSerializable] | None = None
+    ) -> MutableMapping[str, JsonSerializable]:
+        """Return the live state, after copying it on the first call."""
+        state = await self._use_state(default_value)
+        if self._copy is None:
+            self._copy = deepcopy(state)
+        return state
+
+    async def use_state_copy(
+        self, default_value: MutableMapping[str, JsonSerializable] | None = None
+    ) -> MutableMapping[str, JsonSerializable]:
+        """Return the copy. If the browser run never read the state, it is unchanged, so copy it now."""
+        if self._copy is None:
+            self._copy = deepcopy(await self._use_state(default_value))
+        return self._copy
 
 
 @docs_group('Crawlers')
@@ -322,25 +353,17 @@ class AdaptivePlaywrightCrawler(
         self,
         rendering_type: RenderingType,
         context: BasicCrawlingContext,
-        state: MutableMapping[str, JsonSerializable] | None = None,
+        use_state: UseStateFunction | None = None,
     ) -> SubCrawlerRun:
         """Perform a one request crawl with specific context pipeline and return `SubCrawlerRun`.
 
         `SubCrawlerRun` contains either result of the crawl or the exception that was thrown during the crawl.
         Sub crawler pipeline call is dynamically created based on the `rendering_type`.
-        A new context is created from passed `context` and `state` and is passed to sub crawler pipeline. The original
-        `request` is shared, so its mutations persist. Only `result` and `use_state` are isolated per sub crawler.
+        A new context is created from passed `context` and `use_state` and is passed to sub crawler pipeline. The
+        original `request` is shared, so its mutations persist. Only `result` and `use_state` are isolated per sub
+        crawler.
         """
-        if state is not None:
-
-            async def get_input_state(
-                default_value: MutableMapping[str, JsonSerializable] | None = None,  # noqa:ARG001  # Intentionally unused arguments. Closure, that generates same output regardless of inputs.
-            ) -> MutableMapping[str, JsonSerializable]:
-                return state
-
-            use_state_function = get_input_state
-        else:
-            use_state_function = context.use_state
+        use_state_function = use_state or context.use_state
 
         # A fresh result is injected into the new context to isolate `add_requests`/`push_data`/`kvs` calls between
         # sub crawlers. The `request` itself is shared, so mutations to it persist.
@@ -448,21 +471,15 @@ class AdaptivePlaywrightCrawler(
 
         context.log.debug('Running browser request handler for %s', context.request.url)
 
-        old_state_copy = None
+        # The static run of a detection gets a copy of the state as it was before the browser run, so both runs
+        # start from the same state and the static run can't change it.
+        state_snapshot = _StateSnapshot(context.use_state) if should_detect_rendering_type else None
 
-        if should_detect_rendering_type:
-            # Save copy of global state from `use_state` before it can be mutated by browser crawl.
-            # This copy will be used in the static crawl to make sure they both run with same conditions and to
-            # avoid static crawl to modify the state.
-            # (This static crawl is performed only to evaluate rendering type detection.)
-            kvs = await context.get_key_value_store()
-            default_value: MutableMapping[str, JsonSerializable] = {}
-            old_state: MutableMapping[str, JsonSerializable] = await kvs.get_value(
-                f'{self._CRAWLEE_STATE_KEY}_{self._id}', default_value
-            )
-            old_state_copy = deepcopy(old_state)
-
-        pw_run = await self._crawl_one('client only', context=context)
+        pw_run = await self._crawl_one(
+            'client only',
+            context=context,
+            use_state=state_snapshot.use_live_state if state_snapshot else None,
+        )
         self.track_browser_request_handler_runs()
 
         if pw_run.exception is not None:
@@ -471,7 +488,9 @@ class AdaptivePlaywrightCrawler(
         if pw_run.result:
             if should_detect_rendering_type:
                 detection_result: RenderingType
-                static_run = await self._crawl_one('static', context=context, state=old_state_copy)
+                static_run = await self._crawl_one(
+                    'static', context=context, use_state=state_snapshot.use_state_copy if state_snapshot else None
+                )
                 if static_run.result and self.result_comparator(static_run.result, pw_run.result):
                     detection_result = 'static'
                 else:
