@@ -62,13 +62,12 @@ class RequestList(RequestLoader):
         Args:
             requests: The request objects (or their string representations) to be added to the provider.
             name: A name of the request list.
-            persist_state_key: A key for persisting the progress information of the RequestList.
-                If you do not pass a key but pass a `name`, the key is `CRAWLEE_REQUEST_LIST_STATE_{name}`.
-                Otherwise, state will not be persisted.
+            persist_state_key: A key for persisting the progress information of the RequestList. If you do not pass
+                a key but pass a `name`, the key is `CRAWLEE_REQUEST_LIST_STATE_{name}`. Otherwise, state will not be
+                persisted.
             persist_requests_key: A key for persisting the request data loaded from the `requests` iterator.
                 If specified, the request data will be stored in the KeyValueStore to make sure that they don't change
-                over time. This is useful if the `requests` iterator pulls the data dynamically. If you do not pass
-                a key but pass a `name`, the key is `CRAWLEE_REQUEST_LIST_REQUESTS_{name}`.
+                over time. This is useful if the `requests` iterator pulls the data dynamically.
             state: The crawling position to start from when there is no persisted state to restore, such as one
                 returned by `get_state`.
         """
@@ -79,11 +78,8 @@ class RequestList(RequestLoader):
         self._next: tuple[Request | None, Request | None] = (None, None)
         self._requests_to_retry = deque[Request]()
 
-        if name is not None:
-            if persist_state_key is None:
-                persist_state_key = f'CRAWLEE_REQUEST_LIST_STATE_{name}'
-            if persist_requests_key is None:
-                persist_requests_key = f'CRAWLEE_REQUEST_LIST_REQUESTS_{name}'
+        if persist_state_key is None and name is not None:
+            persist_state_key = f'CRAWLEE_REQUEST_LIST_STATE_{name}'
 
         self._persist_state_key = persist_state_key
         self._state = RecoverableState(
