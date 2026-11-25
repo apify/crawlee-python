@@ -258,7 +258,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         for domain in self._fetchable_domains():
             state = self._domain_states[domain]
             # Another call may have armed the domain while an earlier fetch of this call was suspended.
-            if datetime.now(timezone.utc) < state.throttled_until:
+            if self._is_domain_throttled(domain):
                 continue
             # Armed before the fetch suspends, so a concurrent call can't dispatch to the domain in the same window.
             previous_crawl_delay_until = state.crawl_delay_until
