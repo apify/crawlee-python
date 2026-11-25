@@ -440,7 +440,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         self._blocked_status_codes = (
             self._DEFAULT_BLOCKED_STATUS_CODES if blocked_status_codes is None else frozenset(blocked_status_codes)
-        )
+        ) - self._ignore_http_error_status_codes
 
         self._http_client = self._own_or_borrow(http_client, ImpitHttpClient)
 
@@ -2042,7 +2042,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if status_code in self._blocked_status_codes and status_code not in self._ignore_http_error_status_codes:
+        if status_code in self._blocked_status_codes:
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
     async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:

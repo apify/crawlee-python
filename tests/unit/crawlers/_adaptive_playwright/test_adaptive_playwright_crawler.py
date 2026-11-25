@@ -4,13 +4,13 @@ import logging
 import sys
 from datetime import timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import create_autospec, patch
 
 import pytest
 
 from crawlee.autoscaling import ConcurrencySystem
 from crawlee.browsers import BrowserPool
-from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlerStatisticState
+from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlerStatisticState, BasicCrawler
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
 from crawlee.statistics import Statistics
 
@@ -135,3 +135,19 @@ def test_lock_time_counts_both_runs() -> None:
         pass
 
     assert crawler._get_expected_processing_time() == timedelta(minutes=7)
+
+
+def test_one_shot_status_codes_reach_sub_crawlers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Status code options given as a one-shot iterable reach the crawler and both of its sub crawlers."""
+    init = create_autospec(BasicCrawler.__init__, side_effect=BasicCrawler.__init__)
+    monkeypatch.setattr(BasicCrawler, '__init__', init)
+
+    AdaptivePlaywrightCrawler.with_parsel_static_parser(
+        blocked_status_codes=(code for code in [402]),
+        ignore_http_error_status_codes=(code for code in [418]),
+    )
+
+    crawlers = [call.args[0] for call in init.call_args_list]
+    assert len(crawlers) == 3
+    assert all(crawler._blocked_status_codes == frozenset({402}) for crawler in crawlers)
+    assert all(crawler._ignore_http_error_status_codes == {418} for crawler in crawlers)
