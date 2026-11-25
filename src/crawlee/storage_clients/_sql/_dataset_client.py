@@ -151,10 +151,13 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
         items = data if isinstance(data, Sequence) else [data]
 
         db_items = [{'dataset_id': self._id, 'data': item} for item in items]
-        stmt = insert(self._ITEM_TABLE).values(db_items)
 
         async with self.get_session(with_simple_commit=True) as session:
-            await session.execute(stmt)
+            # An insert without rows fails, so an empty push only updates the metadata.
+            if db_items:
+                # Rows passed as parameters run as an executemany, so a large push stays under the database's limit on
+                # bind parameters per statement.
+                await session.execute(insert(self._ITEM_TABLE), db_items)
 
             await self._add_buffer_record(session, update_modified_at=True, delta_item_count=len(items))
 
@@ -183,7 +186,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
             fields=fields,
             omit=omit,
             unwind=unwind,
-            skip_empty=skip_empty,
             skip_hidden=skip_hidden,
             flatten=flatten,
             view=view,
@@ -196,12 +198,17 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
             await self._add_buffer_record(session)
 
         items = [db_item.data for db_item in db_items]
+
+        # Empty items are dropped from the page that `offset` and `limit` select, so a page can hold fewer items.
+        if skip_empty:
+            items = [item for item in items if item]
+
         metadata = await self.get_metadata()
         return DatasetItemsListPage(
             items=items,
             count=len(items),
             desc=desc,
-            limit=limit or 0,
+            limit=limit if limit is not None else max(metadata.item_count - offset, 0),
             offset=offset or 0,
             total=metadata.item_count,
         )
@@ -228,7 +235,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
             fields=fields,
             omit=omit,
             unwind=unwind,
-            skip_empty=skip_empty,
             skip_hidden=skip_hidden,
         )
 
@@ -236,6 +242,10 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
             db_items = await session.stream_scalars(stmt)
 
             async for db_item in db_items:
+                # As in `get_data`, empty items are dropped after `offset` and `limit` are applied.
+                if skip_empty and not db_item.data:
+                    continue
+
                 yield db_item.data
 
             await self._add_buffer_record(session)
@@ -250,7 +260,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
         fields: list[str] | None = None,
         omit: list[str] | None = None,
         unwind: list[str] | None = None,
-        skip_empty: bool = False,
         skip_hidden: bool = False,
         flatten: list[str] | None = None,
         view: str | None = None,
@@ -274,10 +283,6 @@ class SqlDatasetClient(DatasetClient, SqlClientMixin[DatasetMetadataDb, DatasetM
             )
 
         stmt = select(self._ITEM_TABLE).where(self._ITEM_TABLE.dataset_id == self._id)
-
-        if skip_empty:
-            # Skip items that are empty JSON objects
-            stmt = stmt.where(self._ITEM_TABLE.data != {})
 
         # Apply ordering by insertion order (item_id)
         stmt = stmt.order_by(self._ITEM_TABLE.item_id.desc()) if desc else stmt.order_by(self._ITEM_TABLE.item_id.asc())

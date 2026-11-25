@@ -221,6 +221,16 @@ async def test_get_data_with_pagination(dataset: Dataset) -> None:
     assert result.items[-1]['id'] == 5
 
 
+async def test_get_data_without_limit(dataset: Dataset) -> None:
+    """Test that get_data with limit=None reports the number of items after the offset as the page limit."""
+    await dataset.push_data([{'id': i} for i in range(1, 6)])
+
+    result = await dataset.get_data(offset=2, limit=None)
+
+    assert result.items == [{'id': 3}, {'id': 4}, {'id': 5}]
+    assert result.limit == 3
+
+
 async def test_get_data_descending_order(dataset: Dataset) -> None:
     """Test getting data in descending order reverses the item order."""
     # Add some items
@@ -274,6 +284,17 @@ async def test_get_data_skip_empty(dataset: Dataset) -> None:
     result = await dataset.get_data(skip_empty=True)
     assert result.count == 2
     assert all(item != {} for item in result.items)
+
+
+async def test_skip_empty_after_paging(dataset: Dataset) -> None:
+    """Test that skip_empty drops empty items from the page selected by offset and limit."""
+    await dataset.push_data([{'id': 1}, {}, {'id': 3}, {}, {'id': 5}])
+
+    result = await dataset.get_data(skip_empty=True, offset=1, limit=3)
+    assert result.items == [{'id': 3}]
+
+    iterated = [item async for item in dataset.iterate_items(skip_empty=True, offset=1, limit=3)]
+    assert iterated == [{'id': 3}]
 
 
 async def test_iterate_items(dataset: Dataset) -> None:
