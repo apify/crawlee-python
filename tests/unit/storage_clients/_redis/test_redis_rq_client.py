@@ -338,6 +338,26 @@ async def test_mark_request_as_handled_concurrent_no_double_decrement(
     assert metadata.handled_request_count == 1
 
 
+async def test_mark_sets_handled_at_on_success(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that `mark_request_as_handled` sets `handled_at` only when it marks the request, and stores it."""
+    request = Request.from_url('https://example.com/handled-at')
+    await rq_client.add_batch_of_requests([request])
+
+    assert await rq_client.mark_request_as_handled(request) is None
+    assert request.handled_at is None
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+    assert await rq_client.mark_request_as_handled(fetched) is not None
+    assert fetched.handled_at is not None
+
+    stored = await rq_client.get_request(fetched.unique_key)
+    assert stored is not None
+    assert stored.handled_at == fetched.handled_at
+
+
 async def test_failed_mark_keeps_in_progress(
     rq_client: RedisRequestQueueClient,
 ) -> None:
@@ -365,14 +385,18 @@ async def test_failed_mark_keeps_in_progress(
 async def test_partial_mark_keeps_in_progress(
     rq_client: RedisRequestQueueClient,
 ) -> None:
-    """Test that a `mark_request_as_handled` script failing midway leaves the request in progress."""
+    """Test that a `mark_request_as_handled` script failing midway leaves the request in progress and uncounted."""
     await rq_client.add_batch_of_requests([Request.from_url('https://example.com/script-error')])
 
     fetched = await rq_client.fetch_next_request()
     assert fetched is not None
 
-    # A data hash of the wrong type fails the script after its first writes.
-    await await_redis_response(rq_client.redis.set(rq_client._data_key, 'not a hash'))
+    # The last dedup key of the wrong type fails the script after the data write and any earlier dedup write.
+    if rq_client._dedup_strategy == 'bloom':
+        last_dedup_key = rq_client._handled_filter_key
+    else:
+        last_dedup_key = rq_client._pending_set_key
+    await await_redis_response(rq_client.redis.set(last_dedup_key, 'not a set'))
 
     with (
         patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock),
@@ -382,6 +406,54 @@ async def test_partial_mark_keeps_in_progress(
 
     in_progress = await await_redis_response(rq_client.redis.hexists(rq_client._in_progress_key, fetched.unique_key))
     assert in_progress
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 1
+    assert metadata.handled_request_count == 0
+
+
+async def test_mark_removes_in_progress_last(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that a `mark_request_as_handled` script failing on the counter update leaves the request in progress."""
+    await rq_client.add_batch_of_requests([Request.from_url('https://example.com/metadata-error')])
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+
+    # A metadata key of the wrong type fails the script on the counters, after the data and dedup writes.
+    await await_redis_response(rq_client.redis.set(rq_client.metadata_key, 'not a JSON document'))
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock),
+        pytest.raises(RedisError),
+    ):
+        await rq_client.mark_request_as_handled(fetched)
+
+    in_progress = await await_redis_response(rq_client.redis.hexists(rq_client._in_progress_key, fetched.unique_key))
+    assert in_progress
+
+
+async def test_mark_writes_data_first(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that a `mark_request_as_handled` script failing on the request data doesn't report it as handled."""
+    await rq_client.add_batch_of_requests([Request.from_url('https://example.com/data-error')])
+
+    fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+
+    # A data hash of the wrong type fails the script on its first write.
+    await await_redis_response(rq_client.redis.set(rq_client._data_key, 'not a hash'))
+
+    with (
+        patch('crawlee._utils.retry._retry_sleep', new_callable=AsyncMock),
+        pytest.raises(RedisError),
+    ):
+        await rq_client.mark_request_as_handled(fetched)
+
+    response = await rq_client.add_batch_of_requests([fetched])
+    assert response.processed_requests[0].was_already_handled is False
 
 
 async def test_mark_lost_reply_counts_once(
@@ -470,3 +542,21 @@ async def test_forefront_reclaim_served_once(
     assert served is not None
     assert served.unique_key == fetched.unique_key
     assert await rq_client.fetch_next_request() is None
+
+
+async def test_forefront_reclaim_stays_blocked(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that a forefront `reclaim_request` blocks the request again, so a stale reclaim doesn't queue it."""
+    await rq_client.add_batch_of_requests([Request.from_url('https://example.com/forefront-blocked')])
+
+    # A negative block time makes the fetch block the request only until a moment that has already passed.
+    with patch.object(rq_client, '_BLOCK_REQUEST_TIME', -1):
+        fetched = await rq_client.fetch_next_request()
+    assert fetched is not None
+
+    assert await rq_client.reclaim_request(fetched, forefront=True) is not None
+    await rq_client._reclaim_stale_requests()
+
+    queue_length = await await_redis_response(rq_client.redis.llen(rq_client._queue_key))
+    assert queue_length == 0

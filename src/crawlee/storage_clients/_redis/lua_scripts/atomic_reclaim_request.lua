@@ -10,8 +10,8 @@ local forefront = ARGV[4] == '1'
 local client_id = ARGV[5]
 local blocked_until_timestamp = tonumber(ARGV[6])
 
--- A request no longer in progress may already be back in the queue, put there by an earlier attempt whose reply
--- was lost or by another client's stale reclaim
+-- A request no longer in progress may already be back in the queue, put there by an earlier attempt whose reply was
+-- lost or by a stale reclaim
 if redis.call('hexists', in_progress_key, unique_key) == 0 then
     return 0
 end

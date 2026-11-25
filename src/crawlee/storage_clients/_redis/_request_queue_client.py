@@ -402,10 +402,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
         now = datetime.now(timezone.utc)
-
-        # Update the request's handled_at timestamp.
-        if request.handled_at is None:
-            request.handled_at = now
+        handled_at = request.handled_at or now
+        request_data = request.model_copy(update={'handled_at': handled_at}).model_dump_json()
 
         if self._dedup_strategy == 'bloom':
             dedup_keys = [self._handled_filter_key]
@@ -415,12 +413,15 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         # One script, so a connection error can't leave the request out of `in_progress` without marking it handled.
         marked = await self._mark_request_as_handled_script(
             keys=[self._in_progress_key, self._data_key, self.metadata_key, *dedup_keys],
-            args=[request.unique_key, request.model_dump_json(), json.dumps(now.isoformat()), self._dedup_strategy],
+            args=[request.unique_key, request_data, json.dumps(now.isoformat()), self._dedup_strategy],
         )
 
         if not marked:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
+
+        # Set only once the script has marked the request, so a request that isn't in progress doesn't look handled.
+        request.handled_at = handled_at
 
         return ProcessedRequest(
             unique_key=request.unique_key,

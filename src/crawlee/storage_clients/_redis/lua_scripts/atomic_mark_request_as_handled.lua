@@ -14,14 +14,15 @@ if redis.call('hexists', in_progress_key, unique_key) == 0 then
     return 0
 end
 
+-- Written before the dedup keys, so a script failing on it doesn't leave the request reported as handled
+redis.call('hset', data_key, unique_key, request_data)
+
 if dedup_strategy == 'bloom' then
     redis.call('bf.add', handled_key, unique_key)
 else
     redis.call('sadd', handled_key, unique_key)
     redis.call('srem', pending_set_key, unique_key)
 end
-
-redis.call('hset', data_key, unique_key, request_data)
 
 redis.call('json.numincrby', metadata_key, '$.handled_request_count', 1)
 redis.call('json.numincrby', metadata_key, '$.pending_request_count', -1)
