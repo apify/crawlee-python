@@ -272,7 +272,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 if request is None and state.crawl_delay_until == armed_crawl_delay_until:
                     state.crawl_delay_until = previous_crawl_delay_until
             if request is not None:
-                # The window runs from the dispatch, so a slow fetch doesn't shorten it.
+                # The window runs from the dispatch, so a slow fetch doesn't shorten it. A fetch slower than the
+                # crawl-delay outlives the arm, so a concurrent call may have dispatched to the domain meanwhile.
                 self._mark_domain_dispatched(domain)
                 return request
 
