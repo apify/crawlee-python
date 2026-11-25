@@ -7,7 +7,6 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
         - 'actions/setup-python@v7.1.0'
-        - 'apify/actions@v1.7.0'
         - 'apify/actions@v1.9.0'
         - 'astral-sh/setup-uv@v10.4.0'
         - 'codecov/codecov-action@v7.1.1'
@@ -17,7 +16,6 @@ workflows:
     '.github/workflows/factory_review.yaml':
         - 'apify/actions@v1.9.0'
     '.github/workflows/manual_release_beta.yaml':
-        - 'apify/actions@v1.7.0'
         - 'apify/actions@v1.9.0'
     '.github/workflows/manual_release_docs.yaml':
         - 'actions/checkout@v7.0.1'
@@ -26,10 +24,9 @@ workflows:
         - 'actions/setup-node@v7.1.0'
         - 'actions/setup-python@v7.1.0'
         - 'actions/upload-pages-artifact@v5.0.0'
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
         - 'astral-sh/setup-uv@v10.4.0'
     '.github/workflows/manual_release_stable.yaml':
-        - 'apify/actions@v1.7.0'
         - 'apify/actions@v1.9.0'
         - 'softprops/action-gh-release@v3.0.4'
     '.github/workflows/manual_version_docs.yaml':
@@ -38,14 +35,14 @@ workflows:
         - 'actions/setup-node@v7.1.0'
         - 'actions/setup-python@v7.1.0'
         - 'actions/upload-artifact@v7.0.2'
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
         - 'astral-sh/setup-uv@v10.4.0'
     '.github/workflows/on_issue.yaml':
         - 'actions/github-script@v9.0.0'
     '.github/workflows/on_master.yaml':
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
     '.github/workflows/on_pull_request.yaml':
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
     '.github/workflows/on_schedule_tests.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
@@ -56,16 +53,16 @@ workflows:
     '.github/workflows/publish_to_pypi.yaml':
         - 'actions/download-artifact@v8.0.2'
         - 'actions/upload-artifact@v7.0.2'
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
         - 'pypa/gh-action-pypi-publish@release/v1'
     '.github/workflows/update_playwright_version.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-python@v7.1.0'
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
     '.github/workflows/update_public_suffix_list.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-python@v7.1.0'
-        - 'apify/actions@v1.7.0'
+        - 'apify/actions@v1.9.0'
 dependencies:
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
         ref: 'v6.1.0'
@@ -186,38 +183,32 @@ dependencies:
         repo_id: 1238646352
         uses:
             - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
-    'apify/actions@v1.7.0':
-        ref: 'v1.7.0'
-        commit: 'sha1-48ab27d3d0de7744c20dd783b83245dfae2cddfd'
-        owner_id: 24586296
-        repo_id: 1238646352
-        uses:
-            - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-            - 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
-            - 'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803'
-            - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
-            - 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1'
-            - 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
-            - 'amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50'
-            - 'astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b'
-            - 'astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78'
-            - 'crate-ci/typos@512fc24f32f44ab01972217aaaf3dc86ec234d53'
-            - 'pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c'
-            - 'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
     'apify/actions@v1.9.0':
         ref: 'v1.9.0'
         commit: 'sha1-994a3e5ec79a5575ac4d81365bab7549c9687c32'
         owner_id: 24586296
         repo_id: 1238646352
         uses:
+            - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
+            - 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
             - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+            - 'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803'
             - 'actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333'
+            - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
             - 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
             - 'actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
+            - 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1'
+            - 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+            - 'amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50'
             - 'apify/actions@48ab27d3d0de7744c20dd783b83245dfae2cddfd'
+            - 'astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b'
+            - 'astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78'
             - 'astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2'
             - 'codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5'
+            - 'crate-ci/typos@512fc24f32f44ab01972217aaaf3dc86ec234d53'
             - 'damianreeves/write-file-action@6929a9a6d1807689191dcc8bbe62b54d70a32b42'
+            - 'pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c'
+            - 'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
     'apify/setup-apify-cli-action@v1.1.0':
         ref: 'v1.1.0'
         commit: 'sha1-8c169d8455f83deb8b3c948b9184cf9ff8f86b76'
