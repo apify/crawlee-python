@@ -52,7 +52,7 @@ from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.robots import RobotsTxtFile
 from crawlee._utils.time import context_without_active_timeouts, extend_active_timeouts, format_duration
 from crawlee._utils.urls import UNSUPPORTED_SCHEME_MESSAGE, convert_to_absolute_url, filter_url, is_url_absolute
-from crawlee._utils.wait import wait_for, wait_for_extendable
+from crawlee._utils.wait import wait_for, wait_for_all_tasks_to_finish, wait_for_extendable
 from crawlee._utils.web import is_status_code_client_error, is_status_code_server_error
 from crawlee.autoscaling import ConcurrencyConsumer, ConcurrencySystem
 from crawlee.errors import (
@@ -68,7 +68,7 @@ from crawlee.errors import (
     UserDefinedErrorHandlerError,
     UserHandlerTimeoutError,
 )
-from crawlee.events._types import Event, EventCrawlerStatusData
+from crawlee.events._types import Event, EventCrawlerStatusData, EventPersistStateData
 from crawlee.http_clients import ImpitHttpClient
 from crawlee.request_loaders import MinIntervalSignal, RateLimitedSignal
 from crawlee.router import Router
@@ -99,7 +99,6 @@ if TYPE_CHECKING:
     )
     from crawlee.autoscaling._types import ConcurrencySystemInterface
     from crawlee.configuration import Configuration
-    from crawlee.events import EventManager
     from crawlee.http_clients import HttpClient, HttpResponse
     from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
     from crawlee.request_loaders import RequestManager
@@ -125,9 +124,6 @@ class _BasicCrawlerOptions(TypedDict):
 
     configuration: NotRequired[Configuration]
     """The `Configuration` instance. Some of its properties are used as defaults for the crawler."""
-
-    event_manager: NotRequired[EventManager]
-    """The event manager for managing events for the crawler and all its components."""
 
     storage_backend: NotRequired[StorageBackend]
     """The storage backend for managing storages for the crawler and all its components."""
@@ -304,7 +300,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self,
         *,
         configuration: Configuration | None = None,
-        event_manager: EventManager | None = None,
         storage_backend: StorageBackend | None = None,
         request_manager: RequestManager | None = None,
         session_pool: SessionPool | None = None,
@@ -339,7 +334,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Args:
             configuration: The `Configuration` instance. Some of its properties are used as defaults for the crawler.
-            event_manager: The event manager for managing events for the crawler and all its components.
             storage_backend: The storage backend for managing storages for the crawler and all its components.
             request_manager: Manager of requests that should be processed by the crawler.
             session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration. Keep it open
@@ -409,21 +403,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         BasicCrawler.__next_id += 1
         self._consumer = ConcurrencyConsumer(id=self._id)
 
-        implicit_event_manager_with_explicit_config = False
         if not configuration:
             configuration = service_locator.get_configuration()
-        elif not event_manager:
-            implicit_event_manager_with_explicit_config = True
 
         if not storage_backend:
             storage_backend = service_locator.get_storage_backend()
 
-        if not event_manager:
-            event_manager = service_locator.get_event_manager()
-
-        self._service_locator = ServiceLocator(
-            configuration=configuration, storage_backend=storage_backend, event_manager=event_manager
-        )
+        self._service_locator = ServiceLocator(configuration=configuration, storage_backend=storage_backend)
 
         config = self._service_locator.get_configuration()
 
@@ -496,11 +482,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             if not root_logger.handlers:
                 configure_logger(root_logger)
         self._logger = logger or logging.getLogger(f'crawlee.crawlers.{type(self).__name__}')
-        if implicit_event_manager_with_explicit_config:
-            self._logger.warning(
-                'No event manager set, implicitly using event manager from global service_locator.'
-                'It is advised to explicitly set the event manager if explicit configuration is used as well.'
-            )
         self._statistics_log_format = statistics_log_format
 
         # Statistics
@@ -1037,15 +1018,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         return run
 
     async def _run_crawler(self) -> None:
-        local_event_manager = self._service_locator.get_event_manager()
-        global_event_manager = service_locator.get_event_manager()
-        if local_event_manager is global_event_manager:
-            local_event_manager = None  # Avoid entering the same event manager context twice
-
-        # The event managers are always entered.
-        contexts_to_enter: list[Any] = (
-            [global_event_manager, local_event_manager] if local_event_manager else [global_event_manager]
-        )
+        contexts_to_enter: list[Any] = []
 
         # A system supplied by the caller is only borrowed, and its lifecycle belongs to whoever created it. The one
         # the crawler builds for this run is entered and exited below.
@@ -1060,19 +1033,37 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # The status messages of the recurring task read the statistics, so it starts after them and stops before them.
         contexts_to_enter.append(self._crawler_state_rec_task)
 
-        async with AsyncExitStack() as exit_stack:
-            for context in contexts_to_enter:
-                await exit_stack.enter_async_context(context)
+        event_manager = self._service_locator.get_event_manager()
+        started = False
 
-            event_manager = self._service_locator.get_event_manager()
-            event_manager.on(event=Event.MIGRATING, listener=self._pause_by_event)
-            event_manager.on(event=Event.ABORTING, listener=self._pause_by_event)
+        try:
+            async with AsyncExitStack() as exit_stack:
+                for context in contexts_to_enter:
+                    await exit_stack.enter_async_context(context)
 
-            try:
-                await self._run.dispatch_requests()
-            finally:
-                event_manager.off(event=Event.MIGRATING, listener=self._pause_by_event)
-                event_manager.off(event=Event.ABORTING, listener=self._pause_by_event)
+                event_manager.on(event=Event.MIGRATING, listener=self._pause_by_event)
+                event_manager.on(event=Event.ABORTING, listener=self._pause_by_event)
+                started = True
+
+                try:
+                    await self._run.dispatch_requests()
+                finally:
+                    event_manager.off(event=Event.MIGRATING, listener=self._pause_by_event)
+                    event_manager.off(event=Event.ABORTING, listener=self._pause_by_event)
+        finally:
+            # The components entered above saved their state on exit. The event makes the rest save theirs before
+            # `run()` returns, such as the RQ or `use_state`. A run that failed to start raises its error right away,
+            # and the next `PERSIST_STATE` event saves what it changed.
+            if started:
+                listener_tasks = event_manager.emit(
+                    event=Event.PERSIST_STATE,
+                    event_data=EventPersistStateData(is_migrating=False),
+                )
+                await wait_for_all_tasks_to_finish(
+                    tasks=listener_tasks,
+                    logger=self._logger,
+                    timeout=event_manager.close_timeout,
+                )
 
     async def _pause_by_event(self) -> None:
         """Pause the crawl before the process migrates or is aborted, so that no request is left half-done."""

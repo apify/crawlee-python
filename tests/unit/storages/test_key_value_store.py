@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
@@ -10,7 +11,7 @@ from pydantic import ValidationError
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
-from crawlee.events import Event, EventPersistStateData
+from crawlee.events import Event, EventManager, EventPersistStateData
 from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend, SqlStorageBackend, StorageBackend
 from crawlee.storage_backends._memory import MemoryKeyValueStoreBackend
 from crawlee.storage_backends.models import KeyValueStoreRecord
@@ -1417,11 +1418,25 @@ async def test_mutating_read_value_does_not_change_stored_value(kvs: KeyValueSto
     assert await kvs.get_value('test-key') == {'key': 'value'}
 
 
+async def test_autosaved_value_saved_periodically(storage_backend: StorageBackend) -> None:
+    """An autosaved value outside a crawler, with no `async with`, is saved by the periodic `PersistState` event."""
+    service_locator.set_event_manager(EventManager(persist_state_interval=timedelta(milliseconds=50)))
+    kvs = await KeyValueStore.open(name='periodic-save', storage_backend=storage_backend)
+    autosaved_value = await kvs.get_auto_saved_value('state', {'count': 0})
+    autosaved_value['count'] = 1
+
+    for _ in range(100):
+        if await kvs.get_value('state') == {'count': 1}:
+            break
+        await asyncio.sleep(0.05)
+
+    assert await kvs.get_value('state') == {'count': 1}
+
+
 async def _emit_persist_state() -> None:
     event_manager = service_locator.get_event_manager()
-    async with event_manager:
-        event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
-        await event_manager.wait_for_all_listeners_to_complete()
+    event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+    await event_manager.wait_for_all_listeners_to_complete()
 
 
 async def test_purge_drops_autosaved_values(kvs: KeyValueStore) -> None:

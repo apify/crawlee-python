@@ -46,9 +46,9 @@ async def event_manager() -> AsyncGenerator[LocalEventManager, None]:
     async def consume_automatic_system_info(_: EventSystemInfoData) -> None:
         initial_system_info_consumed.set()
 
-    event_manager.on(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
-
     async with event_manager:
+        # Registered before anything yields to the event loop, so the first automatic event already reaches it.
+        event_manager.on(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
         await initial_system_info_consumed.wait()
         event_manager.off(event=Event.SYSTEM_INFO, listener=consume_automatic_system_info)
 

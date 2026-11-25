@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
+import weakref
 from collections import defaultdict
 from datetime import timedelta
-from logging import getLogger
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, overload
+from logging import WARNING, getLogger
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
 
-from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import LoggerOnce
 from crawlee._utils.recurring_task import RecurringTask
 from crawlee._utils.wait import wait_for_all_tasks_to_finish
 from crawlee.events._types import (
@@ -43,7 +45,9 @@ class EventManagerOptions(TypedDict):
 
     close_timeout: NotRequired[timedelta | None]
     """Optional timeout for canceling pending event listeners if they exceed this duration. `None` waits without
-    a limit, zero cancels them right away.
+    a limit, or 30 seconds at the shutdown of the event loop. Zero cancels them right away. A stop waits in two
+    rounds, so it can take up to twice as long. A crawler waits for the listeners at the end of a run with the same
+    limit.
     """
 
 
@@ -54,7 +58,23 @@ class EventManager:
     Listeners can be registered for any of the events and are invoked whenever the event is emitted, each of them
     in its own task - the sync ones in a separate thread so that they cannot block the event loop. On top of that,
     it emits `PersistState` events at regular intervals and can wait for all the running listeners to complete.
+
+    The manager starts by itself on the first `on` call in a running event loop, and keeps running until that loop
+    shuts down, when it emits a final `PersistState` event and drops the listeners. `emit` never starts it. Whoever
+    enters the manager with `async with` owns it instead, also after it started by itself, and it stops on the exit. A
+    manager that has to await something to start, such as connecting somewhere, sets `supports_lazy_start` to `False`,
+    and calling `on` while it isn't active raises an error. Once its event loop starts shutting down, nothing starts the
+    manager again in that loop, and `on` and `async with` do nothing there.
     """
+
+    supports_lazy_start: ClassVar[bool] = True
+    """Whether the manager starts by itself on the first `on` call, instead of being entered first."""
+
+    _SHUTDOWN_TIMEOUT = timedelta(seconds=30)
+    """Time limit for each wait for the listeners when the event loop shuts down, unless `close_timeout` sets one."""
+
+    _instances: ClassVar[weakref.WeakSet[EventManager]] = weakref.WeakSet()
+    """Live managers, reset in a forked child process."""
 
     def __init__(
         self,
@@ -67,19 +87,25 @@ class EventManager:
         Args:
             persist_state_interval: Interval between emitted `PersistState` events to maintain state persistence.
             close_timeout: Optional timeout for canceling pending event listeners if they exceed this duration.
-                `None` waits without a limit, zero cancels them right away.
+                `None` waits without a limit, or 30 seconds at the shutdown of the event loop. Zero cancels them
+                right away. A stop waits in two rounds, so it can take up to twice as long. A crawler waits for the
+                listeners at the end of a run with the same limit.
         """
         self._persist_state_interval = persist_state_interval
         """Interval between the emitted `PersistState` events."""
 
         self._close_timeout = close_timeout
-        """Timeout for the pending listeners when the context is being left, unlimited if not set."""
+        """Timeout for the running listeners when the manager stops. Without it, a stop waits for them without a limit,
+        except for the one at the shutdown of the event loop, which waits for `_SHUTDOWN_TIMEOUT`.
+        """
 
-        self._listener_tasks: set[asyncio.Task[None]] = set()
-        """Tasks of the running listener invocations, kept both to keep them alive and to be able to wait for them."""
+        self._listener_tasks: dict[asyncio.Task[None], Event] = {}
+        """Tasks of the running listener invocations with their events, kept both to keep them alive and to be able to
+        wait for them.
+        """
 
         self._waiting_listener_tasks: set[asyncio.Task[None]] = set()
-        """Listener tasks currently blocked in `wait_for_all_listeners_to_complete`.
+        """Listener tasks currently blocked in a wait for the listeners.
 
         They are excluded from the waits made by the listeners themselves, as a waiter must never await itself.
         """
@@ -92,59 +118,107 @@ class EventManager:
         self._emit_persist_state_event_rec_task = RecurringTask(
             func=self._emit_persist_state_event,
             delay=self._persist_state_interval,
+            run_immediately=False,
         )
         """Recurring task emitting the `PersistState` events."""
 
-        self._active_ref_count = 0
-        """Reference count of the active contexts."""
+        self._loop: asyncio.AbstractEventLoop | None = None
+        """The event loop the manager started in, kept until that loop shuts down or the manager leaves it, even if the
+        manager stops earlier.
+        """
+
+        self._shutdown_task: asyncio.Task[None] | None = None
+        """Task that closes the manager once cancelled, which `asyncio.run` does when the event loop shuts down. Kept
+        here, as the event loop holds only weak references to its tasks.
+        """
+
+        self._active = False
+        """Whether the manager runs in `_loop`. An event loop that stops or closes without a shutdown leaves it set."""
+
+        self._entered = False
+        """Whether an owner entered the running manager with `async with`."""
+
+        self._stops_in_progress = 0
+        """Number of stops still waiting for the listeners."""
+
+        self._closed_loop: asyncio.AbstractEventLoop | None = None
+        """The event loop whose shutdown closes the manager, set once that shutdown begins, so that nothing starts the
+        manager again in that loop.
+        """
+
+        self._logger_once = LoggerOnce(logger)
+        """Logs the warnings that would otherwise repeat, once per manager."""
+
+        EventManager._instances.add(self)
 
     @property
     def active(self) -> bool:
-        """Indicate whether the context is active."""
-        return self._active_ref_count > 0
+        """Whether the manager is running, started by itself or entered with `async with`.
+
+        Within an event loop, only a manager that runs in that loop is active.
+        """
+        if not self._active or self._loop is None:
+            return False
+
+        loop = self._get_running_loop()
+        if loop is not None:
+            return self._loop is loop
+
+        # An event loop closed without a shutdown leaves the flag set.
+        return not self._loop.is_closed()
+
+    @property
+    def close_timeout(self) -> timedelta | None:
+        """Timeout for the running listeners when the manager stops.
+
+        `None` waits without a limit, except at the shutdown of the event loop, where the manager waits for 30 seconds.
+        """
+        return self._close_timeout
 
     async def __aenter__(self) -> Self:
-        """Initialize the event manager upon entering the async context."""
-        self._active_ref_count += 1
+        """Take over the lifecycle of the manager, starting it unless it already started by itself.
 
-        if self._active_ref_count == 1:
-            self._emit_persist_state_event_rec_task.start()
+        Raises:
+            RuntimeError: If an owner has already entered the manager, or if it belongs to another event loop that is
+                still running.
+        """
+        loop = asyncio.get_running_loop()
 
+        if loop is self._closed_loop:
+            return self
+
+        if self._entered and self._loop is loop:
+            raise RuntimeError(f'The {self.__class__.__name__} is already entered.')
+
+        self._leave_other_loop(loop)
+
+        if not self._active:
+            self._start(loop)
+
+        self._entered = True
         return self
 
-    @ensure_context
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        """Close the event manager upon exiting the async context.
-
-        This will stop listening for the events, and it will wait for all the event listeners to finish.
+        """Stop the manager, emitting a final `PersistState` event and waiting for all the running listeners.
 
         Raises:
-            RuntimeError: If the context manager is not active.
+            RuntimeError: If the manager isn't active in the running event loop.
         """
-        last_exit = self._active_ref_count == 1
+        loop = asyncio.get_running_loop()
 
-        try:
-            # Stop the periodic emission first, so that the event emitted below really is the last one.
-            if last_exit:
-                await self._emit_persist_state_event_rec_task.stop()
+        # The shutdown of the event loop may close the manager before an owner running in a cancelled task exits.
+        if loop is self._closed_loop:
+            return
 
-            # Emit a persist state event to ensure the latest state is saved before closing the context.
-            await self._emit_persist_state_event()
-            await self.wait_for_all_listeners_to_complete(timeout=self._close_timeout)
-        finally:
-            # The context has to be left even if closing fails, be it a cancellation or a failed emission. Staying
-            # active would mean never emitting `PersistState` again, as re-entering the context would be a no-op.
-            if last_exit:
-                self._listener_tasks.clear()
-                self._listeners_to_wrappers.clear()
-                self._waiting_listener_tasks.clear()
+        if not self._active or self._loop is not loop:
+            raise RuntimeError(f'The {self.__class__.__name__} is not active.')
 
-            self._active_ref_count -= 1
+        await self._stop(timeout=self._close_timeout)
 
     @overload
     def on(self, *, event: Literal[Event.PERSIST_STATE], listener: EventListener[EventPersistStateData]) -> None: ...
@@ -164,17 +238,55 @@ class EventManager:
     def on(self, *, event: Event, listener: EventListener[Any]) -> None:
         """Register an event listener for a specific event.
 
+        Within a running event loop, it also starts the manager if it starts by itself. The listener stays registered
+        until `off` removes it, or until the event loop the manager runs in shuts down.
+
         Args:
-            event: The event for which to listen to.
+            event: The event to listen to.
             listener: The function (sync or async) which is to be called when the event is emitted.
+
+        Raises:
+            RuntimeError: If the manager doesn't start by itself and nobody has entered it, or if it belongs to another
+                event loop that is still running.
         """
-        self._listeners_to_wrappers[event][listener].append(self._wrap_listener(event, listener))
+        # Wrapped first, so that an invalid listener raises before it starts the manager.
+        listener_wrapper = self._wrap_listener(event, listener)
+        loop = self._get_running_loop()
+
+        if loop is None:
+            # Outside an event loop there is nothing to start, so the listener is only registered. What an event loop
+            # closed without a shutdown left behind goes first, or the next event loop would drop the listener with it.
+            if self._loop is not None and self._loop.is_closed():
+                self._forget_loop()
+        elif loop is self._closed_loop:
+            # The manager closed with this event loop, at its shutdown or after an app cancelled all its tasks, and it
+            # doesn't start again in that loop.
+            self._logger_once.log(
+                'The event manager closed when the tasks of its event loop were cancelled, so it does not register '
+                'the listener for the %s event in that loop.',
+                event.value,
+                key='listener-after-close',
+                level=WARNING,
+            )
+            return
+        else:
+            self._leave_other_loop(loop)
+
+            if self.supports_lazy_start and not self._active:
+                self._start(loop)
+
+        if not self.supports_lazy_start and not self._active:
+            raise RuntimeError(
+                f"The {self.__class__.__name__} doesn't start by itself. Enter it with `async with` before using it."
+            )
+
+        self._listeners_to_wrappers[event][listener].append(listener_wrapper)
 
     def off(self, *, event: Event, listener: EventListener[Any] | None = None) -> None:
         """Remove a specific listener or all listeners for an event.
 
         Args:
-            event: The Actor event for which to remove listeners.
+            event: The event for which to remove listeners.
             listener: The listener which is supposed to be removed. If not passed, all listeners of this event
                 are removed.
         """
@@ -188,31 +300,48 @@ class EventManager:
         self._listeners_to_wrappers.get(event, {}).pop(listener, None)
 
     @overload
-    def emit(self, *, event: Literal[Event.PERSIST_STATE], event_data: EventPersistStateData) -> None: ...
+    def emit(
+        self, *, event: Literal[Event.PERSIST_STATE], event_data: EventPersistStateData
+    ) -> list[asyncio.Task[None]]: ...
     @overload
-    def emit(self, *, event: Literal[Event.SYSTEM_INFO], event_data: EventSystemInfoData) -> None: ...
+    def emit(
+        self, *, event: Literal[Event.SYSTEM_INFO], event_data: EventSystemInfoData
+    ) -> list[asyncio.Task[None]]: ...
     @overload
-    def emit(self, *, event: Literal[Event.MIGRATING], event_data: EventMigratingData) -> None: ...
+    def emit(self, *, event: Literal[Event.MIGRATING], event_data: EventMigratingData) -> list[asyncio.Task[None]]: ...
     @overload
-    def emit(self, *, event: Literal[Event.ABORTING], event_data: EventAbortingData) -> None: ...
+    def emit(self, *, event: Literal[Event.ABORTING], event_data: EventAbortingData) -> list[asyncio.Task[None]]: ...
     @overload
-    def emit(self, *, event: Literal[Event.EXIT], event_data: EventExitData) -> None: ...
+    def emit(self, *, event: Literal[Event.EXIT], event_data: EventExitData) -> list[asyncio.Task[None]]: ...
     @overload
-    def emit(self, *, event: Literal[Event.CRAWLER_STATUS], event_data: EventCrawlerStatusData) -> None: ...
+    def emit(
+        self, *, event: Literal[Event.CRAWLER_STATUS], event_data: EventCrawlerStatusData
+    ) -> list[asyncio.Task[None]]: ...
     @overload
-    def emit(self, *, event: Event, event_data: Any) -> None: ...
+    def emit(self, *, event: Event, event_data: Any) -> list[asyncio.Task[None]]: ...
 
-    @ensure_context
-    def emit(self, *, event: Event, event_data: EventData) -> None:
+    def emit(self, *, event: Event, event_data: EventData) -> list[asyncio.Task[None]]:
         """Emit an event with the associated data to all registered listeners.
 
-        Each listener is invoked in its own task, so this method only starts them. Use
-        `wait_for_all_listeners_to_complete` to wait for them to finish.
+        Each listener is invoked in its own task, so this method only starts them. The manager itself doesn't start
+        here, and an event emitted while it's stopped still reaches the registered listeners.
 
         Args:
             event: The event which will be emitted.
             event_data: The data which will be passed to the event listeners.
+
+        Returns:
+            The tasks the listeners run in. Waiting for them waits for this emission only, while
+            `wait_for_all_listeners_to_complete` waits for every running listener.
+
+        Raises:
+            RuntimeError: If called outside a running event loop, or if the manager belongs to another event loop that
+                is still running.
         """
+        self._leave_other_loop(asyncio.get_running_loop())
+
+        listener_tasks: list[asyncio.Task[None]] = []
+
         # No listener can run before this method returns, as it does not await anything. Reading the mapping with
         # `get` keeps the events that nobody listens to out of it.
         for listener, listener_wrappers in self._listeners_to_wrappers.get(event, {}).items():
@@ -220,10 +349,12 @@ class EventManager:
 
             for listener_wrapper in listener_wrappers:
                 listener_task = asyncio.create_task(listener_wrapper(event_data), name=task_name)
-                self._listener_tasks.add(listener_task)
-                listener_task.add_done_callback(self._listener_tasks.discard)
+                self._listener_tasks[listener_task] = event
+                listener_task.add_done_callback(lambda task: self._listener_tasks.pop(task, None))
+                listener_tasks.append(listener_task)
 
-    @ensure_context
+        return listener_tasks
+
     async def wait_for_all_listeners_to_complete(self, *, timeout: timedelta | None = None) -> None:
         """Wait for all currently executing event listeners to complete.
 
@@ -232,6 +363,10 @@ class EventManager:
                 the specified timeout, they will be canceled. `None` waits without a limit, zero cancels them right
                 away.
         """
+        await self._wait_for_listeners(timeout=timeout)
+
+    async def _wait_for_listeners(self, *, timeout: timedelta | None, event: Event | None = None) -> None:
+        """Wait for the running listeners, only for those of `event` if it's given."""
         # A waiter can't finish until the listeners it awaits do, so waiters must never await each other or
         # themselves - this is what happens when a listener waits or closes from within itself. Only a waiter
         # that is a listener itself can be awaited this way, so only such waiters are tracked and excluded.
@@ -245,15 +380,116 @@ class EventManager:
             # Any other caller is outside the cycle, so it must await every listener, the waiting ones included.
             listener_tasks = list(self._listener_tasks)
 
+        if event is not None:
+            listener_tasks = [task for task in listener_tasks if self._listener_tasks[task] is event]
+
         try:
             await wait_for_all_tasks_to_finish(tasks=listener_tasks, logger=logger, timeout=timeout)
         finally:
             if listener_waiter is not None:
                 self._waiting_listener_tasks.discard(listener_waiter)
 
-    async def _emit_persist_state_event(self) -> None:
-        """Emit a persist state event with the given migration status."""
+    def _emit_persist_state_event(self) -> None:
+        """Emit a persist state event."""
         self.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+
+    def _leave_other_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Forget the event loop the manager ran in, if it's another one than `loop`.
+
+        Raises:
+            RuntimeError: If that event loop is still running.
+        """
+        if self._loop is None or self._loop is loop:
+            return
+
+        if self._loop.is_running():
+            raise RuntimeError(f'The {self.__class__.__name__} belongs to another event loop that is still running.')
+
+        # The event loop stopped without shutting the manager down. Unless it's closed, it may resume and run the tasks
+        # left in it, so the guard is cancelled here, and the recurring tasks cancel theirs when they start again.
+        if not self._loop.is_closed() and self._shutdown_task is not None:
+            self._shutdown_task.cancel()
+
+        self._forget_loop()
+
+    def _start(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Start the recurring work of the manager in the event loop, which is the running one."""
+        if self._loop is None:
+            self._closed_loop = None
+            self._loop = loop
+            self._shutdown_task = asyncio.create_task(self._close_with_loop(), name='Task-event-manager-shutdown')
+
+        self._active = True
+        self._emit_persist_state_event_rec_task.start()
+
+    async def _stop(self, *, timeout: timedelta | None) -> None:
+        """Stop the recurring work, emit the final `PersistState` event and wait for all the running listeners."""
+        # Marked as stopped before anything is awaited, so that an `on` call or an owner entering during the waits
+        # below starts the manager again.
+        self._active = False
+        self._entered = False
+        self._stops_in_progress += 1
+
+        try:
+            # Stop the periodic emission first, so that the event emitted below really is the last one.
+            await self._emit_persist_state_event_rec_task.stop()
+
+            # The final event starts once the earlier ones are done, so that a slower earlier save can't land after it.
+            await self._wait_for_listeners(timeout=timeout, event=Event.PERSIST_STATE)
+            self._emit_persist_state_event()
+            await self.wait_for_all_listeners_to_complete(timeout=timeout)
+        finally:
+            self._stops_in_progress -= 1
+
+    async def _close_with_loop(self) -> None:
+        """Wait until cancelled, which `asyncio.run` does when the event loop shuts down, then close the manager.
+
+        The manager stops, if it still runs, and drops the listeners, so that nothing of that event loop outlives it.
+        """
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            # A guard left in an event loop that the manager moved away from no longer closes it. The garbage collector
+            # finalizes a guard left pending by a closed event loop with `GeneratorExit`, which isn't caught here.
+            if self._shutdown_task is asyncio.current_task():
+                # Set before the stop, so that nothing starts the manager again in this loop while it stops.
+                self._closed_loop = asyncio.get_running_loop()
+
+                try:
+                    # A stop in progress may not have emitted its final event yet, and the shutdown may cancel it.
+                    if self._active or self._stops_in_progress:
+                        timeout = self._SHUTDOWN_TIMEOUT if self._close_timeout is None else self._close_timeout
+                        await self._stop(timeout=timeout)
+                finally:
+                    self._forget_loop()
+
+            raise
+
+    def _forget_loop(self) -> None:
+        """Drop everything that belongs to the event loop the manager ran in, its listeners included."""
+        self._loop = None
+        self._shutdown_task = None
+        self._active = False
+        self._entered = False
+        self._listeners_to_wrappers.clear()
+        self._listener_tasks.clear()
+        self._waiting_listener_tasks.clear()
+
+    @classmethod
+    def _forget_loops_after_fork(cls) -> None:
+        """Reset the managers in a forked child, which inherits the event loop state and listeners of its parent."""
+        for event_manager in list(cls._instances):
+            # Listeners registered outside an event loop belong to none yet, so the child keeps them.
+            if event_manager._loop is not None:  # noqa: SLF001
+                event_manager._forget_loop()  # noqa: SLF001
+
+    @staticmethod
+    def _get_running_loop() -> asyncio.AbstractEventLoop | None:
+        """Get the running event loop, or `None` outside of one."""
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            return None
 
     @staticmethod
     def _wrap_listener(event: Event, listener: EventListener[Any]) -> WrappedListener:
@@ -310,3 +546,10 @@ class EventManager:
     def _get_listener_name(listener: EventListener[Any]) -> str:
         """Get a name of the listener for logging and for naming the tasks it runs in."""
         return getattr(listener, '__name__', None) or type(listener).__name__
+
+
+# A child forked while a manager runs inherits a copy of its event loop, which still reports that it's running, and
+# the listeners of that loop. Without the reset, the first `on()` or `emit()` in the child raises that the manager
+# belongs to another event loop. Platforms that can't fork, such as Windows, have no `register_at_fork`.
+if hasattr(os, 'register_at_fork'):
+    os.register_at_fork(after_in_child=EventManager._forget_loops_after_fork)  # noqa: SLF001

@@ -347,7 +347,7 @@ The <ApiLink to="class/EventManager">`EventManager`</ApiLink> is responsible for
 Crawlee provides several implementations of the event manager:
 
 - <ApiLink to="class/EventManager">`EventManager`</ApiLink> is the base class for event management in Crawlee.
-- <ApiLink to="class/LocalEventManager">`LocalEventManager`</ApiLink> extends the base event manager for local environments by automatically emitting `SYSTEM_INFO` events at regular intervals. This provides real-time system metrics including CPU usage and memory consumption, which are essential for the load signals of the <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink>, such as <ApiLink to="class/CpuLoadSignal">`CpuLoadSignal`</ApiLink> and <ApiLink to="class/MemoryLoadSignal">`MemoryLoadSignal`</ApiLink>.
+- <ApiLink to="class/LocalEventManager">`LocalEventManager`</ApiLink> extends the base event manager for local environments by automatically emitting `SYSTEM_INFO` events at regular intervals while anything listens to them. This provides real-time system metrics including CPU usage and memory consumption, which are essential for the load signals of the <ApiLink to="class/ConcurrencySystem">`ConcurrencySystem`</ApiLink>, such as <ApiLink to="class/CpuLoadSignal">`CpuLoadSignal`</ApiLink> and <ApiLink to="class/MemoryLoadSignal">`MemoryLoadSignal`</ApiLink>.
 - [`ApifyEventManager`](https://docs.apify.com/sdk/python/reference/class/ApifyEventManager) - Manages events on the [Apify platform](https://apify.com/) (cloud-based). It is implemented in the [Apify SDK](https://docs.apify.com/sdk/python/).
 
 :::info
@@ -367,7 +367,7 @@ Crawlee defines several built-in event types:
 
 Additional specialized events for browser and session management are also available.
 
-The event manager operates as an async context manager, automatically starting periodic tasks when entered and ensuring all listeners complete before exiting. Event listeners can be either synchronous or asynchronous functions and are executed safely without blocking the main event loop.
+The whole process shares one event manager. It starts by itself on the first `on()` call in a running event loop and runs until the event loop shuts down. Event listeners can be either synchronous or asynchronous functions and are executed safely without blocking the main event loop.
 
 ```mermaid
 ---

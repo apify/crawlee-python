@@ -79,3 +79,31 @@ async def test_execution_continues_after_exception(delay: timedelta, caplog: pyt
         record.name == 'crawlee._utils.recurring_task' and record.levelno == logging.ERROR and record.exc_info
         for record in caplog.records
     )
+
+
+async def test_run_immediately_false_waits(function: AsyncMock) -> None:
+    """With `run_immediately` off, the first call comes only after the delay."""
+    rt = RecurringTask(function, timedelta(hours=1), run_immediately=False)
+
+    rt.start()
+    for _ in range(10):
+        await asyncio.sleep(0)
+
+    assert function.call_count == 0
+
+    await rt.stop()
+
+
+async def test_start_again_cancels_running_task(function: AsyncMock) -> None:
+    """Starting the recurring task again cancels the execution that still runs, so only one keeps running."""
+    rt = RecurringTask(function, timedelta(hours=1))
+
+    rt.start()
+    first_task = rt.task
+    rt.start()
+
+    assert first_task is not None
+    assert first_task.cancelling() == 1
+
+    await asyncio.gather(first_task, return_exceptions=True)
+    await rt.stop()

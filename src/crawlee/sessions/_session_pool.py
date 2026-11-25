@@ -7,7 +7,6 @@ from collections.abc import Callable
 from logging import getLogger
 from typing import TYPE_CHECKING, Literal, overload
 
-from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
@@ -16,8 +15,6 @@ from crawlee.sessions._models import SessionPoolModel
 
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from crawlee.events import EventManager
 
 logger = getLogger(__name__)
 
@@ -39,7 +36,6 @@ class SessionPool:
         max_pool_size: int = 1000,
         create_session_settings: dict | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
-        event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
@@ -53,14 +49,10 @@ class SessionPool:
                 be used. Do not set it if you are providing a `create_session_function`.
             create_session_function: A callable to create new session instances. If None, a default session settings
                 will be used. Do not set it if you are providing `create_session_settings`.
-            event_manager: The event manager to handle events like persist state.
             persistence_enabled: Flag to enable or disable state persistence of the pool.
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
         """
-        if event_manager:
-            service_locator.set_event_manager(event_manager)
-
         self._state = RecoverableState(
             default_state=SessionPoolModel(
                 max_pool_size=max_pool_size,

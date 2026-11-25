@@ -37,7 +37,9 @@ async def main() -> None:
 
     await crawler.run(['https://crawlee.dev'])
 
-    # Stop listening to the system info events.
+    # Stop listening, as the listeners would otherwise stay until the event loop
+    # shuts down.
+    event_manager.off(event=Event.PERSIST_STATE, listener=on_persist_state)
     event_manager.off(event=Event.SYSTEM_INFO, listener=on_system_info)
 
 

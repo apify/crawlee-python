@@ -20,19 +20,21 @@ logger = getLogger(__name__)
 class ServiceLocator:
     """Service locator for managing the services used by Crawlee.
 
-    All services are initialized to its default value lazily.
+    All services are initialized to their default values lazily. The event manager is one per process, shared by
+    every instance.
     """
 
     global_storage_instance_manager: StorageInstanceManager | None = None
 
+    global_event_manager: EventManager | None = None
+
     def __init__(
         self,
+        *,
         configuration: Configuration | None = None,
-        event_manager: EventManager | None = None,
         storage_backend: StorageBackend | None = None,
     ) -> None:
         self._configuration = configuration
-        self._event_manager = event_manager
         self._storage_backend = storage_backend
 
     def get_configuration(self) -> Configuration:
@@ -61,20 +63,25 @@ class ServiceLocator:
         self._configuration = configuration
 
     def get_event_manager(self) -> EventManager:
-        """Get the event manager."""
-        if self._event_manager is None:
-            logger.debug('No event manager set, implicitly creating and using default LocalEventManager.')
-            if self._configuration is None:
-                logger.warning(
-                    'Implicit creation of event manager will implicitly set configuration as side effect. '
-                    'It is advised to explicitly first set the configuration instead.'
-                )
-            self._event_manager = LocalEventManager().from_config(config=self._configuration)
+        """Get the event manager shared by the whole process.
 
-        return self._event_manager
+        The default one is created from the global configuration.
+        """
+        if ServiceLocator.global_event_manager is None:
+            logger.debug('No event manager set, implicitly creating and using default LocalEventManager.')
+            if service_locator._configuration is None:
+                logger.warning(
+                    'Implicit creation of the event manager will implicitly set the global configuration as side '
+                    'effect. The event manager is shared by the whole process, so it does not use a configuration '
+                    'passed to a crawler. It is advised to explicitly first set the global configuration or the event '
+                    'manager instead.'
+                )
+            ServiceLocator.global_event_manager = LocalEventManager.from_config(service_locator.get_configuration())
+
+        return ServiceLocator.global_event_manager
 
     def set_event_manager(self, event_manager: EventManager) -> None:
-        """Set the event manager.
+        """Set the event manager shared by the whole process.
 
         Args:
             event_manager: The event manager to set.
@@ -82,13 +89,13 @@ class ServiceLocator:
         Raises:
             ServiceConflictError: If the event manager has already been retrieved before.
         """
-        if self._event_manager is event_manager:
+        if ServiceLocator.global_event_manager is event_manager:
             # Same instance, no need to anything
             return
-        if self._event_manager:
-            raise ServiceConflictError(EventManager, event_manager, self._event_manager)
+        if ServiceLocator.global_event_manager:
+            raise ServiceConflictError(EventManager, event_manager, ServiceLocator.global_event_manager)
 
-        self._event_manager = event_manager
+        ServiceLocator.global_event_manager = event_manager
 
     def get_storage_backend(self) -> StorageBackend:
         """Get the storage backend."""
