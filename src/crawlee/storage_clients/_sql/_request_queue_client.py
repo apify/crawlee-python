@@ -252,10 +252,9 @@ class SqlRequestQueueClient(
             result = await session.execute(stmt)
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
             existing_requests = {req.request_id: req for req in result.scalars()}
-            state = await self._get_state(session)
             insert_values: list[dict] = []
 
-            for request_id, request in sorted(unique_requests.items()):
+            for request_id, request in unique_requests.items():
                 existing_req_db = existing_requests.get(request_id)
                 # New Request, add it
                 if existing_req_db is None:
@@ -265,12 +264,6 @@ class SqlRequestQueueClient(
                         'data': request.model_dump_json(),
                         'is_handled': False,
                     }
-                    if forefront:
-                        value['sequence_number'] = state.forefront_sequence_counter
-                        state.forefront_sequence_counter -= 1
-                    else:
-                        value['sequence_number'] = state.sequence_counter
-                        state.sequence_counter += 1
 
                     insert_values.append(value)
                     transaction_processed_requests.append(
@@ -307,12 +300,10 @@ class SqlRequestQueueClient(
                             {
                                 'request_queue_id': self._id,
                                 'request_id': request_id,
-                                'sequence_number': state.forefront_sequence_counter,
                                 'data': request.model_dump_json(),
                                 'is_handled': False,
                             }
                         )
-                        state.forefront_sequence_counter -= 1
                         transaction_processed_requests.append(
                             ProcessedRequest(
                                 unique_key=request.unique_key,
@@ -342,6 +333,18 @@ class SqlRequestQueueClient(
 
             try:
                 if insert_values:
+                    sequence_numbers = await self._reserve_sequence_numbers(
+                        session, count=len(insert_values), forefront=forefront
+                    )
+                    for value, sequence_number in zip(insert_values, sequence_numbers, strict=True):
+                        value['sequence_number'] = sequence_number
+                    # Release the state row lock before inserting, so concurrent adds wait only for the reservation. A
+                    # batch that reserved later numbers can then be inserted and fetched before an earlier one.
+                    await session.commit()
+
+                    # Insert in `request_id` order, so concurrent batches lock their rows in the same order.
+                    insert_values.sort(key=lambda value: value['request_id'])
+
                     if forefront:
                         # If the request already exists in the database, we update the sequence_number
                         # by shifting request to the left.
@@ -551,12 +554,13 @@ class SqlRequestQueueClient(
         )
 
         async with self.get_session(with_simple_commit=True) as session:
-            state = await self._get_state(session)
+            sequence_numbers = await self._reserve_sequence_numbers(session, count=1, forefront=forefront)
+            new_sequence = sequence_numbers[0]
+            # Release the state row lock before updating the request, as in `add_batch_of_requests`.
+            await session.commit()
 
             # Update sequence number if changing priority
             if forefront:
-                new_sequence = state.forefront_sequence_counter
-                state.forefront_sequence_counter -= 1
                 now = datetime.now(timezone.utc)
                 block_until = now + timedelta(seconds=self._BLOCK_REQUEST_TIME)
                 # Extend blocking for forefront request, it is considered blocked by the current client.
@@ -567,8 +571,6 @@ class SqlRequestQueueClient(
                     data=request.model_dump_json(),
                 )
             else:
-                new_sequence = state.sequence_counter
-                state.sequence_counter += 1
                 stmt = stmt.values(
                     sequence_number=new_sequence,
                     time_blocked_until=None,
@@ -664,21 +666,39 @@ class SqlRequestQueueClient(
 
         return False
 
-    async def _get_state(self, session: AsyncSession) -> RequestQueueStateDb:
-        """Get the current state of the request queue."""
-        orm_state: RequestQueueStateDb | None = await session.get(RequestQueueStateDb, self._id)
-        if not orm_state:
-            insert_values = {'request_queue_id': self._id}
-            # Create a new state if it doesn't exist
-            # This is a safeguard against race conditions where multiple clients might try to create the state
-            # simultaneously.
-            insert_stmt = self._build_insert_stmt_with_ignore(RequestQueueStateDb, insert_values)
-            await session.execute(insert_stmt)
-            await session.flush()
-            orm_state = await session.get(RequestQueueStateDb, self._id)
-            if not orm_state:
-                raise RuntimeError(f'Failed to create or retrieve state for queue {self._id}')
-        return orm_state
+    async def _reserve_sequence_numbers(self, session: AsyncSession, *, count: int, forefront: bool) -> range:
+        """Take the next `count` sequence numbers, locking the state row until the transaction ends."""
+        if forefront:
+            counter = RequestQueueStateDb.forefront_sequence_counter
+            step = -1
+        else:
+            counter = RequestQueueStateDb.sequence_counter
+            step = 1
+
+        update_stmt = (
+            update(RequestQueueStateDb)
+            .where(RequestQueueStateDb.request_queue_id == self._id)
+            .values({counter: counter + step * count})
+        )
+        result = await session.execute(update_stmt)
+        result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
+
+        if result.rowcount == 0:
+            # The state row is created on first use, possibly by several clients at once. An upsert locks an existing
+            # row exclusively, while an insert that ignores it takes a shared lock that deadlocks on MySQL.
+            upsert_stmt = self._build_upsert_stmt(
+                RequestQueueStateDb,
+                {'request_queue_id': self._id},
+                update_columns=['request_queue_id'],
+                conflict_cols=['request_queue_id'],
+            )
+            await session.execute(upsert_stmt)
+            await session.execute(update_stmt)
+
+        result = await session.execute(select(counter).where(RequestQueueStateDb.request_queue_id == self._id))
+        new_counter = result.scalar_one()
+
+        return range(new_counter - step * count, new_counter, step)
 
     @override
     def _specific_update_metadata(
