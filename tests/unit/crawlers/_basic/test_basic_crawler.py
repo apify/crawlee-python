@@ -2618,8 +2618,8 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
         configure_logging=False,
         concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
-    # Read from the clock the throttler measures the cooldown with. A different clock, or float seconds, can put
-    # the two readings a little under the cooldown apart on the coarse Windows clock.
+    # Read the clock the throttler checks the cooldown against and compare exact `timedelta` values, so the measured gap
+    # is never shorter than the cooldown.
     dispatched_at = list[datetime]()
     empty_during_cooldown = list[bool]()
 
