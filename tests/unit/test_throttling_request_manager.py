@@ -664,7 +664,7 @@ async def test_concurrent_fetches_pace_a_later_domain(
 
 
 async def test_empty_fetch_keeps_domain_turn(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """A fetch that finds the domain's queue empty doesn't arm its crawl-delay."""
+    """A fetch that finds the domain's RQ empty doesn't arm its crawl-delay."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.set_crawl_delay(url, 30)
 
@@ -677,7 +677,7 @@ async def test_empty_fetch_keeps_domain_turn(manager: ThrottlingRequestManager[R
 
 
 async def test_failed_fetch_keeps_domain_turn(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """A fetch that raises in the domain's queue doesn't arm its crawl-delay."""
+    """A fetch that raises in the domain's RQ doesn't arm its crawl-delay."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.set_crawl_delay(url, 30)
     await manager.add_request(url)
