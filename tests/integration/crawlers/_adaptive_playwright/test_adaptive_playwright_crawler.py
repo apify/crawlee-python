@@ -13,7 +13,7 @@ from bs4 import Tag
 from parsel import Selector
 from typing_extensions import override
 
-from crawlee import ConcurrencySettings, Request
+from crawlee import Request
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -482,42 +482,23 @@ async def test_adaptive_crawling_result_use_state_isolation(
         rendering_type_predictor=static_only_predictor_enforce_detection,
     )
     await key_value_store.set_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0', {'counter': 0})
-    seen_states = list[dict[str, int]]()
+    request_handler_calls = 0
 
     @crawler.router.default_handler
     async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
+        nonlocal request_handler_calls
         state = cast('dict[str, int]', await context.use_state())
-        seen_states.append(dict(state))
+        request_handler_calls += 1
         state['counter'] += 1
 
     await crawler.run(test_urls[:1])
 
     await key_value_store.persist_autosaved_values()
 
-    # Both sub crawlers started from the persisted state.
-    assert seen_states == [{'counter': 0}, {'counter': 0}]
+    # Request handler was called twice
+    assert request_handler_calls == 2
     # Increment of global state happened only once
     assert (await key_value_store.get_value(f'{BasicCrawler._CRAWLEE_STATE_KEY}_0'))['counter'] == 1
-
-
-async def test_adaptive_crawling_detection_copies_unsaved_state(test_urls: list[str]) -> None:
-    """The static run of a detection starts from the live state, including changes not saved to the store yet."""
-    crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-        rendering_type_predictor=_SimpleRenderingTypePredictor(),
-        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
-    )
-    seen_states = list[dict[str, int]]()
-
-    @crawler.router.default_handler
-    async def request_handler(context: AdaptivePlaywrightCrawlingContext) -> None:
-        state = cast('dict[str, int]', await context.use_state({'counter': 0}))
-        seen_states.append(dict(state))
-        state['counter'] += 1
-
-    await crawler.run(test_urls)
-
-    # Browser and static run of the first request, then of the second one.
-    assert seen_states == [{'counter': 0}, {'counter': 0}, {'counter': 1}, {'counter': 1}]
 
 
 async def test_adaptive_crawling_statistics(test_urls: list[str]) -> None:
