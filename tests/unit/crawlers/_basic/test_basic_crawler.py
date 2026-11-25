@@ -2618,12 +2618,14 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
         configure_logging=False,
         concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
-    dispatched_at = list[float]()
+    # Read from the clock the throttler measures the cooldown with. A different clock, or float seconds, can put
+    # the two readings a little under the cooldown apart on the coarse Windows clock.
+    dispatched_at = list[datetime]()
     empty_during_cooldown = list[bool]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        dispatched_at.append(time.monotonic())
+        dispatched_at.append(datetime.now(timezone.utc))
         if len(dispatched_at) == 1:
             throttler.record_domain_delay(context.request.url, retry_after=timedelta(milliseconds=500))
             empty_during_cooldown.append(await throttler.is_empty())
@@ -2632,7 +2634,7 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
 
     assert empty_during_cooldown == [True]
     assert len(dispatched_at) == 2
-    assert dispatched_at[1] - dispatched_at[0] >= 0.5
+    assert dispatched_at[1] - dispatched_at[0] >= timedelta(milliseconds=500)
 
 
 THROTTLED_URL = 'https://throttled.placeholder.com/page'
