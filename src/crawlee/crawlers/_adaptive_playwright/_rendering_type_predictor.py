@@ -125,23 +125,32 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
     https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
     """
 
+    __next_id = 0
+
     def __init__(
         self,
         detection_ratio: float = 0.1,
         *,
+        id: str | None = None,
         persistence_enabled: bool = False,
-        persist_state_key: str = 'CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE',
+        persist_state_key: str | None = None,
     ) -> None:
         """Initialize a new instance.
 
         Args:
             detection_ratio: A number between 0 and 1 that determines the desired ratio of rendering type detections.
+            id: An identifier of the predictor, used in the default `persist_state_key`. Defaults to a per-process
+                counter of `DefaultRenderingTypePredictor` instances. Explicit IDs share one namespace with the
+                generated ones, so avoid explicit IDs like `'0'` or `'1'`.
             persist_state_key: Key in the key-value storage where the trained model parameters will be saved.
-                Defaults to `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE`.
+                Defaults to `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE_{id}`.
             persistence_enabled: Whether to enable persistence of the trained model parameters for reuse.
 
         """
         super().__init__()
+
+        self._id = str(DefaultRenderingTypePredictor.__next_id) if id is None else id
+        DefaultRenderingTypePredictor.__next_id += 1
 
         self._rendering_type_detection_results: dict[RenderingType, dict[str, list[UrlComponents]]] = {
             'static': defaultdict(list),
@@ -158,7 +167,7 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
             default_state=RenderingTypePredictorState(
                 model=LogisticRegression(max_iter=1000), labels_coefficients=defaultdict(lambda: n + 2)
             ),
-            persist_state_key=persist_state_key,
+            persist_state_key=persist_state_key or f'CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE_{self._id}',
             persistence_enabled=persistence_enabled,
             logger=logger,
         )

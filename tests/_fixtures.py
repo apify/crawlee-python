@@ -14,6 +14,7 @@ from curl_cffi import CurlHttpVersion
 from crawlee import service_locator
 from crawlee._utils.public_suffix import PUBLIC_SUFFIX_LIST_SNAPSHOT
 from crawlee.crawlers import BasicCrawler
+from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
 from crawlee.fingerprint_suite._browserforge_adapter import get_available_header_network
 from crawlee.http_clients import CurlImpersonateHttpClient, HttpxHttpClient, ImpitHttpClient
 from crawlee.request_loaders import ThrottlingRequestManager
@@ -77,6 +78,7 @@ def prepare_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Callabl
         BasicCrawler._BasicCrawler__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
         SessionPool._SessionPool__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
         ThrottlingRequestManager._ThrottlingRequestManager__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
+        DefaultRenderingTypePredictor._DefaultRenderingTypePredictor__next_id = 0  # ty:ignore[unresolved-attribute] # Mangled attribute
 
     return _prepare_test_env
 

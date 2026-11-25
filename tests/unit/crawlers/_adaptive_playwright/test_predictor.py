@@ -140,14 +140,21 @@ async def test_persistent_no_learning_data_prediction() -> None:
     assert persisted_data['model']['is_fitted'] is False
 
 
-async def test_default_persist_state_key() -> None:
-    """Without a `persist_state_key`, the model is saved under the default key."""
-    async with DefaultRenderingTypePredictor(persistence_enabled=True):
+async def test_default_persist_state_key_uses_id() -> None:
+    """Without a `persist_state_key`, each predictor saves its model under a key derived from its `id`."""
+    async with DefaultRenderingTypePredictor(id='my-predictor', persistence_enabled=True) as named_predictor:
+        named_predictor.store_result(Request.from_url('http://www.aaa.com/some/stuff', label='a'), 'static')
+    generated_id_predictor = DefaultRenderingTypePredictor(persistence_enabled=True)
+    async with generated_id_predictor:
         pass
 
     kvs = await KeyValueStore.open()
 
-    assert await kvs.get_value('CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE') is not None
+    named_state = await kvs.get_value('CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE_my-predictor')
+    generated_state = await kvs.get_value(f'CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE_{generated_id_predictor._id}')
+    assert named_state is not None
+    assert generated_state is not None
+    assert named_state != generated_state
 
 
 async def test_persistent_prediction() -> None:

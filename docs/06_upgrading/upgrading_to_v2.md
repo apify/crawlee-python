@@ -183,10 +183,10 @@ Crawlee keeps its internal state in the default key-value store. These records n
 | Crawler statistics | `__CRAWLER_STATISTICS_{id}` | `CRAWLEE_CRAWLER_STATISTICS_{id}` |
 | Session pool | `CRAWLEE_SESSION_POOL_STATE` | `CRAWLEE_SESSION_POOL_STATE_{id}` |
 | Request list progress | `SDK_REQUEST_LIST_STATE-{name}` | `CRAWLEE_REQUEST_LIST_STATE_{name}` |
-| Rendering type predictor | `rendering-type-predictor-state` | `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE` |
+| Rendering type predictor | `rendering-type-predictor-state` | `CRAWLEE_RENDERING_TYPE_PREDICTOR_STATE_{id}` |
 | File system request queue state | `__RQ_STATE_{id}` | `CRAWLEE_REQUEST_QUEUE_STATE_{id}` |
 
-`SessionPool` has a new `id` argument for its key. Without it, the pool gets a per-process counter of `SessionPool` instances, such as `'0'`. The counter includes the pools that crawlers create, so pass an `id` to a pool you persist. A `persist_state_key` you pass explicitly is used as it is.
+`SessionPool` has a new `id` argument for its key. Without it, the pool gets a per-process counter of `SessionPool` instances, such as `'0'`. The counter includes the pools that crawlers create, so pass an `id` to a pool you persist. `DefaultRenderingTypePredictor` has a new `id` argument too, and the predictor that `AdaptivePlaywrightCrawler` builds gets the crawler's `id`. A `persist_state_key` you pass explicitly is used as it is.
 
 v2 doesn't read the v1 keys. If you resume a v1 run with `purge_on_start=False`, these components start from an empty state. To keep a record, copy it to the new key before the first v2 run.
 

@@ -174,7 +174,9 @@ class AdaptivePlaywrightCrawler(
 
         super().__init__(statistics=adaptive_statistics, **kwargs)
 
-        self._rendering_type_predictor = self._own_or_borrow(rendering_type_predictor, DefaultRenderingTypePredictor)
+        self._rendering_type_predictor = self._own_or_borrow(
+            rendering_type_predictor, lambda: DefaultRenderingTypePredictor(id=self._id)
+        )
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()
