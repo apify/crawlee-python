@@ -181,14 +181,14 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True))
             results = await pipe.execute()
 
-        serialized_metadata_item = results[0]
+        serialized_metadata_item, value = results[0], results[1]
 
         if not isinstance(serialized_metadata_item, (str, bytes, bytearray)):
             logger.warning(f'Metadata for key "{key}" is missing or invalid.')
             return None
 
         metadata_item = KeyValueStoreRecordMetadata.model_validate_json(serialized_metadata_item)
-        value_bytes = expect_bytes(results[1])
+        value_bytes = expect_bytes(value)
 
         return self._build_record(metadata_item, value_bytes)
 
