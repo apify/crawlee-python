@@ -944,10 +944,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             # SIGINT cancels only `run_task`, and the crawl then ends gracefully. A cancellation of the task that awaits
             # `run()`, such as a timeout around it, propagates, also when the crawl swallowed it. An earlier one that
             # the caller caught doesn't count. The caught exception is raised again, since anyio cancel scopes
-            # recognize their cancellation by its message. A cancelled run counts as finished, so the next one starts
-            # afresh.
+            # recognize their cancellation by its message.
             if current_task is not None and current_task.cancelling() > cancelling_before:
-                self._has_finished_before = True
                 raise cancellation or CancelledError()
 
             if self._statistics.error_tracker.total > 0:

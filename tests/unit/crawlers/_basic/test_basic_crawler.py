@@ -4554,30 +4554,6 @@ async def test_run_raises_when_crawl_swallows_cancellation() -> None:
             await run_task
 
 
-async def test_run_after_cancelled_run_resets_statistics() -> None:
-    """A `run()` after a cancelled one starts with fresh statistics."""
-    crawler = BasicCrawler(configure_logging=False)
-    handler_started = asyncio.Event()
-    release_handler = asyncio.Event()
-
-    @crawler.router.default_handler
-    async def handler(_context: BasicCrawlingContext) -> None:
-        handler_started.set()
-        await release_handler.wait()
-
-    run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
-    await handler_started.wait()
-    run_task.cancel()
-    release_handler.set()
-
-    with pytest.raises(asyncio.CancelledError):
-        await run_task
-
-    stats = await crawler.run(['https://b.placeholder.com'])
-
-    assert stats.requests_finished == 1
-
-
 async def test_sigint_after_caught_cancellation() -> None:
     """SIGINT ends the crawl gracefully even when the task that awaits `run()` caught an earlier cancellation."""
     crawler = BasicCrawler(
