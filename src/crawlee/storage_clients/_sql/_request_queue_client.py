@@ -256,10 +256,12 @@ class SqlRequestQueueClient(
                 logger.debug('Failed add requests to DB with error: %s', e)
                 # asyncpg raises connection errors as a plain `OSError`. Nothing has been written yet, so the caller can
                 # retry the whole batch.
-                unprocessed_requests = [
-                    UnprocessedRequest(unique_key=request.unique_key, url=request.url, method=request.method)
-                    for request in unique_requests.values()
-                ]
+                unprocessed_requests.extend(
+                    [
+                        UnprocessedRequest(unique_key=request.unique_key, url=request.url, method=request.method)
+                        for request in unique_requests.values()
+                    ]
+                )
                 return AddRequestsResponse(processed_requests=[], unprocessed_requests=unprocessed_requests)
 
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
