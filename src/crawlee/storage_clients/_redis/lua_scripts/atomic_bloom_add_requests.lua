@@ -1,6 +1,7 @@
-local added_filter_key = KEYS[1]
-local queue_key = KEYS[2]
-local data_key = KEYS[3]
+local queue_key = KEYS[1]
+local data_key = KEYS[2]
+local metadata_key = KEYS[3]
+local added_filter_key = KEYS[4]
 
 local forefront = ARGV[1] == '1'
 local unique_keys = cjson.decode(ARGV[2])
@@ -31,6 +32,10 @@ if #actually_added > 0 then
     else
         redis.call('rpush', queue_key, unpack(actually_added))
     end
+
+    -- Counted in the same script, so a lost reply doesn't leave the queued requests uncounted
+    redis.call('json.numincrby', metadata_key, '$.pending_request_count', #actually_added)
+    redis.call('json.numincrby', metadata_key, '$.total_request_count', #actually_added)
 end
 
 return cjson.encode(actually_added)
