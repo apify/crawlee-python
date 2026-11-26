@@ -263,6 +263,10 @@ class ImpitHttpClient(HttpClient):
             )
         except TimeoutException as exc:
             raise asyncio.TimeoutError from exc
+        except (TransportError, HTTPError) as exc:
+            if self._is_proxy_error(exc):
+                raise ProxyError from exc
+            raise
 
         try:
             yield _ImpitResponse(response)
