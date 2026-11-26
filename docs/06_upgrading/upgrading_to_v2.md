@@ -212,6 +212,10 @@ A `str` value is encoded with the charset of its content type. A charset that Py
 
 Any other value can only be stored as JSON. Passing it with a content type that isn't JSON raises `TypeError`. In v1, such a value was stored as the bytes of its `str()` form.
 
+### Objects that JSON doesn't support
+
+An object that JSON doesn't support is converted with `pydantic_core.to_jsonable_python` before the value is stored as JSON. A `datetime` becomes an ISO 8601 string, a Pydantic model a `dict` keyed by its field aliases, a `set` a list, and `bytes` inside the value a UTF-8 string. An object of a type that Pydantic can't serialize, or such `bytes` that aren't valid UTF-8, raises `TypeError`. In v1, such objects were stored as their `str()` form, so a `datetime` was stored as `'2026-01-01 00:00:00+00:00'` instead of `'2026-01-01T00:00:00Z'`.
+
 ### Reading values
 
 `get_value` parses a record by its content type. `application/json` is parsed, `text/*` and `application/*xml` are decoded to `str` with the charset of the content type, or with UTF-8 when it has none, and any other content type is returned as `bytes`. A JSON or text record with a charset that Python doesn't know is returned as `bytes` too. In v1, `application/*xml` content types were returned as `bytes`, and the charset was ignored.

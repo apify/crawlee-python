@@ -215,13 +215,14 @@ class KeyValueStore(Storage):
         Args:
             key: Key of the record to set.
             value: Value to set. `bytes`, `bytearray`, `memoryview` and `str` values are stored as they are, and any
-                other value is stored as JSON. `None` deletes the record.
+                other value is stored as JSON. Objects JSON doesn't support, such as a `datetime` or a Pydantic
+                model, are converted with `pydantic_core.to_jsonable_python`. `None` deletes the record.
             content_type: The MIME content type string. If not provided, it's `application/octet-stream` for bytes,
                 `text/plain` for `str` and `application/json` for other values.
 
         Raises:
             TypeError: If `value` is neither `str` nor bytes, and `content_type` isn't JSON, or if JSON can't represent
-                it, for example a `dict` with `tuple` keys.
+                it, for example a `dict` with `tuple` keys or an object of a type Pydantic can't serialize.
             ValueError: If `value` is stored as JSON and JSON can't serialize it, for example because of a circular
                 reference.
             LookupError: If `value` isn't bytes, and the charset of `content_type` is unknown.

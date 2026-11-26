@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import codecs
 import json
 import re
 from typing import Any
 
-from crawlee._utils.file import infer_mime_type, json_dumps, parse_content_type_charset
+from pydantic_core import PydanticSerializationError, to_jsonable_python
+
+from crawlee._utils.file import infer_mime_type, parse_content_type_charset
 
 NAME_REGEX = re.compile(r'^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$')
 
@@ -50,8 +53,12 @@ async def serialize_value(value: Any, content_type: str | None) -> tuple[bytes, 
     JSON. Without a content type, bytes-like values get `application/octet-stream`, strings `text/plain` and other
     values `application/json`.
 
+    Objects JSON doesn't support, such as a `datetime` or a Pydantic model, are converted with
+    `pydantic_core.to_jsonable_python`.
+
     Raises:
-        TypeError: If the value is neither a string nor bytes-like, and the content type isn't JSON.
+        TypeError: If the value is neither a string nor bytes-like, and the content type isn't JSON, or if it holds an
+            object that can't be converted to JSON.
     """
     content_type = content_type or infer_mime_type(value)
 
@@ -69,8 +76,17 @@ async def serialize_value(value: Any, content_type: str | None) -> tuple[bytes, 
             f'"{content_type}". Pass the value as `str` or `bytes`, or use a JSON content type.'
         )
 
-    serialized_value = await json_dumps(value)
+    serialized_value = await asyncio.to_thread(
+        json.dumps, value, ensure_ascii=False, indent=2, default=_to_json_compatible
+    )
     return serialized_value.encode(charset), content_type
+
+
+def _to_json_compatible(value: Any) -> Any:
+    try:
+        return to_jsonable_python(value)
+    except (PydanticSerializationError, UnicodeDecodeError) as exc:
+        raise TypeError(f'Object of type {type(value).__name__} is not JSON serializable: {exc}') from exc
 
 
 def parse_value(value: bytes, content_type: str) -> Any:

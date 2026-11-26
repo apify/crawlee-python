@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
@@ -20,6 +20,15 @@ from crawlee.storages._storage_instance_manager import StorageInstanceManager
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
+
+
+class _Product(BaseModel):
+    name: str
+    price: float
+
+
+class _AliasedProduct(BaseModel):
+    product_name: str = Field(alias='productName')
 
 
 @pytest.fixture
@@ -263,11 +272,45 @@ async def test_set_value_rejects_unserializable_value(kvs: KeyValueStore) -> Non
     assert await kvs.record_exists('key') is False
 
 
-async def test_set_value_stringifies_unsupported_types(kvs: KeyValueStore) -> None:
-    """Objects JSON doesn't support are stored as their string form, and dict keys become strings."""
-    await kvs.set_value('key', {'created_at': datetime(2026, 1, 1, tzinfo=UTC), 1: 'int key'})
+@pytest.mark.parametrize(
+    ('value', 'expected_value'),
+    [
+        pytest.param(
+            {'created_at': datetime(2026, 1, 1, tzinfo=UTC)}, {'created_at': '2026-01-01T00:00:00Z'}, id='datetime'
+        ),
+        pytest.param(_Product(name='Phone', price=799.99), {'name': 'Phone', 'price': 799.99}, id='pydantic model'),
+        pytest.param(
+            _AliasedProduct.model_validate({'productName': 'Phone'}),
+            {'productName': 'Phone'},
+            id='pydantic model with an alias',
+        ),
+        pytest.param({'tags': {'a'}}, {'tags': ['a']}, id='set'),
+        pytest.param({'body': b'text'}, {'body': 'text'}, id='bytes inside the value'),
+        pytest.param({1: 'int key'}, {'1': 'int key'}, id='dict key that is not a string'),
+    ],
+)
+async def test_set_value_converts_types_json_does_not_support(
+    kvs: KeyValueStore, value: Any, expected_value: Any
+) -> None:
+    """Objects JSON doesn't support are stored the way Pydantic serializes them, and dict keys become strings."""
+    await kvs.set_value('key', value)
 
-    assert await kvs.get_value('key') == {'created_at': '2026-01-01 00:00:00+00:00', '1': 'int key'}
+    assert await kvs.get_value('key') == expected_value
+
+
+@pytest.mark.parametrize(
+    ('value', 'reason'),
+    [
+        pytest.param({'value': object()}, 'Unable to serialize unknown type', id='object of an unknown type'),
+        pytest.param({'body': b'\xff'}, "can't decode byte", id='bytes that are not valid UTF-8'),
+    ],
+)
+async def test_set_value_rejects_object_that_cannot_be_converted(kvs: KeyValueStore, value: Any, reason: str) -> None:
+    """An object that Pydantic can't convert to JSON raises `TypeError` with the reason and stores nothing."""
+    with pytest.raises(TypeError, match=reason):
+        await kvs.set_value('key', value)
+
+    assert await kvs.record_exists('key') is False
 
 
 async def test_get_value_nonexistent(kvs: KeyValueStore) -> None:
