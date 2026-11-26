@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from crawlee._utils.robots import RobotsTxtFile
 
 
@@ -60,6 +62,30 @@ async def test_get_fractional_crawl_delay() -> None:
     content = 'User-agent: *\nCrawl-delay: 0.5\nDisallow: /private/'
     robots = await RobotsTxtFile.from_content('http://example.com/robots.txt', content)
     assert robots.get_crawl_delay() == 0.5
+
+
+@pytest.mark.parametrize(
+    ('robots_url', 'url'),
+    [
+        pytest.param(
+            'https://example.com/robots.txt', 'https://example.com:443/private/page.html', id='https_port_in_url'
+        ),
+        pytest.param(
+            'https://example.com:443/robots.txt', 'https://example.com/private/page.html', id='https_port_in_robots'
+        ),
+        pytest.param('http://example.com/robots.txt', 'http://example.com:80/private/page.html', id='http_port_in_url'),
+    ],
+)
+async def test_default_port_matches_robots_txt_origin(robots_url: str, url: str) -> None:
+    """A URL that spells out the default port follows the robots.txt rules of its origin."""
+    robots = await RobotsTxtFile.from_content(robots_url, 'User-agent: *\nDisallow: /private/')
+    assert not robots.is_allowed(url)
+
+
+async def test_non_default_port_is_another_origin() -> None:
+    """A URL on a non-default port is not covered by the robots.txt of the default port."""
+    robots = await RobotsTxtFile.from_content('https://example.com/robots.txt', 'User-agent: *\nDisallow: /private/')
+    assert robots.is_allowed('https://example.com:8443/private/page.html')
 
 
 async def test_bind_robots_txt_url() -> None:
