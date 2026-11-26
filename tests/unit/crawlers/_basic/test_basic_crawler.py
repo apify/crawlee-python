@@ -25,6 +25,7 @@ from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
+from crawlee._utils.console import BORDER
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -1443,20 +1444,23 @@ async def test_logs_final_statistics(
 
     assert final_statistics is not None
     if statistics_log_format == 'table':
-        assert final_statistics.msg.splitlines() == [
+        # Map the box-drawing border to ASCII, so the expected table stays readable in ASCII source.
+        border_to_ascii = str.maketrans(dict.fromkeys(BORDER.values(), '+') | {BORDER['H']: '-', BORDER['V']: '|'})
+        table_lines = [line.translate(border_to_ascii) for line in final_statistics.msg.splitlines()]
+        assert table_lines == [
             'Final request statistics:',
-            '┌───────────────────────────────┬────────────┐',
-            '│ requests_finished             │ 4          │',
-            '│ requests_failed               │ 33         │',
-            '│ retry_histogram               │ [1, 4, 8]  │',
-            '│ request_avg_failed_duration   │ 1min 39.0s │',
-            '│ request_avg_finished_duration │ 483.0ms    │',
-            '│ requests_finished_per_minute  │ 0.33       │',
-            '│ requests_failed_per_minute    │ 0.1        │',
-            '│ request_total_duration        │ 12min      │',
-            '│ requests_total                │ 37         │',
-            '│ crawler_runtime               │ 5min       │',
-            '└───────────────────────────────┴────────────┘',
+            '+-------------------------------+------------+',
+            '| requests_finished             | 4          |',
+            '| requests_failed               | 33         |',
+            '| retry_histogram               | [1, 4, 8]  |',
+            '| request_avg_failed_duration   | 1min 39.0s |',
+            '| request_avg_finished_duration | 483.0ms    |',
+            '| requests_finished_per_minute  | 0.33       |',
+            '| requests_failed_per_minute    | 0.1        |',
+            '| request_total_duration        | 12min      |',
+            '| requests_total                | 37         |',
+            '| crawler_runtime               | 5min       |',
+            '+-------------------------------+------------+',
         ]
     else:
         assert final_statistics.msg == 'Final request statistics:'
