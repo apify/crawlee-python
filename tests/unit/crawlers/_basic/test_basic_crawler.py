@@ -2042,7 +2042,7 @@ async def test_status_message_callback() -> None:
         state: StatisticsState, previous_state: StatisticsState | None, message: str
     ) -> str | None:
         await status_message_callback(message)
-        states.append({'state': state, 'previous_state': previous_state})
+        states.append({'state': state.model_copy(deep=True), 'previous_state': previous_state})
         return message
 
     crawler = BasicCrawler(
@@ -2110,6 +2110,28 @@ async def test_status_message_reports_failed_request_count() -> None:
 
     problem_messages = [m for m in captured_messages if m.startswith('Experiencing problems')]
     assert problem_messages == ['Experiencing problems, 3 failed requests since last status update.']
+
+
+async def test_status_message_new_failures() -> None:
+    """Test that the status message reports requests that failed after the previous status update."""
+    captured_messages: list[str] = []
+
+    async def status_callback(
+        state: StatisticsState, previous_state: StatisticsState | None, message: str
+    ) -> str | None:
+        captured_messages.append(message)
+        return None
+
+    state = StatisticsState()
+    crawler = BasicCrawler(status_message_callback=status_callback)
+    crawler._statistics = Mock(state=state)
+
+    async with service_locator.get_event_manager():
+        await crawler._crawler_state_task()
+        state.requests_failed += 2
+        await crawler._crawler_state_task()
+
+    assert captured_messages[-1] == 'Experiencing problems, 2 failed requests since last status update.'
 
 
 @pytest.mark.parametrize(
