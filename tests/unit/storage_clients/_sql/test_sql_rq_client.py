@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from crawlee import Request
 from crawlee.configuration import Configuration
@@ -337,3 +337,54 @@ async def test_get_metadata_does_not_retry_on_unexpected_exception(rq_client: Sq
 
     # Verify that retry logic was not attempted
     assert mock_sleep.call_count == 0
+
+
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(SQLAlchemyError('db error'), id='sqlalchemy-error'),
+        pytest.param(ConnectionRefusedError(), id='connection-error'),
+    ],
+)
+async def test_add_read_failure_unprocessed(
+    rq_client: SqlRequestQueueClient,
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+) -> None:
+    """Test that a failed read of existing requests returns the whole batch as unprocessed."""
+    requests = [Request.from_url('https://example.com/1'), Request.from_url('https://example.com/2')]
+
+    with monkeypatch.context() as mp:
+        mp.setattr(AsyncSession, 'execute', AsyncMock(side_effect=error))
+        response = await rq_client.add_batch_of_requests(requests)
+
+    assert response.processed_requests == []
+    assert [request.unique_key for request in response.unprocessed_requests] == [
+        request.unique_key for request in requests
+    ]
+
+
+@pytest.mark.parametrize(
+    'error',
+    [
+        pytest.param(SQLAlchemyError('db error'), id='sqlalchemy-error'),
+        pytest.param(ConnectionResetError(), id='connection-error'),
+    ],
+)
+async def test_add_write_failure_unprocessed(
+    rq_client: SqlRequestQueueClient,
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+) -> None:
+    """Test that new requests come back unprocessed when every commit and rollback fails."""
+    existing = Request.from_url('https://example.com/existing')
+    new = Request.from_url('https://example.com/new')
+    await rq_client.add_batch_of_requests([existing])
+
+    with monkeypatch.context() as mp:
+        mp.setattr(AsyncSession, 'commit', AsyncMock(side_effect=error))
+        mp.setattr(AsyncSession, 'rollback', AsyncMock(side_effect=error))
+        response = await rq_client.add_batch_of_requests([existing, new])
+
+    assert [request.unique_key for request in response.processed_requests] == [existing.unique_key]
+    assert [request.unique_key for request in response.unprocessed_requests] == [new.unique_key]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from hashlib import sha256
@@ -249,7 +250,18 @@ class SqlRequestQueueClient(
         )
 
         async with self.get_session() as session:
-            result = await session.execute(stmt)
+            try:
+                result = await session.execute(stmt)
+            except (SQLAlchemyError, OSError) as e:
+                logger.debug('Failed add requests to DB with error: %s', e)
+                # asyncpg raises connection errors as a plain `OSError`. Nothing has been written yet, so the caller can
+                # retry the whole batch.
+                unprocessed_requests = [
+                    UnprocessedRequest(unique_key=request.unique_key, url=request.url, method=request.method)
+                    for request in unique_requests.values()
+                ]
+                return AddRequestsResponse(processed_requests=[], unprocessed_requests=unprocessed_requests)
+
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
             existing_requests = {req.request_id: req for req in result.scalars()}
             insert_values: list[dict] = []
@@ -372,15 +384,18 @@ class SqlRequestQueueClient(
 
                 await session.commit()
                 processed_requests.extend(transaction_processed_requests)
-            except SQLAlchemyError as e:
-                await session.rollback()
+            except (SQLAlchemyError, OSError) as e:
                 logger.debug(f'Failed add requests to DB with error: {e}')
-                await self._add_buffer_record(
-                    session,
-                    update_modified_at=True,
-                    recalculate=True,
-                )
-                await session.commit()
+                # The rollback and recount are best effort, so the requests come back unprocessed even when the database
+                # is unreachable.
+                with suppress(SQLAlchemyError, OSError):
+                    await session.rollback()
+                    await self._add_buffer_record(
+                        session,
+                        update_modified_at=True,
+                        recalculate=True,
+                    )
+                    await session.commit()
                 transaction_processed_requests.clear()
                 unprocessed_requests.extend(
                     [
