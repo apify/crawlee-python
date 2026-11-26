@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, Mock
+
 from crawlee._utils.robots import RobotsTxtFile
 
 
@@ -67,3 +69,15 @@ async def test_bind_robots_txt_url() -> None:
     robots = await RobotsTxtFile.from_content('http://check.com/robots.txt', content)
     assert not robots.is_allowed('http://check.com/test.html')
     assert robots.is_allowed('http://othercheck.com/robots.txt')
+
+
+async def test_load_robots_txt_with_non_utf8_bytes() -> None:
+    """A byte that is not UTF-8, here a Latin-1 comment, does not discard the rules of the file."""
+    content = b'# Mis \xe0 jour en \xe9t\xe9\nUser-agent: *\nDisallow: /private/\n'
+    response = Mock(status_code=200, read=AsyncMock(return_value=content))
+    http_client = Mock(send_request=AsyncMock(return_value=response))
+
+    robots = await RobotsTxtFile.load('https://example.com/robots.txt', http_client)
+
+    assert not robots.is_allowed('https://example.com/private/page.html')
+    assert robots.is_allowed('https://example.com/public/page.html')
