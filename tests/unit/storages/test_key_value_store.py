@@ -1902,3 +1902,14 @@ async def test_set_value_rejects_value_that_json_cannot_represent(kvs: KeyValueS
     """`set_value` raises `TypeError` for a value that JSON can't represent."""
     with pytest.raises(TypeError):
         await kvs.set_value('key', value)
+
+
+async def test_memory_storage_returns_the_model_that_was_set() -> None:
+    """A Pydantic model set in the memory storage is read back as the same model."""
+    kvs = await KeyValueStore.open(storage_backend=MemoryStorageBackend())
+    value = _Product(name='Phone', price=799.99)
+
+    await kvs.set_value('key', value)
+    stored_value = await kvs.get_value('key')
+
+    assert stored_value == value
