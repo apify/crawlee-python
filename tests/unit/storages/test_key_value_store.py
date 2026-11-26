@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from crawlee import service_locator
 from crawlee.configuration import Configuration
@@ -20,6 +20,11 @@ from crawlee.storages._storage_instance_manager import StorageInstanceManager
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
+
+
+class _Product(BaseModel):
+    name: str
+    price: float
 
 
 @pytest.fixture
@@ -1856,3 +1861,44 @@ async def test_cancelled_purge_or_drop_keeps_autosaved_values(
     await _emit_persist_state()
 
     assert await kvs.get_value('state') == {'count': 1}
+
+
+@pytest.mark.parametrize(
+    'key_count',
+    [
+        pytest.param(5, id='store smaller than a page'),
+        pytest.param(15, id='store larger than a page'),
+    ],
+)
+async def test_iteration_ends_when_the_loop_adds_keys(kvs: KeyValueStore, key_count: int) -> None:
+    """A loop that adds keys to the store it iterates yields only the keys that existed when it started."""
+    original_keys = [f'key-{index:02}' for index in range(key_count)]
+    for key in original_keys:
+        await kvs.set_value(key, 'value')
+
+    yielded_keys = list[str]()
+
+    async for item in kvs.iterate_keys(chunk_size=10):
+        yielded_keys.append(item.key)
+
+        # The added key sorts after every key listed so far.
+        await kvs.set_value(f'~processed-{item.key}', 'value')
+
+        # The loop would never end, so it's cut off once it's clearly past the original keys.
+        if len(yielded_keys) > 10 * key_count:
+            break
+
+    assert yielded_keys == original_keys
+
+
+@pytest.mark.parametrize(
+    'value',
+    [
+        pytest.param(_Product(name='Phone', price=799.99), id='pydantic model'),
+        pytest.param({1, 2}, id='set'),
+    ],
+)
+async def test_set_value_rejects_value_that_json_cannot_represent(kvs: KeyValueStore, value: Any) -> None:
+    """`set_value` raises `TypeError` for a value that JSON can't represent."""
+    with pytest.raises(TypeError):
+        await kvs.set_value('key', value)
