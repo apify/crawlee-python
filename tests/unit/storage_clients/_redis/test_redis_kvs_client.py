@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fakeredis import FakeAsyncRedis
+from redis.asyncio.client import Pipeline
 from redis.exceptions import RedisError
 
 from crawlee.storage_clients import RedisStorageClient
@@ -258,15 +259,48 @@ async def test_set_value_does_not_retry_on_unexpected_exception(kvs_client: Redi
     assert mock_sleep.call_count == 0
 
 
+async def test_get_value_none_record(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that `get_value` returns a record, not `None`, for a stored `None` value."""
+    await kvs_client.set_value(key='key', value=None)
+
+    record = await kvs_client.get_value(key='key')
+
+    assert record is not None
+    assert record.value is None
+    assert record.content_type == 'application/x-none'
+
+
+async def test_get_value_during_rewrite(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that `get_value` returns the metadata and value of one write when another client rewrites the record."""
+    await kvs_client.set_value(key='key', value='text')
+    other_client = await RedisStorageClient(redis=kvs_client.redis).create_kvs_client(name='test_kvs')
+    update_metadata = kvs_client._update_metadata
+
+    async def rewrite_record(*args: Any, **kwargs: Any) -> None:
+        await other_client.set_value(key='key', value=b'\x00\x01', content_type='application/octet-stream')
+        await update_metadata(*args, **kwargs)
+
+    # `get_value` updates the access time while it reads the record, so another client rewrites the record there.
+    with (
+        patch.object(kvs_client.redis, 'hget', side_effect=AssertionError('the record must be read in one MULTI')),
+        patch.object(kvs_client, '_update_metadata', side_effect=rewrite_record),
+    ):
+        record = await kvs_client.get_value(key='key')
+
+    assert record is not None
+    assert record.content_type == 'application/octet-stream'
+    assert record.value == b'\x00\x01'
+
+
 @pytest.fixture
-def hmget(kvs_client: RedisKeyValueStoreClient) -> Iterator[MagicMock]:
-    """Wrap the Redis `hmget` of the client in a mock that records the calls while still performing them."""
-    with patch.object(kvs_client.redis, 'hmget', wraps=kvs_client.redis.hmget) as mock:
+def hmget() -> Iterator[MagicMock]:
+    """Wrap the Redis pipeline `hmget` in a mock that records the calls while still performing them."""
+    with patch.object(Pipeline, 'hmget', autospec=True, side_effect=Pipeline.hmget) as mock:
         yield mock
 
 
-def hmget_keys(hmget: MagicMock) -> list[list[str]]:
-    return [list(call.args[1]) for call in hmget.call_args_list]
+def hmget_keys(hmget: MagicMock, hash_key: str) -> list[list[str]]:
+    return [list(call.args[2]) for call in hmget.call_args_list if call.args[1] == hash_key]
 
 
 async def test_iterate_entries_reads_values_in_batches(kvs_client: RedisKeyValueStoreClient, hmget: MagicMock) -> None:
@@ -286,7 +320,7 @@ async def test_iterate_entries_reads_values_in_batches(kvs_client: RedisKeyValue
     assert records[2].content_type == 'application/octet-stream'
 
     # All values fit in a single batch.
-    assert hmget_keys(hmget) == [['a-json', 'b-text', 'c-bytes', 'd-none']]
+    assert hmget_keys(hmget, kvs_client._items_key) == [['a-json', 'b-text', 'c-bytes', 'd-none']]
 
 
 async def test_iterate_entries_batches_are_bounded_by_key_count(
@@ -300,7 +334,7 @@ async def test_iterate_entries_batches_are_bounded_by_key_count(
         records = [record async for record in kvs_client.iterate_entries()]
 
     assert [(record.key, record.value) for record in records] == [(f'key{i}', f'value{i}') for i in range(5)]
-    assert hmget_keys(hmget) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
+    assert hmget_keys(hmget, kvs_client._items_key) == [['key0', 'key1'], ['key2', 'key3'], ['key4']]
 
 
 async def test_iterate_entries_batches_are_bounded_by_size(
@@ -319,7 +353,7 @@ async def test_iterate_entries_batches_are_bounded_by_size(
         records = [record async for record in kvs_client.iterate_entries()]
 
     assert [record.key for record in records] == ['large', 'small1', 'small2', 'small3']
-    assert hmget_keys(hmget) == [['large'], ['small1', 'small2', 'small3']]
+    assert hmget_keys(hmget, kvs_client._items_key) == [['large'], ['small1', 'small2', 'small3']]
 
 
 async def test_iterate_entries_with_exclusive_start_key_and_limit(kvs_client: RedisKeyValueStoreClient) -> None:
@@ -350,6 +384,25 @@ async def test_iterate_entries_skips_value_deleted_after_listing(
 
     assert [(record.key, record.value) for record in records] == [('kept', 'a')]
     assert 'missing' not in caplog.text
+
+
+async def test_iterate_entries_rewritten_after_listing(kvs_client: RedisKeyValueStoreClient) -> None:
+    """Test that `iterate_entries` returns the current metadata and value of a record rewritten after listing."""
+    await kvs_client.set_value(key='a', value='first')
+    await kvs_client.set_value(key='b', value='text')
+
+    with (
+        patch.object(type(kvs_client), '_ITERATE_ENTRIES_BATCH_MAX_KEYS', 1),
+        patch.object(kvs_client.redis, 'hmget', side_effect=AssertionError('the records must be read in one MULTI')),
+    ):
+        entries = kvs_client.iterate_entries()
+        # Lists both records and fetches the batch with the first one.
+        await anext(entries)
+        await kvs_client.set_value(key='b', value={'rewritten': True})
+        records = [record async for record in entries]
+
+    assert [(record.key, record.value) for record in records] == [('b', {'rewritten': True})]
+    assert records[0].content_type.startswith('application/json')
 
 
 async def test_iterate_entries_empty_store(kvs_client: RedisKeyValueStoreClient) -> None:
