@@ -6,6 +6,7 @@ from crawlee import Request
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import (
     DefaultRenderingTypePredictor,
     RenderingType,
+    RenderingTypePrediction,
     calculate_url_similarity,
     get_url_components,
 )
@@ -123,78 +124,69 @@ async def test_no_learning_data_prediction() -> None:
         assert probability == 1
 
 
-async def test_persistent_no_learning_data_prediction() -> None:
-    """Test that the model is saved after initialisation in KeyValueStore."""
+async def test_persists_untrained_model() -> None:
+    """Test that a predictor that has learned nothing saves its untrained model."""
     persist_key = 'test-no_learning-state'
-    async with DefaultRenderingTypePredictor(persistence_enabled=True, persist_state_key=persist_key) as _predictor:
+    async with DefaultRenderingTypePredictor(persistence_enabled=True, persist_state_key=persist_key):
         pass
 
     kvs = await KeyValueStore.open()
-
     persisted_data = await kvs.get_value(persist_key)
-
-    assert persisted_data is not None
     assert persisted_data['model']['is_fitted'] is False
 
 
-async def test_persistent_prediction() -> None:
-    """Test that the model and resources is saved after train in KeyValueStore."""
-    persist_key = 'test-persistent-state'
-    async with DefaultRenderingTypePredictor(persistence_enabled=True, persist_state_key=persist_key) as predictor:
-        # Learn some data
-        predictor.store_result(
-            Request.from_url(url='http://www.aaa.com/some/stuff', label='some label'), rendering_type='static'
-        )
+async def test_no_persistence_saves_nothing() -> None:
+    """Test that a predictor with persistence disabled doesn't save its state."""
+    persist_key = 'test-no-persistence'
+    async with DefaultRenderingTypePredictor(persist_state_key=persist_key):
+        pass
 
     kvs = await KeyValueStore.open()
-
-    persisted_data = await kvs.get_value(persist_key)
-
-    assert persisted_data is not None
-    assert persisted_data['model']['is_fitted'] is True
+    assert await kvs.get_value(persist_key) is None
 
 
-@pytest.mark.parametrize(
-    ('persistence_enabled', 'same_result'),
-    [
-        pytest.param(True, True, id='with persistence'),
-        pytest.param(False, False, id='without persistence'),
-    ],
-)
-async def test_persistent_prediction_recovery(*, persistence_enabled: bool, same_result: bool) -> None:
-    """Test that the model and resources is recovered from KeyValueStore."""
-    persist_key = 'test-persistent-state-recovery'
+async def test_recovered_predictor_continues_learning() -> None:
+    """Test that a recovered predictor predicts from the recovered results and keeps them when it learns more."""
+    persist_key = 'test-recovered-predictor'
+    static_request = Request.from_url(url='http://www.aaa.com/products/item-99')
+    client_only_request = Request.from_url(url='http://www.aaa.com/app/view-99')
+
+    async with DefaultRenderingTypePredictor(persistence_enabled=True, persist_state_key=persist_key) as predictor:
+        for i in range(5):
+            predictor.store_result(
+                Request.from_url(url=f'http://www.aaa.com/products/item-{i}'), rendering_type='static'
+            )
+            predictor.store_result(
+                Request.from_url(url=f'http://www.aaa.com/app/view-{i}'), rendering_type='client only'
+            )
+
+    async with DefaultRenderingTypePredictor(persistence_enabled=True, persist_state_key=persist_key) as recovered:
+        assert recovered.predict(static_request) == RenderingTypePrediction('static', 0.1)
+        assert recovered.predict(client_only_request) == RenderingTypePrediction('client only', 0.1)
+
+        recovered.store_result(Request.from_url(url='http://www.aaa.com/app/view-100'), rendering_type='client only')
+        assert recovered.predict(static_request).rendering_type == 'static'
+
+
+async def test_recovered_new_label_detection() -> None:
+    """Test that a recovered predictor increases the detection recommendation for a label without results."""
+    detection_ratio = 0.01
+    persist_key = 'test-recovered-new-label'
 
     async with DefaultRenderingTypePredictor(
-        detection_ratio=0.01, persistence_enabled=persistence_enabled, persist_state_key=persist_key
+        detection_ratio=detection_ratio, persistence_enabled=True, persist_state_key=persist_key
     ) as predictor:
-        # Learn some data
-        predictor.store_result(
-            Request.from_url(url='http://www.aaa.com/some/stuff', label='some label'), rendering_type='static'
-        )
-        before_recover_prediction = predictor.predict(
-            Request.from_url(url='http://www.aaa.com/some/stuff', label='some label')
-        )
+        for i in range(4):
+            predictor.store_result(
+                Request.from_url(url=f'http://www.aaa.com/some/stuff-{i}', label='known label'), rendering_type='static'
+            )
 
-    # Recover predictor
     async with DefaultRenderingTypePredictor(
-        detection_ratio=0.01, persistence_enabled=True, persist_state_key=persist_key
-    ) as recover_predictor:
-        after_recover_prediction = recover_predictor.predict(
-            Request.from_url(url='http://www.aaa.com/some/stuff', label='some label')
-        )
+        detection_ratio=detection_ratio, persistence_enabled=True, persist_state_key=persist_key
+    ) as recovered:
+        prediction = recovered.predict(Request.from_url(url='http://www.aaa.com/some/stuff', label='new label'))
 
-    # If persistence is enabled, the predicted results must be the same.
-    if same_result:
-        assert (
-            before_recover_prediction.detection_probability_recommendation
-            == after_recover_prediction.detection_probability_recommendation
-        )
-    else:
-        assert (
-            before_recover_prediction.detection_probability_recommendation
-            != after_recover_prediction.detection_probability_recommendation
-        )
+    assert prediction.detection_probability_recommendation == detection_ratio * 5
 
 
 @pytest.mark.parametrize(
