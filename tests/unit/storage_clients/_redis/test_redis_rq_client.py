@@ -219,6 +219,15 @@ async def test_metadata_record_updates(rq_client: RedisRequestQueueClient, monke
     assert metadata.accessed_at == write_time
     assert metadata.modified_at == write_time
 
+    # An add of a request already in the queue stamps both times too.
+    duplicate_time = write_time + timedelta(seconds=1)
+    clock.now.return_value = duplicate_time
+    await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.accessed_at == duplicate_time
+    assert metadata.modified_at == duplicate_time
+
 
 async def test_get_request(rq_client: RedisRequestQueueClient) -> None:
     """Test that get_request works correctly."""
@@ -560,3 +569,103 @@ async def test_forefront_reclaim_stays_blocked(
 
     queue_length = await await_redis_response(rq_client.redis.llen(rq_client._queue_key))
     assert queue_length == 0
+
+
+async def test_add_skips_handled_meanwhile(
+    rq_client: RedisRequestQueueClient,
+    redis_client: FakeAsyncRedis,
+) -> None:
+    """Test that a request another client handles after the dedup check of an add isn't queued again."""
+    request = Request.from_url('https://example.com/handled-meanwhile')
+    other_client = await RedisStorageClient(
+        redis=redis_client, queue_dedup_strategy=rq_client._dedup_strategy
+    ).create_rq_client(name='test_request_queue')
+
+    add_script = rq_client._add_requests_script
+    assert add_script is not None
+
+    async def handle_then_add(*args: Any, **kwargs: Any) -> Any:
+        await other_client.add_batch_of_requests([request])
+        fetched = await other_client.fetch_next_request()
+        assert fetched is not None
+        await other_client.mark_request_as_handled(fetched)
+        return await add_script(*args, **kwargs)
+
+    with patch.object(rq_client, '_add_requests_script', AsyncMock(side_effect=handle_then_add)):
+        await rq_client.add_batch_of_requests([request])
+
+    queue_length = await await_redis_response(rq_client.redis.llen(rq_client._queue_key))
+    assert queue_length == 0
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 0
+
+
+async def test_add_lost_reply_counts_once(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that requests added by an add whose reply was lost are counted once."""
+    request = Request.from_url('https://example.com/lost-reply')
+    lossy_script = _lose_first_reply(rq_client._add_requests_script)
+
+    with patch.object(rq_client, '_add_requests_script', lossy_script), pytest.raises(RedisError):
+        await rq_client.add_batch_of_requests([request])
+
+    # Adding the request again finds it already in the queue.
+    await rq_client.add_batch_of_requests([request])
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 1
+    assert metadata.total_request_count == 1
+
+
+async def test_add_batch_over_unpack_limit(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that an add of more new requests than Lua in Redis can unpack in one call adds them all."""
+    # 4000 requests make 8000 `hset` arguments, past the Lua `unpack` limit.
+    requests = [Request.from_url(f'https://example.com/{i}') for i in range(4000)]
+
+    await rq_client.add_batch_of_requests(requests)
+
+    queue_length = await await_redis_response(rq_client.redis.llen(rq_client._queue_key))
+    assert queue_length == 4000
+
+    metadata = await rq_client.get_metadata()
+    assert metadata.pending_request_count == 4000
+
+
+async def test_forefront_order_across_chunks(
+    rq_client: RedisRequestQueueClient,
+) -> None:
+    """Test that a forefront add split into several script calls queues the requests as one call would."""
+    requests = [Request.from_url(f'https://example.com/{i}') for i in range(5)]
+
+    with patch.object(rq_client, '_MAX_BATCH_ADD_SIZE', 2):
+        await rq_client.add_batch_of_requests(requests, forefront=True)
+
+    # One `lpush` of all keys leaves them in reverse order.
+    queue = await await_redis_response(rq_client.redis.lrange(rq_client._queue_key, 0, -1))
+    assert queue == [request.unique_key.encode() for request in reversed(requests)]
+
+
+@pytest.mark.parametrize(
+    'reset_method',
+    [
+        pytest.param('purge', id='purge'),
+        pytest.param('drop', id='drop'),
+    ],
+)
+async def test_reset_clears_fetch_cache(
+    rq_client: RedisRequestQueueClient,
+    reset_method: str,
+) -> None:
+    """Test that `purge` and `drop` discard requests fetched in a batch but not served yet."""
+    await rq_client.add_batch_of_requests([Request.from_url(f'https://example.com/{i}') for i in range(2)])
+
+    # The fetch takes both requests and keeps the second one for the next call.
+    assert await rq_client.fetch_next_request() is not None
+
+    await getattr(rq_client, reset_method)()
+
+    assert await rq_client.is_empty()

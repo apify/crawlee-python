@@ -80,6 +80,10 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     _MAX_BATCH_FETCH_SIZE = 10
     """Maximum number of requests to fetch in a single batch operation."""
 
+    _MAX_BATCH_ADD_SIZE = 1000
+    """Maximum number of new requests to pass to one call of the add script. The script unpacks two values per request,
+    and Lua in Redis fails to unpack about 8000 values."""
+
     _BLOCK_REQUEST_TIME = 300_000  # milliseconds
     """Time in milliseconds to block a fetched request for other clients before it can be autoreclaimed."""
 
@@ -227,6 +231,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             raise RuntimeError(f'Unknown deduplication strategy: {self._dedup_strategy}')
         extra_keys.extend([self._queue_key, self._data_key, self._in_progress_key])
         await self._drop(extra_keys=extra_keys)
+        self._pending_fetch_cache.clear()
 
     @retry_on_error(RedisError)
     @override
@@ -248,6 +253,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 new_total_request_count=0,
             ),
         )
+        self._pending_fetch_cache.clear()
 
     @override
     async def add_batch_of_requests(
@@ -261,9 +267,6 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         processed_requests = []
 
-        delta_pending = 0
-        delta_total = 0
-
         requests_by_unique_key = {req.unique_key: req for req in requests}
         unique_keys = list(requests_by_unique_key.keys())
         # Check which requests are already added or handled
@@ -275,6 +278,12 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))
                 await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))
 
+            # Stamped in the check pipeline to save a round trip, so `modified_at` is set before the add runs.
+            await self._update_metadata(
+                pipe,
+                **_QueueMetadataUpdateParams(update_accessed_at=True, update_modified_at=True),
+            )
+
             pipe_results = await pipe.execute()
 
         added_pending_flags = pipe_results[0]
@@ -282,8 +291,6 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
 
         new_unique_keys = []
         new_request_data = {}
-        delta_pending = 0
-        delta_total = 0
 
         for i, unique_key in enumerate(unique_keys):
             # Already handled - skip
@@ -314,20 +321,22 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
             new_unique_keys.append(unique_key)
             new_request_data[unique_key] = request.model_dump_json()
 
-        if new_unique_keys:
-            # Add new requests to the queue atomically, get back which were actually added
+        # The added Bloom filter keeps handled requests too, so only the set strategy checks the handled set.
+        if self._dedup_strategy == 'bloom':
+            dedup_keys = [self._added_filter_key]
+        else:
+            dedup_keys = [self._pending_set_key, self._handled_set_key]
+
+        for chunk_start in range(0, len(new_unique_keys), self._MAX_BATCH_ADD_SIZE):
+            chunk = new_unique_keys[chunk_start : chunk_start + self._MAX_BATCH_ADD_SIZE]
+            chunk_data = {unique_key: new_request_data[unique_key] for unique_key in chunk}
+
+            # Add new requests to the queue and count them atomically, get back which were actually added
             script_results = await self._add_requests_script(
-                keys=[
-                    self._added_filter_key if self._dedup_strategy == 'bloom' else self._pending_set_key,
-                    self._queue_key,
-                    self._data_key,
-                ],
-                args=[int(forefront), json.dumps(new_unique_keys), json.dumps(new_request_data)],
+                keys=[self._queue_key, self._data_key, self.metadata_key, *dedup_keys],
+                args=[int(forefront), json.dumps(chunk), json.dumps(chunk_data)],
             )
             actually_added = set(json.loads(script_results))
-
-            delta_pending = len(actually_added)
-            delta_total = len(actually_added)
 
             processed_requests.extend(
                 [
@@ -336,19 +345,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                         was_already_present=unique_key not in actually_added,
                         was_already_handled=False,
                     )
-                    for unique_key in new_unique_keys
+                    for unique_key in chunk
                 ]
-            )
-
-        async with self._get_pipeline() as pipe:
-            await self._update_metadata(
-                pipe,
-                **_QueueMetadataUpdateParams(
-                    update_accessed_at=True,
-                    update_modified_at=True,
-                    delta_pending_request_count=delta_pending,
-                    delta_total_request_count=delta_total,
-                ),
             )
 
         return AddRequestsResponse(
