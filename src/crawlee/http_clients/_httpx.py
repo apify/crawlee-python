@@ -295,7 +295,7 @@ class HttpxHttpClient(HttpClient):
             raise asyncio.TimeoutError from exc
         except httpx2.TransportError as exc:
             if self._is_proxy_error(exc):
-                raise ProxyError from exc
+                raise ProxyError(str(exc)) from exc
             raise
 
         try:

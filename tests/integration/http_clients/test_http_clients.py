@@ -161,9 +161,11 @@ async def test_stream_with_proxy_disabled(
 ) -> None:
     url = 'https://apify.com/'
 
-    with pytest.raises(ProxyError):
+    with pytest.raises(ProxyError) as exc_info:
         async with http_client.stream(url, proxy_info=disabled_proxy):
             pass
+
+    assert str(exc_info.value)
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
