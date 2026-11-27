@@ -1,4 +1,3 @@
-import os
 import traceback
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
@@ -88,7 +87,7 @@ async def test_error_tracker_similar_messages_full_stack(
 async def test_error_tracker_shows_file_name_without_directories() -> None:
     """Test that the error group shows the file name only, whatever separator the platform puts in the path."""
     error_tracker = ErrorTracker()
-    path = os.path.join('some_directory', 'nested', 'failing_module.py')  # noqa: PTH118
+    path = str(Path('some_directory', 'nested', 'failing_module.py'))
 
     try:
         exec(compile('raise ValueError("Some value error")', path, 'exec'))
