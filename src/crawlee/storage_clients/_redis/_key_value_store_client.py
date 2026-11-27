@@ -56,10 +56,10 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     """Human-readable client type for error messages."""
 
     _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
-    """Maximum number of records fetched with a single HMGET call in `iterate_entries`."""
+    """Maximum number of records fetched in a single batch in `iterate_entries`."""
 
     _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
-    """Maximum total size of the records fetched with a single HMGET call in `iterate_entries`.
+    """Maximum total size of the records fetched in a single batch in `iterate_entries`.
 
     A single record larger than this is still fetched, but alone in its batch.
     """
@@ -179,9 +179,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
             await await_redis_response(pipe.hget(self._metadata_items_key, key))
             await await_redis_response(pipe.hget(self._items_key, key))
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True))
-            results = await pipe.execute()
-
-        serialized_metadata_item, value = results[0], results[1]
+            serialized_metadata_item, value, *_ = await pipe.execute()
 
         if not isinstance(serialized_metadata_item, (str, bytes, bytearray)):
             logger.warning(f'Metadata for key "{key}" is missing or invalid.')
