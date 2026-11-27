@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 
 - Keep `robots.txt` rules when the file is not valid UTF-8 ([#2531](https://github.com/apify/crawlee-python/pull/2531)) ([fb26519](https://github.com/apify/crawlee-python/commit/fb26519ebc1f66e1d78498c6f11ae7aef91423de)) by [@shlokbam](https://github.com/shlokbam), closes [#2530](https://github.com/apify/crawlee-python/issues/2530)
 - Apply `robots.txt` rules to URLs with the default port ([#2533](https://github.com/apify/crawlee-python/pull/2533)) ([4d50067](https://github.com/apify/crawlee-python/commit/4d50067cad2f99d79b59e1cb3fe054dc0121bf01)) by [@shlokbam](https://github.com/shlokbam), closes [#2532](https://github.com/apify/crawlee-python/issues/2532)
+- **throttling-manager:** Respect crawl-delay under concurrency ([#2506](https://github.com/apify/crawlee-python/pull/2506)) ([d0a953e](https://github.com/apify/crawlee-python/commit/d0a953ec72eb620683190a5fec3942001a43e5a2)) by [@Mantisus](https://github.com/Mantisus)
+- **redis:** Avoid lost and duplicate requests in RQ ([#2508](https://github.com/apify/crawlee-python/pull/2508)) ([1b9418c](https://github.com/apify/crawlee-python/commit/1b9418cf9c0236ab309c4fe5444223baea51d489)) by [@Mantisus](https://github.com/Mantisus)
 
 <!-- git-cliff-unreleased-end -->
 
