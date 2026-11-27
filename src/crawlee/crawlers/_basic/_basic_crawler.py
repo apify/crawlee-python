@@ -1912,7 +1912,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             event=Event.CRAWLER_STATUS, event_data=EventCrawlerStatusData(message=message, crawler_id=id(self))
         )
 
-        self._previous_crawler_state = current_state
+        # `Statistics` updates its state in place, so the next status update compares against a copy.
+        self._previous_crawler_state = current_state.model_copy(deep=True)
 
     async def _mark_request_as_handled(self, request: Request) -> None:
         request_manager = await self.get_request_manager()

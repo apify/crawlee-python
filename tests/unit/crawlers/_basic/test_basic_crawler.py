@@ -25,6 +25,7 @@ from crawlee import ConcurrencySettings, Glob, service_locator
 from crawlee._log_config import CrawleeLogFormatter
 from crawlee._request import Request, RequestState
 from crawlee._types import BasicCrawlingContext, EnqueueLinksKwargs
+from crawlee._utils.console import BORDER
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BasicCrawler
 from crawlee.errors import (
@@ -1443,20 +1444,23 @@ async def test_logs_final_statistics(
 
     assert final_statistics is not None
     if statistics_log_format == 'table':
-        assert final_statistics.msg.splitlines() == [
+        # Map the box-drawing border to ASCII, so the expected table stays readable in ASCII source.
+        border_to_ascii = str.maketrans(dict.fromkeys(BORDER.values(), '+') | {BORDER['H']: '-', BORDER['V']: '|'})
+        table_lines = [line.translate(border_to_ascii) for line in final_statistics.msg.splitlines()]
+        assert table_lines == [
             'Final request statistics:',
-            '┌───────────────────────────────┬────────────┐',
-            '│ requests_finished             │ 4          │',
-            '│ requests_failed               │ 33         │',
-            '│ retry_histogram               │ [1, 4, 8]  │',
-            '│ request_avg_failed_duration   │ 1min 39.0s │',
-            '│ request_avg_finished_duration │ 483.0ms    │',
-            '│ requests_finished_per_minute  │ 0.33       │',
-            '│ requests_failed_per_minute    │ 0.1        │',
-            '│ request_total_duration        │ 12min      │',
-            '│ requests_total                │ 37         │',
-            '│ crawler_runtime               │ 5min       │',
-            '└───────────────────────────────┴────────────┘',
+            '+-------------------------------+------------+',
+            '| requests_finished             | 4          |',
+            '| requests_failed               | 33         |',
+            '| retry_histogram               | [1, 4, 8]  |',
+            '| request_avg_failed_duration   | 1min 39.0s |',
+            '| request_avg_finished_duration | 483.0ms    |',
+            '| requests_finished_per_minute  | 0.33       |',
+            '| requests_failed_per_minute    | 0.1        |',
+            '| request_total_duration        | 12min      |',
+            '| requests_total                | 37         |',
+            '| crawler_runtime               | 5min       |',
+            '+-------------------------------+------------+',
         ]
     else:
         assert final_statistics.msg == 'Final request statistics:'
@@ -2042,7 +2046,7 @@ async def test_status_message_callback() -> None:
         state: StatisticsState, previous_state: StatisticsState | None, message: str
     ) -> str | None:
         await status_message_callback(message)
-        states.append({'state': state, 'previous_state': previous_state})
+        states.append({'state': state.model_copy(deep=True), 'previous_state': previous_state})
         return message
 
     crawler = BasicCrawler(
@@ -2110,6 +2114,28 @@ async def test_status_message_reports_failed_request_count() -> None:
 
     problem_messages = [m for m in captured_messages if m.startswith('Experiencing problems')]
     assert problem_messages == ['Experiencing problems, 3 failed requests since last status update.']
+
+
+async def test_status_message_new_failures() -> None:
+    """Test that the status message reports requests that failed after the previous status update."""
+    captured_messages: list[str] = []
+
+    async def status_callback(
+        state: StatisticsState, previous_state: StatisticsState | None, message: str
+    ) -> str | None:
+        captured_messages.append(message)
+        return None
+
+    state = StatisticsState()
+    crawler = BasicCrawler(status_message_callback=status_callback)
+    crawler._statistics = Mock(state=state)
+
+    async with service_locator.get_event_manager():
+        await crawler._crawler_state_task()
+        state.requests_failed += 2
+        await crawler._crawler_state_task()
+
+    assert captured_messages[-1] == 'Experiencing problems, 2 failed requests since last status update.'
 
 
 @pytest.mark.parametrize(
@@ -2618,12 +2644,14 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
         configure_logging=False,
         concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
     )
-    dispatched_at = list[float]()
+    # Read the clock the throttler checks the cooldown against and compare exact `timedelta` values, so the measured gap
+    # is never shorter than the cooldown.
+    dispatched_at = list[datetime]()
     empty_during_cooldown = list[bool]()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
-        dispatched_at.append(time.monotonic())
+        dispatched_at.append(datetime.now(timezone.utc))
         if len(dispatched_at) == 1:
             throttler.record_domain_delay(context.request.url, retry_after=timedelta(milliseconds=500))
             empty_during_cooldown.append(await throttler.is_empty())
@@ -2632,7 +2660,7 @@ async def test_throttled_domain_waits_out_backoff_without_ending_the_crawl() -> 
 
     assert empty_during_cooldown == [True]
     assert len(dispatched_at) == 2
-    assert dispatched_at[1] - dispatched_at[0] >= 0.5
+    assert dispatched_at[1] - dispatched_at[0] >= timedelta(milliseconds=500)
 
 
 THROTTLED_URL = 'https://throttled.placeholder.com/page'
