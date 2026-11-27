@@ -99,6 +99,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         base_delay: timedelta = timedelta(seconds=2),
         max_delay: timedelta = timedelta(seconds=60),
         max_domain_stall: timedelta = timedelta(seconds=900),
+        min_crawl_delay: timedelta = timedelta(0),
     ) -> None:
         """Initialize the throttling manager.
 
@@ -123,10 +124,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             max_domain_stall: How long a domain may rate-limit every request before the crawler raises
                 `PersistentRateLimitError`. A crawler running with `keep_alive` never raises it. The crawler checks
                 for a stall about twice a second, so a window under a second may not be detected.
+            min_crawl_delay: Minimum interval between two requests to each throttled domain. A longer robots.txt
+                crawl-delay takes precedence.
 
         Raises:
-            ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match, or if
-                `base_delay`, `max_delay` or `max_domain_stall` is not positive.
+            ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match, if
+                `base_delay`, `max_delay` or `max_domain_stall` is not positive, or if `min_crawl_delay` is negative.
         """
         # A zero delay would let the crawler defer a rate-limited request and dispatch it again at once.
         if base_delay <= timedelta(0):
@@ -138,6 +141,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if max_domain_stall <= timedelta(0):
             raise ValueError(f'max_domain_stall must be positive, got {max_domain_stall}.')
 
+        if min_crawl_delay < timedelta(0):
+            raise ValueError(f'min_crawl_delay must not be negative, got {min_crawl_delay}.')
+
         self._inner = inner
         self._owns_inner = inner is None
         """Whether `inner` is the default store, which `drop()` forgets so the next use opens it again."""
@@ -146,6 +152,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._max_domain_stall = max_domain_stall
+        self._min_crawl_delay = min_crawl_delay
         self._request_manager_opener = request_manager_opener
         # Padding on an entry would otherwise survive parsing into a key no crawled hostname can match.
         domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
@@ -439,8 +446,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         A `RateLimitedSignal` backs the domain off for the signal's `wait` if it's positive, and exponentially from
         `base_delay` otherwise. Only the first refusal of a burst advances the backoff. A `MinIntervalSignal` becomes
-        the domain's crawl-delay. The first one wins, so a robots.txt re-fetch can't change the dispatch cadence
-        mid-crawl.
+        the domain's crawl-delay, unless `min_crawl_delay` is longer. The first one wins, so a robots.txt re-fetch can't
+        change the dispatch cadence mid-crawl.
 
         Returns:
             `True` if the URL's domain is in `domains`, so the manager paces it by the signal. `False` if the domain
@@ -691,13 +698,10 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return available
 
     def _mark_domain_dispatched(self, domain: str) -> None:
-        """Record that a request to this domain was just dispatched.
-
-        If a crawl-delay is configured, push `crawl_delay_until` forward by that amount.
-        """
+        """Push the domain's `crawl_delay_until` forward by the longer of its crawl-delay and `min_crawl_delay`."""
         state = self._domain_states.get(domain)
         if state is not None:
-            state.apply_crawl_delay(datetime.now(UTC))
+            state.apply_crawl_delay(datetime.now(UTC), self._min_crawl_delay)
 
     async def _fetch_owner(self, request: Request) -> TRequestManager:
         """Return the manager the request must be given back to, leaving its in-flight record in place.
@@ -753,7 +757,7 @@ class _DomainState:
     """Number of consecutive 429 responses (for exponential backoff)."""
 
     crawl_delay: timedelta | None = None
-    """Minimum interval between requests, used to push `crawl_delay_until` on dispatch."""
+    """Minimum interval between requests the domain declared, such as a robots.txt crawl-delay."""
 
     rate_limited_since: datetime | None = None
     """Time of the first 429 since the domain last completed a request."""
@@ -783,10 +787,11 @@ class _DomainState:
         last = self.last_rate_limited_at
         return since is not None and last is not None and now - last <= window and now - since > window
 
-    def apply_crawl_delay(self, now: datetime) -> None:
-        """Block the domain for its crawl-delay, if it declared one."""
-        if self.crawl_delay is not None:
-            self.crawl_delay_until = now + self.crawl_delay
+    def apply_crawl_delay(self, now: datetime, min_crawl_delay: timedelta) -> None:
+        """Block the domain for its crawl-delay or `min_crawl_delay`, whichever is longer."""
+        delay = max(self.crawl_delay or timedelta(0), min_crawl_delay)
+        if delay > timedelta(0):
+            self.crawl_delay_until = now + delay
 
     def reset_throttling(self) -> None:
         """Clear the transient throttle state."""
