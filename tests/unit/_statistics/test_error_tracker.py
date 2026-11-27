@@ -1,4 +1,5 @@
 import traceback
+from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -73,7 +74,7 @@ async def test_error_tracker_similar_messages_full_stack(
             await error_tracker.add(e)
             line = traceback.extract_tb(e.__traceback__)[0].lineno
 
-    file_name = __file__.split('/')[-1]
+    file_name = Path(__file__).name
     errors = error_tracker.get_most_common_errors()
     assert errors[0][0] == f'{file_name}:{line}:KeyError:{message_1}'
     assert errors[0][1] == 3
@@ -81,6 +82,19 @@ async def test_error_tracker_similar_messages_full_stack(
     assert errors[1][1] == 2
     assert errors[2][0] == f'{file_name}:{line}:RuntimeError:{message_2}'
     assert errors[2][1] == 1
+
+
+async def test_error_tracker_shows_file_name_without_directories() -> None:
+    """Test that the error group shows the file name only, whatever separator the platform puts in the path."""
+    error_tracker = ErrorTracker()
+    path = str(Path('some_directory', 'nested', 'failing_module.py'))
+
+    try:
+        exec(compile('raise ValueError("Some value error")', path, 'exec'))
+    except Exception as e:
+        await error_tracker.add(e)
+
+    assert error_tracker.get_most_common_errors()[0][0] == 'failing_module.py:1:ValueError:Some value error'
 
 
 @pytest.mark.parametrize(
