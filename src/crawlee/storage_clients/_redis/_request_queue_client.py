@@ -81,8 +81,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     """Maximum number of requests to fetch in a single batch operation."""
 
     _MAX_BATCH_ADD_SIZE = 1000
-    """Maximum number of new requests to pass to one call of the add script. The script unpacks two values per
-    request, and Lua in Redis fails to unpack about 8000 values."""
+    """Maximum number of new requests to pass to one call of the add script. The script unpacks two values per request,
+    and Lua in Redis fails to unpack about 8000 values."""
 
     _BLOCK_REQUEST_TIME = 300_000  # milliseconds
     """Time in milliseconds to block a fetched request for other clients before it can be autoreclaimed."""
@@ -278,7 +278,7 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
                 await await_redis_response(pipe.bf().mexists(self._added_filter_key, *unique_keys))
                 await await_redis_response(pipe.bf().mexists(self._handled_filter_key, *unique_keys))
 
-            # Stamped with the check to save a round trip, so `modified_at` goes ahead of the add itself.
+            # Stamped in the check pipeline to save a round trip, so `modified_at` is set before the add runs.
             await self._update_metadata(
                 pipe,
                 **_QueueMetadataUpdateParams(update_accessed_at=True, update_modified_at=True),
