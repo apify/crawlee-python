@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -442,9 +441,7 @@ async def test_export_to_json(
     assert record is not None
 
     # Verify content has all the items
-    assert '"id": 1' in record
-    assert '"id": 2' in record
-    assert '"id": 3' in record
+    assert record == items
 
     await kvs.drop()
 
@@ -549,7 +546,7 @@ async def test_export_with_multiple_kwargs(dataset: Dataset, tmp_path: Path) -> 
     target_configuration = Configuration(storage_dir=str(custom_dir))
 
     # Set expected values
-    expected_exported_data = f'{json.dumps([{"some key": "some data"}])}'
+    expected_exported_data = [{'some key': 'some data'}]
     expected_kvs_dir = custom_dir / 'key_value_stores' / target_kvs_name
 
     # Populate dataset and export

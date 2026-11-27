@@ -60,7 +60,7 @@ The second request is a duplicate of the first one, so the queue ends up with fi
 
 ## Retries
 
-When a request handler raises an exception, the crawler retries the request. It increments `retry_count` and returns the request to the queue. A request is retried until `retry_count` reaches the crawler's `max_request_retries` option, which defaults to 3. To set a different limit for a single request, pass `max_retries` to `from_url`. A request created with `no_retry=True` isn't retried at all, and neither are requests that failed with an HTTP client error status (4xx), except the status codes that mark a session as blocked (401, 403, and 429 by default), which rotate the session and retry. Session rotations caused by blocking are counted separately and are limited by `max_session_rotations`.
+When a request handler raises an exception, the crawler retries the request. It increments `retry_count` and returns the request to the queue. A request is retried until `retry_count` reaches the crawler's `max_request_retries` option, which defaults to 3. To set a different limit for a single request, pass `max_retries` to `from_url`. A request created with `no_retry=True` isn't retried at all, and neither are requests that failed with an HTTP client error status (4xx), except the status codes in the crawler's `blocked_status_codes` option (401, 403, and 429 by default), which mark the session as blocked, rotate it, and retry. Session rotations caused by blocking are counted separately and are limited by `max_session_rotations`.
 
 When the retries run out, the crawler calls the failed request handler and marks the request as handled. For error handlers, failed request handlers, and the related options, see [Error handling](./error-handling).
 

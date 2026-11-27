@@ -29,7 +29,6 @@ class SessionModel(BaseModel):
     error_score: float
     retired: bool = False
     cookies: list[CookieParam]
-    blocked_status_codes: list[int]
 
 
 class SessionPoolModel(BaseModel):

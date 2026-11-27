@@ -12,6 +12,7 @@ import time
 from asyncio import Future
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import chain, product, repeat
@@ -1156,6 +1157,106 @@ async def test_context_update_kv_store() -> None:
     assert (await store.get_value('foo')) == 'bar'
 
 
+async def test_context_kv_store_reads_value_set_to_none_as_default() -> None:
+    """A value set to `None` in a handler reads as the default value there, and the record is deleted afterwards."""
+    crawler = BasicCrawler()
+    read_value = Mock()
+    store = await crawler.get_key_value_store()
+    await store.set_value('foo', 'stored before the run')
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 'bar')
+        await store.set_value('foo', None)
+        read_value(await store.get_value('foo', 'default'))
+
+    await crawler.run(['https://hello.world'])
+
+    read_value.assert_called_once_with('default')
+    assert await store.record_exists('foo') is False
+
+
+async def test_context_kv_store_reads_pending_value_as_stored() -> None:
+    """A value set in a handler reads there the same way as after it's stored."""
+    crawler = BasicCrawler()
+    read_value = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', '{"a": 1}', content_type='application/json')
+        read_value(await store.get_value('foo'))
+
+    await crawler.run(['https://hello.world'])
+
+    read_value.assert_called_once_with({'a': 1})
+    store = await crawler.get_key_value_store()
+    assert await store.get_value('foo') == {'a': 1}
+
+
+async def test_context_kv_store_keeps_value_as_it_was_set() -> None:
+    """Changing an object after `set_value` in a handler changes neither the value read back nor the committed one."""
+    crawler = BasicCrawler()
+    read_value = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        value = ['item']
+        await store.set_value('foo', value)
+        value.append('changed')
+        read_value(await store.get_value('foo'))
+
+    await crawler.run(['https://hello.world'])
+
+    read_value.assert_called_once_with(['item'])
+    store = await crawler.get_key_value_store()
+    assert await store.get_value('foo') == ['item']
+
+
+async def test_context_kv_store_unstorable_value_fails_request() -> None:
+    """A value that can't be stored raises in the handler, so only the request fails and the crawl goes on."""
+    crawler = BasicCrawler(max_request_retries=0)
+    failed_request_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 5, content_type='text/plain')
+
+    @crawler.failed_request_handler
+    async def on_failed_request(context: BasicCrawlingContext, error: Exception) -> None:
+        failed_request_handler(type(error))
+
+    stats = await crawler.run(['https://hello.world'])
+
+    failed_request_handler.assert_called_once_with(TypeError)
+    assert stats.requests_failed == 1
+
+
+async def test_context_kv_store_unparsable_pending_value_names_key() -> None:
+    """Reading a pending value that can't be parsed raises in the handler with a note that names its key."""
+    crawler = BasicCrawler(max_request_retries=0)
+    failed_request_handler = Mock()
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        store = await context.get_key_value_store()
+        await store.set_value('foo', 'not json', content_type='application/json')
+        await store.get_value('foo')
+
+    @crawler.failed_request_handler
+    async def on_failed_request(context: BasicCrawlingContext, error: Exception) -> None:
+        failed_request_handler(error)
+
+    await crawler.run(['https://hello.world'])
+
+    error = failed_request_handler.call_args.args[0]
+    assert isinstance(error, json.JSONDecodeError)
+    assert any("key 'foo'" in note for note in error.__notes__)
+
+
 async def test_context_use_state() -> None:
     crawler = BasicCrawler()
 
@@ -1467,15 +1568,54 @@ async def test_abort_on_error_applies_to_one_run() -> None:
     assert handled_urls == ['https://a.placeholder.com', 'https://b.placeholder.com']
 
 
-async def test_repeated_run_starts_with_fresh_statistics() -> None:
-    """A repeated `run()` starts from fresh statistics instead of adding to the previous run's."""
-    crawler = BasicCrawler(request_handler=AsyncMock())
+async def test_request_limit_spans_runs() -> None:
+    """`max_requests_per_crawl` counts the earlier runs, so a run that starts at the limit handles no request."""
+    handler = AsyncMock()
+    crawler = BasicCrawler(request_handler=handler, max_requests_per_crawl=1)
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    handler.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    'statistics',
+    [
+        pytest.param(None, id='own'),
+        pytest.param(Statistics.with_default_state(), id='passed'),
+    ],
+)
+async def test_repeated_run_keeps_stats(statistics: Statistics[StatisticsState] | None) -> None:
+    """A repeated `run()` adds to the statistics of the crawler, built by it or passed to it."""
+    crawler = BasicCrawler(request_handler=AsyncMock(), statistics=statistics)
 
     await crawler.run(['https://a.placeholder.com'])
     stats = await crawler.run(['https://b.placeholder.com'])
 
+    assert stats.requests_finished == 2
+
+
+async def test_repeated_run_keeps_errors() -> None:
+    """A repeated `run()` adds to the errors that the error tracker collected in the earlier runs."""
+    crawler = BasicCrawler(max_request_retries=0)
+    crawler.router.default_handler(AsyncMock(side_effect=RuntimeError('Handler failed')))
+
+    await crawler.run(['https://a.placeholder.com'])
+    await crawler.run(['https://b.placeholder.com'])
+
+    assert crawler.statistics.error_tracker.total == 2
+
+
+async def test_stats_reset_between_runs() -> None:
+    """Statistics reset between runs make the next run count from zero, although the crawler persists them."""
+    crawler = BasicCrawler(request_handler=AsyncMock())
+
+    await crawler.run(['https://a.placeholder.com'])
+    crawler.statistics.reset()
+    stats = await crawler.run(['https://b.placeholder.com'])
+
     assert stats.requests_finished == 1
-    assert crawler.statistics.state.requests_finished == 1
 
 
 async def test_crawlers_share_stats_in_turn() -> None:
@@ -1587,20 +1727,20 @@ async def test_repeated_run_keeps_sessions() -> None:
         assert session_pool.active
 
 
-async def test_repeated_run_resets_own_sessions() -> None:
-    """A repeated `run()` replaces the sessions of the session pool the crawler built."""
+async def test_repeated_run_keeps_own_pool() -> None:
+    """A repeated `run()` keeps the sessions of the session pool the crawler built, since it continues the crawl."""
     crawler = BasicCrawler()
-    session_ids = list[set[str]]()
+    pool_session_ids = list[set[str]]()
 
     @crawler.router.default_handler
     async def handler(_context: BasicCrawlingContext) -> None:
-        session_ids.append(set(crawler._session_pool.get_state(as_dict=False).sessions))
+        pool_session_ids.append(set(crawler._session_pool.get_state(as_dict=False).sessions))
 
     await crawler.run(['https://a.placeholder.com'])
     await crawler.run(['https://b.placeholder.com'])
 
-    first_ids, second_ids = session_ids
-    assert first_ids.isdisjoint(second_ids)
+    first_run_ids, second_run_ids = pool_session_ids
+    assert first_run_ids <= second_run_ids
 
 
 async def test_run_needs_entered_session_pool() -> None:
@@ -1847,14 +1987,14 @@ async def test_handled_count_error_does_not_fail_the_run(
     queue = await RequestQueue.open()
     crawler = BasicCrawler(request_manager=queue)
     crawler.router.default_handler(AsyncMock())
-    await crawler.run(['https://a.placeholder.com'])
+    first_stats = await crawler.run(['https://a.placeholder.com'])
 
     get_handled_count = AsyncMock(side_effect=RuntimeError('Handled count unavailable'))
     monkeypatch.setattr(queue, 'get_handled_count', get_handled_count)
     with caplog.at_level(logging.WARNING):
         stats = await crawler.run(['https://a.placeholder.com'])
 
-    assert stats.requests_total == 0
+    assert stats.requests_total == first_stats.requests_total
     get_handled_count.assert_awaited_once()
     assert processed_no_requests_warnings(caplog) == []
 
@@ -1897,12 +2037,12 @@ async def test_aborted_crawl_with_pending_requests_does_not_warn(caplog: pytest.
     )
     handler = AsyncMock(side_effect=[None, RuntimeError('Handler failed')])
     crawler.router.default_handler(handler)
-    await crawler.run(['https://a.placeholder.com'])
+    first_stats = await crawler.run(['https://a.placeholder.com'])
 
     with caplog.at_level(logging.WARNING):
         stats = await crawler.run(['https://b.placeholder.com'])
 
-    assert stats.requests_total == 0
+    assert stats.requests_total == first_stats.requests_total
     assert processed_no_requests_warnings(caplog) == []
 
 
@@ -2191,10 +2331,7 @@ async def test_stop_ends_paused_run() -> None:
     await asyncio.wait_for(pause_task, timeout=10)
 
     crawler.stop()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2221,10 +2358,7 @@ async def test_pause_after_stop_ends_run() -> None:
 
     release.set()
     await asyncio.wait_for(pause_task, timeout=10)
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2249,10 +2383,7 @@ async def test_pause_timeout_after_stop_ends_run() -> None:
         await crawler.pause(timeout=timedelta(milliseconds=50))
 
     release.set()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2279,10 +2410,7 @@ async def test_migration_after_stop_ends_run() -> None:
 
     release.set()
     await event_manager.wait_for_all_listeners_to_complete()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2311,10 +2439,7 @@ async def test_abort_on_error_ends_paused_run() -> None:
         await crawler.pause(timeout=timedelta(milliseconds=50))
 
     release.set()
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert visited == urls[:1]
 
@@ -2355,10 +2480,7 @@ async def test_pause_after_abort_on_error_ends_run() -> None:
 
     release.set()
     await asyncio.wait_for(pause_task, timeout=10)
-    # `run` swallows a cancellation, so `wait_for` would return after its timeout instead of raising.
-    await asyncio.wait([run_task], timeout=10)
-    assert run_task.done()
-    await run_task
+    await asyncio.wait_for(run_task, timeout=10)
 
     assert len(visited) == 2
 
@@ -4457,6 +4579,107 @@ async def test_sigint_without_loop_signal_handlers(caplog: pytest.LogCaptureFixt
     assert 'Pausing...' in caplog.text
     assert 'The crawl was interrupted' in caplog.text
     assert signal.getsignal(signal.SIGINT) is sigint_handler_before_run
+
+
+async def test_run_raises_when_cancelled(caplog: pytest.LogCaptureFixture) -> None:
+    """Cancelling the task that awaits `run()` raises `CancelledError` once the requests in progress finish."""
+    caplog.set_level(logging.INFO, logger='crawlee')
+    crawler = BasicCrawler(configure_logging=False)
+    handler_started = asyncio.Event()
+    release_handler = asyncio.Event()
+    handler_finished = Mock()
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        handler_started.set()
+        await release_handler.wait()
+        handler_finished()
+
+    run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+    await handler_started.wait()
+    # The message shows that the caller's own cancellation propagates, not a new one.
+    run_task.cancel('caller cancelled')
+    # The crawl lets the running request finish before it ends.
+    release_handler.set()
+
+    with pytest.raises(asyncio.CancelledError, match='caller cancelled'):
+        await run_task
+
+    handler_finished.assert_called_once()
+    assert 'Final request statistics' not in caplog.text
+
+
+async def test_run_raises_timeout_error_on_timeout() -> None:
+    """A timeout around `run()` raises `TimeoutError` once the requests in progress finish."""
+    crawler = BasicCrawler(configure_logging=False)
+    handler_finished = Mock()
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        # Expire the timeout while the request is in progress, and finish only once it has cancelled the run.
+        run_timeout.reschedule(asyncio.get_running_loop().time())
+        await poll_until_condition(run_timeout.expired)
+        handler_finished()
+
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(None) as run_timeout:
+            await crawler.run(['https://a.placeholder.com'])
+
+    handler_finished.assert_called_once()
+
+
+async def test_run_raises_when_crawl_swallows_cancellation() -> None:
+    """Cancelling the task that awaits `run()` raises `CancelledError` even when the crawl swallows the cancellation."""
+    crawler = BasicCrawler(configure_logging=False)
+    handler_started = asyncio.Event()
+    release_handler = asyncio.Event()
+    run_crawler = crawler._run_crawler
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        handler_started.set()
+        await release_handler.wait()
+
+    async def swallow_cancellation() -> None:
+        with suppress(asyncio.CancelledError):
+            await run_crawler()
+
+    with patch.object(crawler, '_run_crawler', swallow_cancellation):
+        run_task = asyncio.create_task(crawler.run(['https://a.placeholder.com']))
+        await handler_started.wait()
+        run_task.cancel()
+        release_handler.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await run_task
+
+
+async def test_sigint_after_caught_cancellation() -> None:
+    """SIGINT ends the crawl gracefully even when the task that awaits `run()` caught an earlier cancellation."""
+    crawler = BasicCrawler(
+        configure_logging=False,
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+    )
+
+    @crawler.router.default_handler
+    async def handler(_context: BasicCrawlingContext) -> None:
+        signal.raise_signal(signal.SIGINT)
+        # The pause lets the running request finish, so keep it running until the pause takes effect.
+        await asyncio.sleep(0.5)
+
+    async def run_after_caught_cancellation() -> FinalStatistics:
+        with suppress(asyncio.CancelledError):
+            await asyncio.Event().wait()
+
+        return await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com'])
+
+    run_task = asyncio.create_task(run_after_caught_cancellation())
+    await asyncio.sleep(0)
+    run_task.cancel()
+
+    stats = await run_task
+
+    assert stats.requests_finished == 1
 
 
 async def test_concurrency_system_excludes_settings() -> None:

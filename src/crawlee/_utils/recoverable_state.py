@@ -4,7 +4,7 @@ import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generic, TypeVar
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from crawlee._utils.raise_if_too_many_kwargs import raise_if_too_many_kwargs
 from crawlee._utils.wait import wait_for
@@ -112,8 +112,8 @@ class RecoverableState(Generic[TStateModel]):
             The loaded state model
 
         Raises:
-            ValidationError: If the persisted record is invalid. The record is kept, and every call raises again until
-                it's fixed or cleared by `reset_store`.
+            ValueError: If the persisted record is invalid. The record is kept, and every call raises again until it's
+                fixed or cleared by `reset_store`.
         """
         # Checked without the lock first, so that a call on an initialized state doesn't wait for a save in progress.
         if self._initialized:
@@ -254,23 +254,22 @@ class RecoverableState(Generic[TStateModel]):
         return self._key_value_store
 
     async def _load_saved_state(self) -> None:
-        stored_state = None
         if self._persistence_enabled:
             key_value_store = await self._open_key_value_store()
-            stored_state = await self._with_timeout(
-                lambda: key_value_store.get_value(self._persist_state_key), 'Loading the persisted state'
-            )
-
-        if stored_state is not None:
             try:
-                self._state = self._state_type.model_validate(stored_state)
-            except ValidationError as exc:
+                stored_state = await self._with_timeout(
+                    lambda: key_value_store.get_value(self._persist_state_key), 'Loading the persisted state'
+                )
+                if stored_state is not None:
+                    self._state = self._state_type.model_validate(stored_state)
+            except ValueError as exc:
                 exc.add_note(
                     f"The state persisted under key '{self._persist_state_key}' is invalid. Fix or delete the record "
                     'to start from the default state.'
                 )
                 raise
-        elif self._state is None:
+
+        if self._state is None:
             self._state = self._default_state.model_copy(deep=True)
 
         # Set only once the load succeeds. A load that fails, is cancelled or finds an invalid record leaves the object

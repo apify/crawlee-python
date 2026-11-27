@@ -172,6 +172,15 @@ class AdaptivePlaywrightCrawler(
             or logging.getLogger(f'crawlee.crawlers.{type(self).__name__}'),
         )
 
+        # This crawler and both sub crawlers read the same status code options, so a one-shot iterable must survive the
+        # first read.
+        if (codes := kwargs.get('additional_http_error_status_codes')) is not None:
+            kwargs['additional_http_error_status_codes'] = tuple(codes)
+        if (codes := kwargs.get('ignore_http_error_status_codes')) is not None:
+            kwargs['ignore_http_error_status_codes'] = tuple(codes)
+        if (codes := kwargs.get('blocked_status_codes')) is not None:
+            kwargs['blocked_status_codes'] = tuple(codes)
+
         super().__init__(statistics=adaptive_statistics, **kwargs)
 
         self._rendering_type_predictor = self._own_or_borrow(rendering_type_predictor, DefaultRenderingTypePredictor)

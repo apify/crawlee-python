@@ -176,9 +176,72 @@ Data written by v1 still loads, so an existing storage directory, Redis instance
 
 ## `MemoryStorageBackend` stores copies
 
-`MemoryStorageBackend` stores a JSON snapshot of each dataset item and of each key-value store value with a JSON content type, serialized the same way as by `FileSystemStorageBackend`. Changing an object after you push or set it doesn't change the stored data, and pushing the same object twice stores two independent items. Reads return fresh copies too, so changing a returned item or value doesn't change the store.
+`MemoryStorageBackend` stores a JSON snapshot of each dataset item, serialized the same way as by `FileSystemStorageBackend`. Changing an object after you push it doesn't change the stored data, and pushing the same object twice stores two independent items. Reads return fresh copies too, so changing a returned item doesn't change the dataset.
 
-The memory backend now handles values the same way as the file-system backend. It raises on a value the file-system backend can't serialize, such as one with a circular reference or a tuple as a dict key. Values that JSON doesn't support, such as a `datetime`, are stored as strings, and dict keys that aren't strings become strings.
+The memory backend now handles dataset items the same way as the file-system backend. It raises on an item the file-system backend can't serialize, such as one with a circular reference or a tuple as a dict key. Values that JSON doesn't support, such as a `datetime`, are stored as strings, and dict keys that aren't strings become strings.
+
+Key-value store values are serialized by `KeyValueStore` itself, the same way for every storage backend. For details, see [`KeyValueStore` serializes and parses the values](#keyvaluestore-serializes-and-parses-the-values).
+
+## `KeyValueStore` serializes and parses the values
+
+`KeyValueStore` now serializes a value before passing it to the storage backend, and parses the stored bytes after reading them. In v1, each storage backend did both on its own. The rules are the same for every storage backend. The v1 behavior described below is that of the file-system, SQL and Redis backends. `MemoryStorageBackend` kept each value as it was set.
+
+### `set_value` with `None` deletes the record
+
+`set_value(key, None)` deletes the record, the same as `delete_value(key)`. In v1, it stored a record with the `application/x-none` content type, so `record_exists` returned `True` for it. A record stored that way by v1 still reads as `None`, and `record_exists` still returns `True` for it.
+
+### Values without a content type
+
+Without `content_type`, `bytes`, `bytearray` and `memoryview` values are stored as `application/octet-stream`, `str` values as `text/plain`, and any other value as JSON. In v1, only `dict` and `list` values were stored as JSON. Numbers and booleans were stored as text and read back as `str`, and other objects were stored as the bytes of their `str()` form.
+
+```python
+await kvs.set_value('count', 5)
+
+# v1
+await kvs.get_value('count')  # '5'
+
+# v2
+await kvs.get_value('count')  # 5
+```
+
+### Values with a content type
+
+A `str` or bytes value is stored as it is under the given `content_type`. In v1, a value with a JSON content type was always serialized, so a string that already held JSON was encoded twice and read back as a string. In v2, it's read back parsed. A string that isn't valid JSON is stored too, and reading it raises `ValueError`. Store such a string without the JSON content type. `Dataset.export_to` with the JSON content type now writes the items as a JSON array, where v1 wrote that array wrapped in a JSON string.
+
+A `str` value is encoded with the charset of its content type. A charset that Python doesn't know raises `LookupError`, and a character that the charset can't encode raises `UnicodeEncodeError`. In v1, a `str` value was always encoded as UTF-8. A `str` value that v1 stored under a content type with another charset is now decoded with that charset, so its non-ASCII characters come back wrong. To read its text, decode the bytes from the new `KeyValueStore.get_record` as UTF-8.
+
+Any other value can only be stored as JSON. Passing it with a content type that isn't JSON raises `TypeError`. In v1, such a value was stored as the bytes of its `str()` form.
+
+### Objects that JSON doesn't support
+
+An object that JSON doesn't support is converted with `pydantic_core.to_jsonable_python` before the value is stored as JSON. A `datetime` becomes an ISO 8601 string, a Pydantic model a `dict` keyed by its field aliases, a `set` a list, and `bytes` inside the value a UTF-8 string. An object of a type that Pydantic can't serialize, or such `bytes` that aren't valid UTF-8, raises `TypeError`. In v1, such objects were stored as their `str()` form, so a `datetime` was stored as `'2026-01-01 00:00:00+00:00'` instead of `'2026-01-01T00:00:00Z'`.
+
+### Reading values
+
+`get_value` parses a record by its content type. `application/json` is parsed, `text/*` and `application/*xml` are decoded to `str` with the charset of the content type, or with UTF-8 when it has none, and any other content type is returned as `bytes`. A JSON or text record with a charset that Python doesn't know is returned as `bytes` too. In v1, `application/*xml` content types were returned as `bytes`, and the charset was ignored.
+
+A record with a JSON content type that isn't valid JSON raises `ValueError` from `get_value`, `iterate_values` and `iterate_entries`. In a text or JSON record, the bytes that its charset can't decode are replaced with the Unicode replacement character. In v1, the storage backend logged a warning in both cases, and the record was reported as missing. To read the stored bytes of such a record, use `KeyValueStore.get_record`.
+
+### Iteration lists the keys a page at a time
+
+`iterate_keys`, `iterate_values`, `iterate_entries` and `async for` over a store list the keys a page at a time, so a key set during the iteration can show up in it. In v1, `iterate_keys` listed all the keys when the iteration started. A page holds 1000 keys by default, and the new `chunk_size` argument of `iterate_keys`, `iterate_values` and `iterate_entries` changes that. With a `chunk_size` larger than the store, the keys are listed at once, as in v1. To keep your own writes out of an iteration, collect the keys first, for example with `keys = [key async for key in kvs]`, and write after that.
+
+### Values set in a request handler
+
+The key-value store from `context.get_key_value_store()` serializes a value when you call `set_value`. Changes made to the object afterwards aren't stored when the crawler commits the results of the handler, and `get_value` in the same handler returns a new copy of the value. In v1, the store kept the object itself until the commit, so those changes were stored, and `get_value` returned the same object. A value that can't be stored now raises from `set_value` in the handler, where v1 raised only during the commit.
+
+### Custom key-value store backends
+
+A custom `KeyValueStoreBackend` no longer serializes or parses the values:
+
+- `set_value(*, key, value, content_type)` receives the value as `bytes`, and `content_type` is always set.
+- `get_value(*, key)` returns a `KeyValueStoreRecord` whose `value` is the stored `bytes`. `KeyValueStoreRecord` is no longer generic.
+- `list_keys(*, prefix, exclusive_start_key, limit)` replaces `iterate_keys` and `iterate_entries`. It returns a single `KeyValueStoreKeysListPage`, whose `items` are ordered by key. Its `next_exclusive_start_key` is where the next page starts, or `None` on the last page. A page before the last one may hold fewer than `limit` keys, or none. The page also carries `count`, the number of keys on it, and the `limit` and `exclusive_start_key` it was requested with.
+- `get_values(*, keys)` is optional. Override it if the backend can read several records in a single call. It returns a mapping from each key that has a record to that record. The default implementation calls `get_value` for each key. The built-in file-system, SQL and Redis backends override it, so a subclass of one of them that changes `get_value` must change `get_values` the same way.
+
+### `RedisStorageBackend` indexes the record keys
+
+`RedisStorageBackend` keeps the keys of each key-value store in a sorted set, `key_value_stores:{name}:keys`, so it lists them a page at a time. When v2 opens a store written by v1, it builds the set from the existing records. Don't write to the same store from v1 and v2 at the same time, since v2 doesn't list the keys that v1 adds after the set exists.
 
 ## SQL and Redis lock fetched requests for 3 minutes
 
@@ -326,11 +389,13 @@ crawler_1 = BasicCrawler(request_manager=queue)
 crawler_2 = BasicCrawler(request_manager=queue)
 ```
 
-## Repeated `run()` calls no longer purge the request queue
+## Repeated `run()` calls continue the crawl
 
 In v1, calling `crawler.run()` again on the same instance purged the request queue, unless the queue was named or the previous run had failed. In v2, nothing is purged between runs, the same as Crawlee JS. A repeated `run()` continues with the same request manager and skips the requests an earlier run handled, failed ones included.
 
-The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself:
+The statistics and the session pool carry over too. A repeated `run()` adds to the statistics of the earlier runs, error trackers included, and keeps the sessions. In v1, it reset both. The `max_requests_per_crawl` limit counts the requests in the statistics, so it includes the earlier runs. A run that starts with the limit already reached stops right away. To count from zero, call `crawler.statistics.reset()` before the next `run()`. To start with fresh sessions, pass your own `SessionPool` and call its `reset()` between runs.
+
+The `purge_request_queue` argument of `run()` is removed. If you passed `purge_request_queue=False`, drop the argument. To crawl the same requests again, purge the request manager yourself. To also count from zero, as v1 did, reset the statistics:
 
 ```python
 # v1
@@ -341,6 +406,8 @@ await crawler.run(urls)
 await crawler.run(urls)
 request_manager = await crawler.get_request_manager()
 await request_manager.purge()
+crawler.statistics.reset()
+await crawler.statistics.reset_store()
 await crawler.run(urls)
 ```
 
@@ -355,6 +422,25 @@ for urls in batches:
 ```
 
 `Configuration.purge_on_start` isn't affected. Unnamed storages are still purged once per process, when they're first opened. With `SqlStorageBackend` and `RedisStorageBackend`, each instance now opens its own storages, so it purges them once per instance.
+
+## A timeout or cancellation around `run()` raises
+
+In v1, `crawler.run()` caught the cancellation of the task that awaited it and returned the final statistics. A timeout around `run()`, such as `asyncio.wait_for()` or `asyncio.timeout()`, that expired during the crawl didn't raise `TimeoutError`, and a task running `run()` returned the statistics even after `task.cancel()`. In v2, `run()` lets the requests in progress finish and then raises `CancelledError`, which a timeout turns into `TimeoutError`. A repeated cancellation, which anyio cancel scopes keep sending, cancels the requests in progress. A cancelled run doesn't log the final statistics or the error analysis, the same as a failed run. Ctrl+C still ends the crawl gracefully and returns the statistics.
+
+To limit how long a crawl runs and still get the statistics, stop the crawler when the time is up. The requests in progress still finish, so the crawl can end after the limit:
+
+```python
+# v1
+stats = await asyncio.wait_for(crawler.run(urls), timeout=600)
+
+# v2
+stop_handle = asyncio.get_running_loop().call_later(600, crawler.stop)
+try:
+    stats = await crawler.run(urls)
+finally:
+    # A stop called after the run ends would stop the next run.
+    stop_handle.cancel()
+```
 
 ## `RequestQueue.purge` raises when the storage backend can't purge
 
@@ -564,7 +650,7 @@ What you do with an object you pass depends on its type:
 
 - `SessionPool`, `BrowserPool`, an HTTP client and the `rendering_type_predictor` of `AdaptivePlaywrightCrawler`: enter it with `async with` before you run the crawler, or `run()` raises a `RuntimeError`. Keep it open until every crawler using it has finished.
 - The `extractor` of `PydanticAiCrawler`: enter it the same way. `PydanticAiDirectExtractor` is now an async context manager, like `PydanticAiSelectorExtractor`. Used on its own, either extractor has to be entered before `extract()` too, or it raises a `RuntimeError`. A selector extractor enters and exits its `fallback` itself, so don't enter the fallback yourself, and don't share one fallback between selector extractors that are entered at the same time. If your subclass of `BasePydanticAiHtmlExtractor` overrides `__aenter__` or `__aexit__`, call `super()`. A custom extractor that implements the `PydanticAiHtmlExtractor` protocol directly needs the new `active` property, `__aenter__` and `__aexit__`.
-- `Statistics`: don't enter it yourself, or `run()` raises a `RuntimeError`. In v1, the crawler left entered statistics alone. Crawlers that run one after another can share an instance, including another crawler's statistics. The instance adds up their runs, so the `max_requests_per_crawl` of the second crawler counts the requests of the first one too. When a crawler runs again, it resets the instance, including what the other crawlers counted. Two crawlers can't run with the same instance at the same time.
+- `Statistics`: don't enter it yourself, or `run()` raises a `RuntimeError`. In v1, the crawler left entered statistics alone. Crawlers that run one after another can share an instance, including another crawler's statistics. The instance adds up their runs, so the `max_requests_per_crawl` of the second crawler counts the requests of the first one too. Two crawlers can't run with the same instance at the same time.
 
 For example:
 
@@ -580,8 +666,6 @@ crawler = ParselCrawler(session_pool=session_pool)
 async with session_pool:
     await crawler.run(urls)
 ```
-
-When a crawler runs again, it resets only a session pool it created. A `SessionPool` you pass keeps its sessions. In v1, a repeated `run()` reset a passed pool too.
 
 The `with_beautifulsoup_static_parser` and `with_parsel_static_parser` factory methods of `AdaptivePlaywrightCrawler` pass `statistics` to the crawler as they are, instead of a copy built with `Statistics.replace_state_model`, so the instance you pass is the one that counts. The instance must use `AdaptivePlaywrightCrawlerStatisticState` as its state model, or the crawler raises a `ValueError`:
 
@@ -688,6 +772,10 @@ Messages that mentioned a storage client name the storage backend instead. The D
 
 `RequestQueue.purge()` no longer logs the `Storage client "..." does not support purging the request queue.` warnings. It raises `NotImplementedError` instead. For details, see [`RequestQueue.purge` raises when the storage backend can't purge](#requestqueuepurge-raises-when-the-storage-backend-cant-purge).
 
+A cancelled `run()` doesn't log `Final request statistics` or `Error analysis`. For details, see [A timeout or cancellation around `run()` raises](#a-timeout-or-cancellation-around-run-raises).
+
+The storage backends no longer log the `Failed to decode JSON value for key "..."` and `Failed to decode text value for key "..."` warnings. Instead, `KeyValueStore` raises `ValueError` for a record that isn't valid JSON, and replaces the bytes it can't decode in a text or JSON record. For details, see [Reading values](#reading-values). `RedisStorageBackend` no longer logs the `Metadata for key "..." is missing or invalid.` warning when it reads a key that has no record.
+
 The ERROR message the crawler logs before raising `PersistentRateLimitError` now reads "Giving up the crawl because the request manager can't make progress." instead of "Giving up the crawl because a domain keeps rate-limiting every request."
 
 The two DEBUG messages that `RequestQueue.is_finished` logged, "Background add requests tasks are still in progress." and "The request queue is finished.", are removed together with the method.
@@ -731,6 +819,22 @@ async with session_pool:
 # In a request handler
 response = await context.send_request(url, cookies=SessionCookies())
 ```
+
+## `blocked_status_codes` is a crawler option
+
+The `blocked_status_codes` argument of `Session` and the `Session.is_blocked_status_code()` method are removed. The crawler decides whether a response means the session is blocked, so pass `blocked_status_codes` to the crawler instead. It defaults to 401, 403 and 429, as before. An empty list marks no status code as blocked, while in v1 it fell back to the defaults.
+
+```python
+# v1
+crawler = ParselCrawler(
+    session_pool=SessionPool(create_session_settings={'blocked_status_codes': [403]}),
+)
+
+# v2
+crawler = ParselCrawler(blocked_status_codes=[403])
+```
+
+Session state, including the persisted session pool state, no longer has the `blocked_status_codes` field. Sessions saved by v1 still load, and the field is ignored.
 
 ## Session retirement is permanent
 

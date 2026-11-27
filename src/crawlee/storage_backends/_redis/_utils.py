@@ -1,4 +1,4 @@
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Iterable
 from pathlib import Path
 from typing import TypeVar, cast, overload
 
@@ -34,6 +34,11 @@ def expect_bytes(value: bytes | str | None) -> bytes | None:
             'requires a Redis client created without `decode_responses=True`.'
         )
     return value
+
+
+def decode_strings(values: Iterable[bytes | str]) -> list[str]:
+    """Decode the strings of a Redis reply, which redis-py returns as bytes unless the client decodes responses."""
+    return [value.decode() if isinstance(value, bytes) else value for value in values]
 
 
 def read_lua_script(script_name: str) -> str:

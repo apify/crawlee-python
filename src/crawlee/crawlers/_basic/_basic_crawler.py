@@ -156,7 +156,8 @@ class _BasicCrawlerOptions(TypedDict):
     max_requests_per_crawl: NotRequired[int | None]
     """Maximum number of pages to open during a crawl. The crawl stops upon reaching this limit.
     Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means no limit.
-    Due to concurrency settings, the actual number of pages visited may slightly exceed this value."""
+    Due to concurrency settings, the actual number of pages visited may slightly exceed this value. The limit counts
+    the requests in the statistics, so it includes earlier runs and other crawlers that share the statistics."""
 
     max_session_rotations: NotRequired[int]
     """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
@@ -209,6 +210,10 @@ class _BasicCrawlerOptions(TypedDict):
 
     ignore_http_error_status_codes: NotRequired[Iterable[int]]
     """HTTP status codes that are typically considered errors but should be treated as successful responses."""
+
+    blocked_status_codes: NotRequired[Iterable[int]]
+    """HTTP status codes that mean the website blocked the session. With `retry_on_blocked`, such a response retires the
+    session and the request is retried with another one. Defaults to 401, 403 and 429."""
 
     respect_robots_txt_file: NotRequired[bool]
     """If set to `True`, the crawler will automatically try to fetch the robots.txt file for each domain,
@@ -293,6 +298,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     _ERROR_HANDLING_LOCK_MARGIN = timedelta(minutes=1)
     """How much longer than its timeouts the crawler keeps a request locked, so the error handling still holds it."""
 
+    _DEFAULT_BLOCKED_STATUS_CODES = frozenset({401, 403, 429})
+    """Status codes that mean the website blocked the session, unless `blocked_status_codes` says otherwise."""
+
     def __init__(
         self,
         *,
@@ -311,6 +319,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         retry_on_blocked: bool = True,
         additional_http_error_status_codes: Iterable[int] | None = None,
         ignore_http_error_status_codes: Iterable[int] | None = None,
+        blocked_status_codes: Iterable[int] | None = None,
         concurrency_settings: ConcurrencySettings | None = None,
         concurrency_system: ConcurrencySystemInterface | None = None,
         request_handler_timeout: timedelta = timedelta(minutes=1),
@@ -348,7 +357,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
                 this value. If used together with `keep_alive`, then the crawler will be kept alive only until
-                `max_requests_per_crawl` is achieved.
+                `max_requests_per_crawl` is achieved. The limit counts the requests in the statistics, so it includes
+                earlier runs and other crawlers that share the statistics.
             max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
                 if a proxy error occurs or if the website blocks the request.
                 The session rotations are not counted towards the `max_request_retries` limit.
@@ -362,6 +372,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             ignore_http_error_status_codes: HTTP status codes that are typically considered errors but should be treated
                 as successful responses. Doesn't apply to a 429 from a domain the crawler's request manager paces, which
                 is retried later.
+            blocked_status_codes: HTTP status codes that mean the website blocked the session. With `retry_on_blocked`,
+                such a response retires the session and the request is retried with another one, limited by
+                `max_session_rotations`. Defaults to 401, 403 and 429. Doesn't apply to codes in
+                `ignore_http_error_status_codes` or to a 429 from a domain the crawler's request manager paces.
             concurrency_settings: Settings to fine-tune concurrency levels.
             concurrency_system: A concurrency system to use instead of the default one, e.g. one shared between
                 crawlers to cap their combined concurrency. Keep it open with `async with` until every crawler using it
@@ -426,6 +440,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._ignore_http_error_status_codes = (
             set(ignore_http_error_status_codes) if ignore_http_error_status_codes else set()
         )
+        self._blocked_status_codes = (
+            self._DEFAULT_BLOCKED_STATUS_CODES if blocked_status_codes is None else frozenset(blocked_status_codes)
+        ) - self._ignore_http_error_status_codes
 
         self._http_client = self._own_or_borrow(http_client, ImpitHttpClient)
 
@@ -534,7 +551,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # State flags
         self._keep_alive = keep_alive
-        self._has_finished_before = False
         self._stop_before_run = False
         self._logger_once = LoggerOnce(self._logger)
 
@@ -598,7 +614,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
     @property
     def statistics(self) -> Statistics[TStatisticsState]:
-        """Statistics about the current (or last) crawler run."""
+        """Statistics of the crawler's runs, which add up from one run to the next."""
         return self._statistics
 
     @property
@@ -837,7 +853,12 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         Calling `run()` again on the same instance keeps crawling the same request manager. Requests that a previous
         run handled, failed ones included, aren't processed again. To crawl them again, purge the request manager, or
-        create a new crawler with a freshly opened request queue.
+        create a new crawler with a freshly opened request queue. The statistics carry over too, so
+        `max_requests_per_crawl` includes the requests of the earlier runs.
+
+        Cancelling the task that awaits `run()`, such as with a timeout around it, raises `CancelledError` once the
+        requests in progress finish. A repeated cancellation, which anyio cancel scopes keep sending, cancels them.
+        Ctrl+C also lets them finish, and then returns the final statistics.
 
         Args:
             requests: The requests to be enqueued before the crawler starts.
@@ -869,15 +890,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         self._last_run = self._create_run()
 
         try:
-            if self._has_finished_before:
-                self._statistics.reset()
-                await self._statistics.reset_store()
-
-                # A session pool passed in belongs to the caller, who may still use it in another crawler.
-                if self._session_pool in self._owned_collaborators:
-                    self._session_pool.reset()
-                    await self._session_pool.reset_store()
-
             if requests is not None:
                 await self.add_requests(requests)
 
@@ -917,13 +929,24 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     )
                     remove_sigint_handler = partial(signal.signal, signal.SIGINT, previous_sigint_handler)
 
+            current_task = asyncio.current_task()
+            cancelling_before = current_task.cancelling() if current_task is not None else 0
+            cancellation: CancelledError | None = None
+
             try:
                 await run_task
-            except CancelledError:
-                pass
+            except CancelledError as exc:
+                cancellation = exc
             finally:
                 if remove_sigint_handler is not None:
                     remove_sigint_handler()
+
+            # SIGINT cancels only `run_task`, and the crawl then ends gracefully. A cancellation of the task that awaits
+            # `run()`, such as a timeout around it, propagates, also when the crawl swallowed it. An earlier one that
+            # the caller caught doesn't count. The caught exception is raised again, since anyio cancel scopes
+            # recognize their cancellation by its message.
+            if current_task is not None and current_task.cancelling() > cancelling_before:
+                raise cancellation or CancelledError()
 
             if self._statistics.error_tracker.total > 0:
                 self._logger.info(
@@ -936,8 +959,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 self._logger.info(
                     'The crawl was interrupted. To resume, do: CRAWLEE_PURGE_ON_START=0 python %s', sys.argv[0]
                 )
-
-            self._has_finished_before = True
 
             await self._save_crawler_state()
 
@@ -1656,7 +1677,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         for (id, name, alias), changes in result.key_value_store_changes.items():
             store = await get_kvs(id=id, name=name, alias=alias)
             for key, value in changes.updates.items():
-                await store.set_value(key, value.content, content_type=value.content_type)
+                if value is None:
+                    await store.set_value(key, None)
+                else:
+                    await store.set_value(key, value.content, content_type=value.content_type)
 
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
@@ -2018,20 +2042,16 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         )
         return False
 
-    def _raise_for_session_blocked_status_code(self, session: Session, status_code: int) -> None:
+    def _raise_for_session_blocked_status_code(self, status_code: int) -> None:
         """Raise an exception if the given status code indicates the session is blocked.
 
         Args:
-            session: The session used for the request.
             status_code: The HTTP status code to check.
 
         Raises:
             SessionError: If the status code indicates the session is blocked.
         """
-        if session.is_blocked_status_code(
-            status_code=status_code,
-            ignore_http_error_status_codes=self._ignore_http_error_status_codes,
-        ):
+        if status_code in self._blocked_status_codes:
             raise SessionError(f'Assuming the session is blocked based on HTTP status code {status_code}')
 
     async def _is_allowed_based_on_robots_txt_file(self, url: str) -> bool:

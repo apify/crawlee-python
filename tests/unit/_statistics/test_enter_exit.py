@@ -68,6 +68,20 @@ async def test_enter_during_exit_raises(monkeypatch: pytest.MonkeyPatch) -> None
     await exit_task
 
 
+async def test_enter_drops_unfinished_requests() -> None:
+    """A request left in progress by an earlier run doesn't count as retried in the next one."""
+    statistics = Statistics.with_default_state()
+
+    async with statistics:
+        statistics.record_request_processing_start('request')
+
+    async with statistics:
+        statistics.record_request_processing_start('request')
+        statistics.record_request_processing_finish('request')
+
+    assert statistics.state.request_retry_histogram == {0: 1}
+
+
 async def test_failed_start_tears_down_stats(monkeypatch: pytest.MonkeyPatch) -> None:
     """Statistics whose entry fails after loading the state tear the state down and can be entered again."""
     statistics = Statistics.with_default_state()

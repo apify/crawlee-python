@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -324,6 +325,28 @@ async def test_invalid_record_raises_and_keeps_record(event_manager: EventManage
 
     assert state == _State()
     await recoverable_state.teardown()
+
+
+async def test_record_cleared_by_v1_loads_default_state() -> None:
+    """A record that Crawlee v1 cleared by storing `None` loads the default state."""
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(KEY, b'', content_type='application/x-none')
+
+    state = await _build_state().initialize()
+
+    assert state == _State()
+
+
+async def test_unparsable_record_raises_with_fix_note() -> None:
+    """A record that isn't valid JSON makes `initialize` raise `ValueError` with a note to fix or delete it."""
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(KEY, '{not json', content_type='application/json')
+    recoverable_state = _build_state()
+
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        await recoverable_state.initialize()
+
+    assert any('Fix or delete the record' in note for note in exc_info.value.__notes__)
 
 
 async def test_reset_leaves_record_alone() -> None:

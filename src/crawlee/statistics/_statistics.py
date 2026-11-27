@@ -159,6 +159,10 @@ class Statistics(Generic[TStatisticsState]):
 
         self._active = True
 
+        # Records of requests that an earlier run left unfinished, including ones waiting for a retry, are dropped, the
+        # same as after a restore.
+        self._requests_in_progress.clear()
+
         try:
             await self._state.initialize()
 

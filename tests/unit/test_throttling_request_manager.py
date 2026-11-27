@@ -718,6 +718,54 @@ async def test_backoff_escalates_under_a_long_crawl_delay(manager: ThrottlingReq
         assert state.backoff_until == clock.now.return_value + manager._base_delay * 2**4
 
 
+async def test_min_crawl_delay_paces_dispatch(inner_queue: RequestQueue, service_locator: ServiceLocator) -> None:
+    """`min_crawl_delay` holds a domain back after a dispatch without a robots.txt crawl-delay."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+        min_crawl_delay=timedelta(seconds=5),
+    )
+    await manager.add_requests([f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2'])
+
+    with _frozen_clock():
+        assert await manager.fetch_next_request() is not None
+        assert await manager.fetch_next_request() is None
+        status = await manager.check_readiness()
+
+    assert status == WaitingStatus(ready_at=CLOCK_START + timedelta(seconds=5))
+
+
+@pytest.mark.parametrize(
+    ('declared', 'expected'),
+    [
+        pytest.param(timedelta(seconds=2), timedelta(seconds=5), id='floor-longer'),
+        pytest.param(timedelta(seconds=9), timedelta(seconds=9), id='declared-longer'),
+    ],
+)
+async def test_longer_crawl_delay_applies(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+    declared: timedelta,
+    expected: timedelta,
+) -> None:
+    """A domain waits for the longer of its robots.txt crawl-delay and `min_crawl_delay`."""
+    manager = ThrottlingRequestManager(
+        inner_queue,
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+        min_crawl_delay=timedelta(seconds=5),
+    )
+    manager.record_pacing_signal(MinIntervalSignal(f'https://{THROTTLED_DOMAIN}/', interval=declared, scope='hostname'))
+
+    with _frozen_clock():
+        manager._mark_domain_dispatched(THROTTLED_DOMAIN)
+
+    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay_until == CLOCK_START + expected
+
+
 # ── Fetch Scheduling Tests ────────────────────────────
 
 
@@ -1832,6 +1880,18 @@ async def test_unknown_throttle_by_is_rejected(inner_queue: RequestQueue, servic
             throttle_by='site',  # ty: ignore[invalid-argument-type]
             request_manager_opener=RequestQueue.open,
             service_locator=service_locator,
+        )
+
+
+async def test_min_crawl_delay_must_not_be_negative(inner_queue: RequestQueue, service_locator: ServiceLocator) -> None:
+    """A negative `min_crawl_delay` is rejected."""
+    with pytest.raises(ValueError, match='min_crawl_delay'):
+        ThrottlingRequestManager(
+            inner_queue,
+            domains=TEST_DOMAINS,
+            request_manager_opener=RequestQueue.open,
+            service_locator=service_locator,
+            min_crawl_delay=timedelta(seconds=-1),
         )
 
 

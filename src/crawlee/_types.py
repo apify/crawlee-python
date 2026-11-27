@@ -234,13 +234,14 @@ class KeyValueStoreInterface(Protocol):
 
 @dataclass()
 class KeyValueStoreValue:
-    content: Any
-    content_type: str | None
+    content: bytes
+    content_type: str
 
 
 class KeyValueStoreChangeRecords:
     def __init__(self, actual_key_value_store: KeyValueStore) -> None:
-        self.updates = dict[str, KeyValueStoreValue]()
+        self.updates = dict[str, KeyValueStoreValue | None]()
+        """The pending value of each key, serialized as it will be stored, or `None` to delete the record."""
         self._actual_key_value_store = actual_key_value_store
 
     async def set_value(
@@ -250,7 +251,16 @@ class KeyValueStoreChangeRecords:
         *,
         content_type: str | None = None,
     ) -> None:
-        self.updates[key] = KeyValueStoreValue(value, content_type)
+        if value is None:
+            self.updates[key] = None
+            return
+
+        # Import here to avoid circular imports.
+        from crawlee.storages._utils import serialize_value  # noqa: PLC0415
+
+        # Serialized right away, so that a value that can't be stored fails in the request handler.
+        content, resolved_content_type = await serialize_value(value, content_type)
+        self.updates[key] = KeyValueStoreValue(content, resolved_content_type)
 
     @overload
     async def get_value(self, key: str) -> Any: ...
@@ -263,7 +273,23 @@ class KeyValueStoreChangeRecords:
 
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         if key in self.updates:
-            return cast('T', self.updates[key].content)
+            update = self.updates[key]
+
+            # A pending `None` deletes the record once the changes are committed.
+            if update is None:
+                return default_value
+
+            # Import here to avoid circular imports.
+            from crawlee.storages._utils import parse_value  # noqa: PLC0415
+
+            try:
+                return cast('T', parse_value(update.content, update.content_type))
+            except ValueError as exc:
+                exc.add_note(
+                    f"The value set under key '{key}' in this request handler can't be parsed as "
+                    f"'{update.content_type}'."
+                )
+                raise
 
         return await self._actual_key_value_store.get_value(key, default_value)
 
