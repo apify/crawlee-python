@@ -67,8 +67,9 @@ class RobotsTxtFile:
             else:
                 body = await response.read()
             # `utf-8-sig` drops a leading byte order mark, which would otherwise hide the first rule line from Protego.
-            # Bytes that are not UTF-8, such as a Latin-1 comment, are dropped, so the rest of the file still applies.
-            robots = Protego.parse(body.decode('utf-8-sig', errors='ignore'))
+            # Bytes that are not UTF-8 become U+FFFD. Protego decodes the same bytes in a URL to U+FFFD too, so a rule
+            # path that holds such a byte matches the URL it is written for.
+            robots = Protego.parse(body.decode('utf-8-sig', errors='replace'))
 
         except Exception as e:
             logger.warning(f'Failed to fetch from robots.txt from "{url}" with error: "{e}"')
