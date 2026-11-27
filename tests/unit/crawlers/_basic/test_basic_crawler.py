@@ -466,6 +466,7 @@ async def test_error_handler_no_retry_fails(error: Exception) -> None:
     handler_mock.assert_awaited_once()
     failed_request_handler_mock.assert_awaited_once()
     assert crawler.statistics.error_tracker.total == 1
+    assert crawler.statistics.error_tracker_retry.total == 0
     stored_request = await queue.get_request(request.unique_key)
     assert stored_request is not None
     assert stored_request.retry_count == 0

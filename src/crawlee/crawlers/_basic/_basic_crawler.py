@@ -1801,9 +1801,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request.state = RequestState.ERROR_HANDLER
             should_retry = self._should_retry_request(context, session_error)
 
-            if should_retry:
-                await self._statistics.error_tracker_retry.add(error=session_error, context=context)
-
             await self._call_error_handler(context, session_error)
 
             # Retire before checking `no_retry`, so the blocked session leaves the pool even when the error handler
@@ -1812,6 +1809,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 session.retire()
 
             if should_retry and not request.no_retry:
+                await self._statistics.error_tracker_retry.add(error=session_error, context=context)
                 exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
                 self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
 
