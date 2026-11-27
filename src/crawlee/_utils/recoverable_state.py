@@ -111,7 +111,8 @@ class RecoverableState(Generic[TStateModel]):
         If persistence is enabled, this method loads the saved state and registers the object to listen for
         PERSIST_STATE events. A state established beforehand by `reset` survives if there is no record to restore.
 
-        Calling this again after `teardown` registers the listener again, but doesn't reload the record.
+        Calling this again after `teardown` registers the listener again, but doesn't reload the record. The next
+        PERSIST_STATE event then writes the state even if it hasn't changed.
 
         Returns:
             The loaded state model
@@ -128,7 +129,10 @@ class RecoverableState(Generic[TStateModel]):
             if self._initialized:
                 return self.current_value
 
-            if not self._record_loaded:
+            if self._record_loaded:
+                # The record may have changed since `teardown`, for example by a purge that failed partway.
+                self._persisted_digest = None
+            else:
                 await self._load_saved_state()
 
             # Registered only after a successful load, so that a failed one leaves no listener behind.
@@ -142,8 +146,8 @@ class RecoverableState(Generic[TStateModel]):
         """Clean up resources used by the recoverable state.
 
         If persistence is enabled, this method deregisters the object from PERSIST_STATE events and persists the
-        current state one last time if it has changed since it was last saved or loaded, logging a warning if that
-        fails. The in-memory state is kept, and `initialize` can be called again.
+        current state one last time, logging a warning if that fails. The in-memory state is kept, and `initialize`
+        can be called again.
         """
         async with self._lock:
             self._initialized = False
@@ -152,7 +156,7 @@ class RecoverableState(Generic[TStateModel]):
                 return
 
             self._event_manager.off(event=Event.PERSIST_STATE, listener=self._persist_state_on_event)
-            await self._persist_state_quietly()
+            await self._persist_state_quietly(skip_unchanged=False)
 
     @property
     def current_value(self) -> TStateModel:
@@ -197,10 +201,6 @@ class RecoverableState(Generic[TStateModel]):
 
             key_value_store = await self._open_key_value_store()
 
-            # The next persist has to write the state even if it hasn't changed. Cleared before the delete, since a
-            # delete that fails or is cancelled may still land.
-            self._persisted_digest = None
-
             await self._with_timeout(
                 lambda: key_value_store.set_value(self._persist_state_key, None), 'Clearing the persisted state'
             )
@@ -210,8 +210,8 @@ class RecoverableState(Generic[TStateModel]):
 
         It does nothing if persistence is disabled, or before `initialize` has read the persisted record. A failed write
         raises from a direct call, while the persists on PERSIST_STATE events and in `teardown` log a warning instead.
-        A direct call writes the state even if it hasn't changed since it was last saved or loaded, while the other
-        persists skip such a write.
+        A direct call and `teardown` write the state even if it hasn't changed since it was last saved or loaded, while
+        a persist on a PERSIST_STATE event skips such a write.
 
         Args:
             event_data: Optional data associated with a PERSIST_STATE event
@@ -277,11 +277,13 @@ class RecoverableState(Generic[TStateModel]):
             if not self._initialized:
                 return
 
-            await self._persist_state_quietly(event_data)
+            await self._persist_state_quietly(event_data, skip_unchanged=True)
 
-    async def _persist_state_quietly(self, event_data: EventPersistStateData | None = None) -> None:
+    async def _persist_state_quietly(
+        self, event_data: EventPersistStateData | None = None, *, skip_unchanged: bool
+    ) -> None:
         try:
-            await self._persist(event_data, skip_unchanged=True)
+            await self._persist(event_data, skip_unchanged=skip_unchanged)
         except Exception:
             self._log.warning(f"Failed to persist the state under key '{self._persist_state_key}'.", exc_info=True)
 

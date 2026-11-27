@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.crawlers import AdaptivePlaywrightCrawlerStatisticState
+from crawlee.events import Event, EventPersistStateData
 from crawlee.statistics import Statistics, StatisticsState
+from crawlee.statistics import _models as statistics_models
 from crawlee.storages import KeyValueStore
 
 
@@ -253,6 +258,26 @@ async def test_persist_state_writes_state_in_progress() -> None:
 
     assert persisted is not None
     assert persisted['requestsFailed'] == 42
+
+
+async def test_unchanged_state_is_saved_on_every_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The statistics are saved on every PERSIST_STATE event, since the record includes the time of the save."""
+    key = 'statistics_every_event'
+    kvs = await KeyValueStore.open()
+    event_manager = service_locator.get_event_manager()
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    ticks = (start + timedelta(seconds=second) for second in itertools.count())
+    monkeypatch.setattr(statistics_models, 'datetime', Mock(now=Mock(side_effect=lambda _tz: next(ticks))))
+
+    async with event_manager, Statistics.with_default_state(persistence_enabled=True, persist_state_key=key):
+        set_value = AsyncMock(side_effect=kvs.set_value)
+        monkeypatch.setattr(kvs, 'set_value', set_value)
+
+        for _ in range(2):
+            event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+            await event_manager.wait_for_all_listeners_to_complete()
+
+        assert set_value.await_count == 2
 
 
 async def test_persistence_loads_numeric_id() -> None:

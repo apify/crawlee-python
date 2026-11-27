@@ -618,7 +618,7 @@ async def test_initialize_skips_wait_for_save_in_progress(
 async def test_unchanged_state_is_not_persisted_again(
     event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A PERSIST_STATE event and `teardown` write the state only when it changed since it was last saved."""
+    """A PERSIST_STATE event writes the state only when it changed since it was last saved."""
     kvs = await KeyValueStore.open()
     recoverable_state = _build_state()
     await recoverable_state.initialize()
@@ -635,6 +635,20 @@ async def test_unchanged_state_is_not_persisted_again(
     assert set_value.await_count == 1
 
     await recoverable_state.teardown()
+
+
+async def test_teardown_writes_unchanged_state(event_manager: EventManager, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`teardown` writes the state even if it hasn't changed since it was last saved."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+
+    set_value = AsyncMock(side_effect=kvs.set_value)
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+
+    await recoverable_state.teardown()
+
     assert set_value.await_count == 1
 
 

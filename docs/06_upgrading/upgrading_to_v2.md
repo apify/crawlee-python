@@ -710,7 +710,7 @@ Entering `Statistics` or `SessionPool` again keeps their in-memory state. In v1,
 
 ## State is saved only when it has changed
 
-A component, such as the session pool, a `RequestList` or a `use_state` dictionary, now saves its state on a `PERSIST_STATE` event and on exit only if the state has changed since it was last saved or loaded. A direct `persist_state()` call and `KeyValueStore.persist_autosaved_values()` save the state every time. In v1, the state was saved on every `PERSIST_STATE` event and on exit.
+A component, such as the session pool, a `RequestList` or a `use_state` dictionary, now saves its state on a `PERSIST_STATE` event only if the state has changed since it was last saved or loaded. On exit, on a direct `persist_state()` call and in `KeyValueStore.persist_autosaved_values()`, it still saves the state every time. `Statistics` saves on every event, since its record includes the time of the save. In v1, every `PERSIST_STATE` event saved the state.
 
 ## Logs changed
 
