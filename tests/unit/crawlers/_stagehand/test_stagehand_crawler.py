@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -51,3 +51,10 @@ def test_import_error_handled() -> None:
                 sys.modules.pop(mod_name, None)
         with pytest.raises(ImportError):
             from crawlee.crawlers._stagehand import StagehandCrawler  # noqa: F401 PLC0415
+
+
+def test_navigation_request_is_not_fetched_by_playwright() -> None:
+    """Playwright does not know the proxy of a browser attached over CDP, so it never sends the navigation request."""
+    crawler = StagehandCrawler()
+
+    assert crawler._can_fetch_navigation_request(Mock()) is False

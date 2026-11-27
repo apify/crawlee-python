@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from logging import getLogger
 from typing import TYPE_CHECKING
 
+from playwright.async_api import Error as PlaywrightError
+
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from playwright.async_api import Page, Route
     from playwright.async_api import Request as PlaywrightRequest
 
     from crawlee._types import HttpHeaders, HttpMethod, HttpPayload
+
+logger = getLogger(__name__)
 
 _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.css',
@@ -23,6 +30,10 @@ _DEFAULT_BLOCK_REQUEST_URL_PATTERNS = [
     '.zip',
 ]
 
+# The browser ignores these overrides on a continued request: it loads cookies from its own store and keeps proxy
+# credentials away from the site.
+_BROWSER_MANAGED_HEADERS = frozenset({'cookie', 'proxy-authorization'})
+
 
 class NavigationRequestInterceptor:
     """One-shot page route that applies a custom method, headers, and payload to the main-frame navigation request.
@@ -31,10 +42,23 @@ class NavigationRequestInterceptor:
     `Page.set_extra_http_headers` would leak sensitive values like `Authorization` to every subresource request
     the page makes, including cross-origin ones. The navigation request is matched by its role (a main-frame
     navigation) rather than by its URL, because the browser normalizes URLs (adds the root path, strips
-    fragments), so a URL comparison can silently miss. Redirect hops bypass routing and inherit the overrides.
+    fragments), so a URL comparison can silently miss.
 
     Custom headers are merged into the headers the browser would send on its own (e.g. `User-Agent` or
     fingerprint headers), with the custom ones winning.
+
+    Redirect hops bypass routing, and a continued request passes its header overrides to them, also to a redirect
+    target on another origin. So with `fetch_authorized_request`, a request with a custom `Authorization` header
+    is not continued: `Route.fetch` sends it without following redirects, and its response is fulfilled. The browser
+    then follows any redirect on its own, without the custom headers, so the credentials never reach another origin.
+    Any other request is continued, and redirect hops carry its custom headers.
+
+    A request sent with `Route.fetch` differs from a continued one:
+
+    - Playwright sends it over HTTP/1.1 with its own TLS stack, header order, and no `sec-fetch-*` headers, so its
+      fingerprint is not the fingerprint of the browser.
+    - A redirect target on the same origin gets no custom header either.
+    - After a 307 or 308 redirect, the browser sends a `GET` without a payload, whatever the custom method is.
     """
 
     def __init__(
@@ -44,11 +68,27 @@ class NavigationRequestInterceptor:
         method: HttpMethod = 'GET',
         headers: HttpHeaders | dict[str, str] | None = None,
         payload: HttpPayload | None = None,
+        timeout: timedelta | None = None,
+        fetch_authorized_request: bool = False,
     ) -> None:
+        """Initialize a new instance.
+
+        Args:
+            page: The page whose navigation request gets the overrides.
+            method: HTTP method of the navigation request.
+            headers: Custom headers of the navigation request.
+            payload: Payload of the navigation request.
+            timeout: Time limit for a request sent with `Route.fetch`. If None, the Playwright default applies.
+            fetch_authorized_request: Whether `Route.fetch` sends a request with a custom `Authorization` header.
+                Playwright then sends the request in place of the browser, so it needs the proxy of the browser
+                in its own options, and the browser has to accept a fulfilled redirect response.
+        """
         self._page = page
         self._method = method
         self._headers = headers
         self._payload = payload
+        self._timeout = timeout
+        self._fetch_authorized_request = fetch_authorized_request
         self._applied = False
 
     async def register(self) -> None:
@@ -66,7 +106,35 @@ class NavigationRequestInterceptor:
 
         self._applied = True
         merged_headers = {**request.headers, **dict(self._headers)} if self._headers else None
+
+        has_authorization = any(name.lower() == 'authorization' for name in self._headers or ())
+
+        if merged_headers and has_authorization and self._fetch_authorized_request:
+            await self._fetch_and_fulfill(route, merged_headers)
+            return
+
         await route.continue_(method=self._method, headers=merged_headers, post_data=self._payload)
+
+    async def _fetch_and_fulfill(self, route: Route, headers: dict[str, str]) -> None:
+        """Send the request with `Route.fetch` without following redirects, and fulfill the route with the response."""
+        # Without these overrides, the request has the same headers as a continued one.
+        headers = {name: value for name, value in headers.items() if name.lower() not in _BROWSER_MANAGED_HEADERS}
+
+        try:
+            response = await route.fetch(
+                method=self._method,
+                headers=headers,
+                post_data=self._payload,
+                max_redirects=0,
+                timeout=self._timeout.total_seconds() * 1000 if self._timeout else None,
+            )
+            await route.fulfill(response=response)
+        except PlaywrightError as exc:
+            # A route that stays unresolved keeps `Page.goto` waiting for its whole timeout, and Playwright raises
+            # the error of the route handler from the next call on any of its objects.
+            logger.debug(f'Sending the navigation request to {route.request.url} failed: {exc}')
+            with suppress(PlaywrightError):
+                await route.abort()
 
 
 async def infinite_scroll(page: Page) -> None:
