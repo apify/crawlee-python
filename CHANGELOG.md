@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Keep `robots.txt` rules when the file is not valid UTF-8 ([#2531](https://github.com/apify/crawlee-python/pull/2531)) ([fb26519](https://github.com/apify/crawlee-python/commit/fb26519ebc1f66e1d78498c6f11ae7aef91423de)) by [@shlokbam](https://github.com/shlokbam), closes [#2530](https://github.com/apify/crawlee-python/issues/2530)
+- Apply `robots.txt` rules to URLs with the default port ([#2533](https://github.com/apify/crawlee-python/pull/2533)) ([4d50067](https://github.com/apify/crawlee-python/commit/4d50067cad2f99d79b59e1cb3fe054dc0121bf01)) by [@shlokbam](https://github.com/shlokbam), closes [#2532](https://github.com/apify/crawlee-python/issues/2532)
 
 <!-- git-cliff-unreleased-end -->
 
