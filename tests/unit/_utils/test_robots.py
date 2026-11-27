@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+
 from crawlee._utils.robots import RobotsTxtFile
 
 
@@ -67,3 +71,31 @@ async def test_bind_robots_txt_url() -> None:
     robots = await RobotsTxtFile.from_content('http://check.com/robots.txt', content)
     assert not robots.is_allowed('http://check.com/test.html')
     assert robots.is_allowed('http://othercheck.com/robots.txt')
+
+
+@pytest.mark.parametrize(
+    ('content', 'disallowed_path', 'allowed_path'),
+    [
+        pytest.param(
+            b'# Copyright \xa9 2026\nUser-agent: *\nDisallow: /private/\n',
+            '/private/page.html',
+            '/public/page.html',
+            id='byte_in_comment',
+        ),
+        pytest.param(
+            b'User-agent: *\nDisallow: /men\xfc/\n',
+            '/men%FC/page.html',
+            '/men/page.html',
+            id='byte_in_rule_path',
+        ),
+    ],
+)
+async def test_load_robots_txt_with_non_utf8_bytes(content: bytes, disallowed_path: str, allowed_path: str) -> None:
+    """A byte that is not UTF-8 keeps the rules of the file and the path of the rule it is in."""
+    response = Mock(status_code=200, read=AsyncMock(return_value=content))
+    http_client = Mock(send_request=AsyncMock(return_value=response))
+
+    robots = await RobotsTxtFile.load('https://example.com/robots.txt', http_client)
+
+    assert not robots.is_allowed(f'https://example.com{disallowed_path}')
+    assert robots.is_allowed(f'https://example.com{allowed_path}')
