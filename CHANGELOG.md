@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
 
+## 1.11.5 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Keep `robots.txt` rules when the file is not valid UTF-8 ([#2531](https://github.com/apify/crawlee-python/pull/2531)) ([fb26519](https://github.com/apify/crawlee-python/commit/fb26519ebc1f66e1d78498c6f11ae7aef91423de)) by [@shlokbam](https://github.com/shlokbam), closes [#2530](https://github.com/apify/crawlee-python/issues/2530)
+
 <!-- git-cliff-unreleased-end -->
 
 ## [1.11.4](https://github.com/apify/crawlee-python/releases/tag/v1.11.4) (2026-11-27)
