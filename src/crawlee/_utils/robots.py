@@ -97,7 +97,8 @@ class RobotsTxtFile:
             user_agent: The user-agent string to check permissions for. Defaults to '*' which matches any user-agent.
         """
         check_url = URL(url)
-        if check_url.origin() != self._original_url:
+        # Compare string forms, because `URL` equality treats an explicit default port as another origin.
+        if str(check_url.origin()) != str(self._original_url):
             return True
         return bool(self._robots.can_fetch(str(check_url), user_agent))
 
