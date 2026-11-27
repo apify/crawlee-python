@@ -285,7 +285,7 @@ class CurlImpersonateHttpClient(HttpClient):
             raise asyncio.TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
-                raise ProxyError from exc
+                raise ProxyError(str(exc)) from exc
             raise
 
         if self._persist_cookies_per_session and session and response.curl:

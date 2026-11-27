@@ -155,6 +155,20 @@ async def test_send_request_with_proxy_disabled(
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
+async def test_stream_with_proxy_disabled(
+    http_client: HttpClient,
+    disabled_proxy: ProxyInfo,
+) -> None:
+    url = 'https://apify.com/'
+
+    with pytest.raises(ProxyError) as exc_info:
+        async with http_client.stream(url, proxy_info=disabled_proxy):
+            pass
+
+    assert str(exc_info.value)
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Skipped on Windows')
 async def test_session_cookies_sent_through_proxy(
     http_client: HttpClient,
     proxy: ProxyInfo,

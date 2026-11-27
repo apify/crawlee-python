@@ -293,6 +293,10 @@ class HttpxHttpClient(HttpClient):
             response = await client.send(http_request, stream=True)
         except httpx2.TimeoutException as exc:
             raise asyncio.TimeoutError from exc
+        except httpx2.TransportError as exc:
+            if self._is_proxy_error(exc):
+                raise ProxyError(str(exc)) from exc
+            raise
 
         try:
             yield _HttpxResponse(response)
