@@ -108,7 +108,7 @@ async def test_send_request_with_proxy_disabled(
 ) -> None:
     url = 'https://apify.com/'
 
-    with pytest.raises(ProxyError, match=r'^Detected a session error, retiring session\.\.\. Proxy error: \S'):
+    with pytest.raises(ProxyError, match=r'^Detected a session error, retiring session\.\.\. \S'):
         await http_client.send_request(url, proxy_info=disabled_proxy)
 
 

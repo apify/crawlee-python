@@ -1364,7 +1364,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         error: Exception,
         *,
         request_manager: RequestManager,
-        retire_session: bool = False,
+        retire_session: bool,
     ) -> bool:
         """Invoke the user `error_handler` and enqueue a replacement request when appropriate.
 
