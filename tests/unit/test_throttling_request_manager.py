@@ -620,6 +620,141 @@ async def test_crawl_delay_hides_queued_requests(manager: ThrottlingRequestManag
     assert await manager.is_finished() is False
 
 
+async def test_concurrent_fetches_paced(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """Concurrent fetches dispatch one request to a domain per crawl-delay window."""
+    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    await manager.add_requests([f'https://{THROTTLED_DOMAIN}/page{i}' for i in range(3)])
+    sub_manager = manager._sub_managers[THROTTLED_DOMAIN]
+    fetch = sub_manager.fetch_next_request
+
+    async def suspending_fetch() -> Request | None:
+        # A backend that does I/O can suspend inside a fetch, the memory one doesn't.
+        await asyncio.sleep(0)
+        return await fetch()
+
+    with patch.object(sub_manager, 'fetch_next_request', side_effect=suspending_fetch):
+        results = await asyncio.gather(*(manager.fetch_next_request() for _ in range(3)))
+
+    assert sum(result is not None for result in results) == 1
+
+
+async def test_concurrent_fetches_pace_a_later_domain(
+    two_domain_manager: ThrottlingRequestManager[RequestQueue],
+) -> None:
+    """A fetch suspended on an empty domain skips a later domain that another call has armed meanwhile."""
+    two_domain_manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    two_domain_manager.set_crawl_delay(f'https://{SECOND_THROTTLED_DOMAIN}/', 30)
+    await two_domain_manager.add_requests([f'https://{SECOND_THROTTLED_DOMAIN}/page{i}' for i in range(4)])
+    empty_sub_manager = two_domain_manager._sub_managers[THROTTLED_DOMAIN]
+    fetch = empty_sub_manager.fetch_next_request
+
+    async def suspending_fetch() -> Request | None:
+        await asyncio.sleep(0)
+        return await fetch()
+
+    with _frozen_clock() as clock:
+        # An earlier dispatch sorts the busy domain after the empty one, which has never been dispatched to.
+        assert await two_domain_manager.fetch_next_request() is not None
+        clock.now.return_value += timedelta(seconds=31)
+
+        with patch.object(empty_sub_manager, 'fetch_next_request', side_effect=suspending_fetch):
+            results = await asyncio.gather(*(two_domain_manager.fetch_next_request() for _ in range(3)))
+
+    assert sum(result is not None for result in results) == 1
+
+
+async def test_empty_fetch_keeps_domain_turn(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A fetch that finds the domain's RQ empty doesn't arm its crawl-delay."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    manager.set_crawl_delay(url, 30)
+
+    assert await manager.fetch_next_request() is None
+    await manager.add_request(url)
+    request = await manager.fetch_next_request()
+
+    assert request is not None
+    assert request.url == url
+
+
+async def test_failed_fetch_keeps_domain_turn(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A fetch that raises in the domain's RQ doesn't arm its crawl-delay."""
+    url = f'https://{THROTTLED_DOMAIN}/page1'
+    manager.set_crawl_delay(url, 30)
+    await manager.add_request(url)
+    sub_manager = manager._sub_managers[THROTTLED_DOMAIN]
+
+    with (
+        patch.object(sub_manager, 'fetch_next_request', side_effect=RuntimeError('storage failure')),
+        pytest.raises(RuntimeError, match='storage failure'),
+    ):
+        await manager.fetch_next_request()
+
+    request = await manager.fetch_next_request()
+
+    assert request is not None
+    assert request.url == url
+
+
+async def test_empty_fetch_keeps_a_later_dispatch_armed(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A slow fetch that finds nothing doesn't undo the crawl-delay armed by a dispatch made meanwhile."""
+    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    sub_manager = manager._sub_managers[THROTTLED_DOMAIN]
+    state = manager._domain_states[THROTTLED_DOMAIN]
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def empty_fetch() -> Request | None:
+        entered.set()
+        await release.wait()
+        return None
+
+    with _frozen_clock() as clock:
+        with patch.object(sub_manager, 'fetch_next_request', side_effect=empty_fetch):
+            slow_fetch = asyncio.create_task(manager.fetch_next_request())
+            await entered.wait()
+
+        clock.now.return_value += timedelta(seconds=31)
+        assert await manager.fetch_next_request() is not None
+
+        release.set()
+        assert await slow_fetch is None
+        assert state.crawl_delay_until == clock.now.return_value + timedelta(seconds=30)
+
+
+async def test_crawl_delay_runs_from_dispatch(manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """A slow fetch doesn't shorten the crawl-delay window, which runs from the dispatch."""
+    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+    sub_manager = manager._sub_managers[THROTTLED_DOMAIN]
+    state = manager._domain_states[THROTTLED_DOMAIN]
+    fetch = sub_manager.fetch_next_request
+
+    with _frozen_clock() as clock:
+
+        async def slow_fetch() -> Request | None:
+            clock.now.return_value += timedelta(seconds=10)
+            return await fetch()
+
+        with patch.object(sub_manager, 'fetch_next_request', side_effect=slow_fetch):
+            assert await manager.fetch_next_request() is not None
+
+        assert state.crawl_delay_until == clock.now.return_value + timedelta(seconds=30)
+
+
+async def test_inner_dispatch_arms_crawl_delay(
+    manager: ThrottlingRequestManager[RequestQueue],
+    inner_queue: RequestQueue,
+) -> None:
+    """A request of a configured domain dispatched from inner arms the domain's crawl-delay."""
+    manager.set_crawl_delay(f'https://{THROTTLED_DOMAIN}/', 30)
+    # Requests stored in inner before their domain was configured.
+    await inner_queue.add_requests([f'https://{THROTTLED_DOMAIN}/page1', f'https://{THROTTLED_DOMAIN}/page2'])
+
+    assert await manager.fetch_next_request() is not None
+    assert await manager.fetch_next_request() is None
+
+
 async def test_expired_throttle_makes_the_domain_fetchable_again(
     manager: ThrottlingRequestManager[RequestQueue],
 ) -> None:
