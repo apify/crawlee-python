@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import inspect, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from crawlee import Request
@@ -344,6 +344,7 @@ async def test_get_metadata_does_not_retry_on_unexpected_exception(rq_client: Sq
     [
         pytest.param(SQLAlchemyError('db error'), id='sqlalchemy-error'),
         pytest.param(ConnectionRefusedError(), id='connection-error'),
+        pytest.param(asyncio.TimeoutError(), id='timeout'),
     ],
 )
 async def test_add_read_failure_unprocessed(
@@ -369,6 +370,7 @@ async def test_add_read_failure_unprocessed(
     [
         pytest.param(SQLAlchemyError('db error'), id='sqlalchemy-error'),
         pytest.param(ConnectionResetError(), id='connection-error'),
+        pytest.param(asyncio.TimeoutError(), id='timeout'),
     ],
 )
 async def test_add_write_failure_unprocessed(
@@ -376,7 +378,7 @@ async def test_add_write_failure_unprocessed(
     monkeypatch: pytest.MonkeyPatch,
     error: Exception,
 ) -> None:
-    """Test that new requests come back unprocessed when every commit and rollback fails."""
+    """Test that new requests come back unprocessed once when every commit and rollback fails."""
     existing = Request.from_url('https://example.com/existing')
     new = Request.from_url('https://example.com/new')
     await rq_client.add_batch_of_requests([existing])
@@ -384,7 +386,41 @@ async def test_add_write_failure_unprocessed(
     with monkeypatch.context() as mp:
         mp.setattr(AsyncSession, 'commit', AsyncMock(side_effect=error))
         mp.setattr(AsyncSession, 'rollback', AsyncMock(side_effect=error))
-        response = await rq_client.add_batch_of_requests([existing, new])
+        response = await rq_client.add_batch_of_requests([existing, new, new])
 
     assert [request.unique_key for request in response.processed_requests] == [existing.unique_key]
     assert [request.unique_key for request in response.unprocessed_requests] == [new.unique_key]
+
+
+@pytest.mark.parametrize(
+    'method',
+    [
+        pytest.param('execute', id='read'),
+        pytest.param('commit', id='write'),
+    ],
+)
+async def test_add_programming_error_raises(
+    rq_client: SqlRequestQueueClient,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+) -> None:
+    """Test that a permanent database error during an add is raised, not returned as unprocessed."""
+    error = ProgrammingError('SELECT', {}, Exception('relation does not exist'))
+
+    with monkeypatch.context() as mp:
+        mp.setattr(AsyncSession, method, AsyncMock(side_effect=error))
+        with pytest.raises(ProgrammingError):
+            await rq_client.add_batch_of_requests([Request.from_url('https://example.com')])
+
+
+async def test_add_batch_duplicates_keep_first(rq_client: SqlRequestQueueClient) -> None:
+    """Test that a batch with a duplicate unique key stores the first request."""
+    first = Request.from_url('https://example.com/first', unique_key='key')
+    second = Request.from_url('https://example.com/second', unique_key='key')
+
+    response = await rq_client.add_batch_of_requests([first, second])
+
+    assert [request.unique_key for request in response.processed_requests] == ['key']
+    stored = await rq_client.get_request('key')
+    assert stored is not None
+    assert stored.url == first.url
