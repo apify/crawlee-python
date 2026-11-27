@@ -27,7 +27,12 @@ async def main() -> None:
     async def request_handler(context: FileDownloadCrawlingContext) -> None:
         context.log.info(f'Downloading {context.request.url} ...')
 
-        file_name = URL(context.request.url).name
+        # The decoded URL name can contain path separators (e.g. from `%2F`), so keep
+        # only its last component.
+        file_name = Path(URL(context.request.url).name).name
+        if file_name in {'', '..'}:
+            context.log.warning(f'Skipping {context.request.url}: no usable file name')
+            return
 
         # Write each chunk to disk as it arrives, without buffering the whole file.
         with (DOWNLOAD_DIR / file_name).open('wb') as file:
