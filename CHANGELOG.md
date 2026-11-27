@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
 
-## 1.11.4 - **not yet released**
+<!-- git-cliff-unreleased-end -->
+
+## [1.11.4](https://github.com/apify/crawlee-python/releases/tag/v1.11.4) (2026-11-27)
 
 ### 🐛 Bug Fixes
 
@@ -15,8 +17,6 @@ All notable changes to this project will be documented in this file.
 - **sql:** Fix dataset pushes and `skip_empty` paging ([a68fbb9](https://github.com/apify/crawlee-python/commit/a68fbb9f798f5115b6a31ffae5f00e6f0ed24c31)) by [@Mantisus](https://github.com/Mantisus)
 - **crawlers:** Report new failures in the periodic status message ([#2537](https://github.com/apify/crawlee-python/pull/2537)) ([baf3776](https://github.com/apify/crawlee-python/commit/baf3776cebcf4386bef97ba3052fe212b623a7e2)) by [@Mantisus](https://github.com/Mantisus)
 - **sql:** Cap `PyMySQL` below 1.2.1 to keep MySQL storage working ([#2524](https://github.com/apify/crawlee-python/pull/2524)) ([508aade](https://github.com/apify/crawlee-python/commit/508aade7221dd6f6df0385d01e841cc2e5fbd55b)) by [@Mantisus](https://github.com/Mantisus)
-
-<!-- git-cliff-unreleased-end -->
 
 ## [1.11.3](https://github.com/apify/crawlee-python/releases/tag/v1.11.3) (2026-11-23)
 
