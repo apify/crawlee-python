@@ -137,6 +137,14 @@ def test_lock_time_counts_both_runs() -> None:
     assert crawler._get_expected_processing_time() == timedelta(minutes=7)
 
 
+def test_default_predictor_uses_crawler_id() -> None:
+    """The predictor the crawler builds takes the crawler ID, so each crawler persists its own model."""
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(id='my-crawler')
+
+    assert isinstance(crawler._rendering_type_predictor, DefaultRenderingTypePredictor)
+    assert crawler._rendering_type_predictor._id == 'my-crawler'
+
+
 def test_one_shot_status_codes_reach_sub_crawlers(monkeypatch: pytest.MonkeyPatch) -> None:
     """Status code options given as a one-shot iterable reach the crawler and both of its sub crawlers."""
     init = create_autospec(BasicCrawler.__init__, side_effect=BasicCrawler.__init__)

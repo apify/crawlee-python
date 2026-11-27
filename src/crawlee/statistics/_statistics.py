@@ -99,7 +99,7 @@ class Statistics(Generic[TStatisticsState]):
 
         self._state = RecoverableState(
             default_state=state_model(stats_id=self._id),
-            persist_state_key=persist_state_key or f'__CRAWLER_STATISTICS_{self._id}',
+            persist_state_key=persist_state_key or f'CRAWLEE_CRAWLER_STATISTICS_{self._id}',
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_kvs_factory=persist_state_kvs_factory,

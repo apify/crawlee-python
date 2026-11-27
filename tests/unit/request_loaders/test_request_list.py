@@ -511,6 +511,17 @@ async def test_close_persists_state_and_stops_listening() -> None:
         assert (await kvs.get_value('state'))['nextIndex'] == 1
 
 
+async def test_name_derives_persist_state_key() -> None:
+    """A list with a `name` and no `persist_state_key` persists its progress under a key derived from the name."""
+    async with RequestList(URLS, name='my-list') as request_list:
+        request = await request_list.fetch_next_request()
+        assert request is not None
+        await request_list.mark_request_as_handled(request)
+
+    kvs = await KeyValueStore.open()
+    assert (await kvs.get_value('CRAWLEE_REQUEST_LIST_STATE_my-list'))['nextIndex'] == 1
+
+
 async def test_close_before_first_use_stops_listening() -> None:
     """A list closed before its first use doesn't persist on PERSIST_STATE events once it's used."""
     async with EventManager() as event_manager:

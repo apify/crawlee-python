@@ -60,7 +60,7 @@ Note that:
 
 ## Sub-manager storage
 
-Each configured domain gets its own sub-manager, opened through the `request_manager_opener` callback under the alias `throttled-<domain>`. All of them are opened the first time you use the manager, so a domain that never receives a request still gets an empty store.
+Each configured domain gets its own sub-manager, opened through the `request_manager_opener` callback under the alias `throttled-<id>-<domain>`. The `<id>` is the manager's `id` argument or, without one, a per-process counter of `ThrottlingRequestManager` instances. Pass the same `id` after a restart to reopen the same sub-managers. All of them are opened the first time you use the manager, so a domain that never receives a request still gets an empty store.
 
 Opening the sub-managers up front also makes requests that a previous run left behind visible again. Whether they're resumed or discarded depends on <ApiLink to="class/Configuration#purge_on_start">`Configuration.purge_on_start`</ApiLink>:
 

@@ -89,12 +89,15 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     ```
     """
 
+    __next_id = 0
+
     def __init__(
         self,
         inner: TRequestManager | None = None,
         *,
         domains: Sequence[str],
         request_manager_opener: _RequestManagerOpener[TRequestManager],
+        id: str | None = None,
         service_locator: ServiceLocator | None = None,
         base_delay: timedelta = timedelta(seconds=2),
         max_delay: timedelta = timedelta(seconds=60),
@@ -116,6 +119,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 Must accept `alias`, `storage_backend`, and `configuration` keyword arguments and return the same
                 concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`). Without
                 `inner`, it's also called without `alias` to open the default one.
+            id: An identifier of the manager, used in the aliases of the per-domain sub-managers. Defaults to
+                a per-process counter of `ThrottlingRequestManager` instances. Explicit IDs share one namespace with
+                the generated ones, so avoid explicit IDs like `'0'` or `'1'`.
             service_locator: Service locator for creating sub-managers and the default `inner`. If not provided,
                 defaults to the global service locator, ensuring consistency with the crawler's storage backend.
             base_delay: Initial delay after the first 429 response from a domain. Must be positive.
@@ -138,6 +144,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         if max_domain_stall <= timedelta(0):
             raise ValueError(f'max_domain_stall must be positive, got {max_domain_stall}.')
 
+        self._id = str(ThrottlingRequestManager.__next_id) if id is None else id
+        ThrottlingRequestManager.__next_id += 1
         self._inner = inner
         self._owns_inner = inner is None
         """Whether `inner` is the default store, which `drop()` forgets so the next use opens it again."""
@@ -596,7 +604,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
     async def _open_sub_manager(self, domain: str) -> None:
         """Open the sub-manager for a single domain using the configured `request_manager_opener`."""
         self._sub_managers[domain] = await self._request_manager_opener(
-            alias=f'throttled-{domain}',
+            alias=f'throttled-{self._id}-{domain}',
             storage_backend=self._service_locator.get_storage_backend(),
             configuration=self._service_locator.get_configuration(),
         )

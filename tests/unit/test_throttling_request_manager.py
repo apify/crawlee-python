@@ -106,6 +106,7 @@ async def _open_fs_manager(service_locator: ServiceLocator) -> ThrottlingRequest
         domains=TEST_DOMAINS,
         request_manager_opener=RequestQueue.open,
         service_locator=service_locator,
+        id='persistent',
     )
 
 
@@ -1255,7 +1256,7 @@ async def test_failed_open_keeps_successful_sub_managers(
 ) -> None:
     """A failing opener leaves the sub-managers that did open in place, so a retry opens only what is missing."""
     domains = [THROTTLED_DOMAIN, SECOND_THROTTLED_DOMAIN]
-    failing_alias = f'throttled-{SECOND_THROTTLED_DOMAIN}'
+    failing_alias = f'throttled-failing-{SECOND_THROTTLED_DOMAIN}'
     pending_failures = {failing_alias}
 
     async def open_once_failing(*, alias: str, **kwargs: Any) -> RequestQueue:
@@ -1270,6 +1271,7 @@ async def test_failed_open_keeps_successful_sub_managers(
         domains=domains,
         request_manager_opener=opener,
         service_locator=service_locator,
+        id='failing',
     )
 
     with pytest.raises(RuntimeError, match='storage unavailable'):
@@ -1279,8 +1281,34 @@ async def test_failed_open_keeps_successful_sub_managers(
 
     # The domain that opened before its sibling failed is reused, not opened a second time.
     opened_aliases = [call.kwargs['alias'] for call in opener.await_args_list]
-    assert opened_aliases.count(f'throttled-{THROTTLED_DOMAIN}') == 1
+    assert opened_aliases.count(f'throttled-failing-{THROTTLED_DOMAIN}') == 1
     assert opened_aliases.count(failing_alias) == 2
+
+
+async def test_managers_with_different_ids_keep_separate_sub_managers(
+    inner_queue: RequestQueue,
+    service_locator: ServiceLocator,
+) -> None:
+    """Two managers that list the same domain don't share its sub-manager."""
+    first: ThrottlingRequestManager[RequestQueue] = ThrottlingRequestManager(
+        inner_queue,
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+        id='first',
+    )
+    second: ThrottlingRequestManager[RequestQueue] = ThrottlingRequestManager(
+        await RequestQueue.open(name='second-inner', storage_backend=service_locator.get_storage_backend()),
+        domains=TEST_DOMAINS,
+        request_manager_opener=RequestQueue.open,
+        service_locator=service_locator,
+        id='second',
+    )
+
+    await first.add_request(f'https://{THROTTLED_DOMAIN}/page1')
+
+    assert await first.get_pending_count() == 1
+    assert await second.get_pending_count() == 0
 
 
 async def test_read_path_after_drop_reopens_sub_managers(
@@ -1337,7 +1365,7 @@ async def test_purge_empties_sub_queues_from_a_previous_run(fs_service_locator: 
     await restarted.purge()
 
     sub_queue = await RequestQueue.open(
-        alias=f'throttled-{THROTTLED_DOMAIN}',
+        alias=f'throttled-persistent-{THROTTLED_DOMAIN}',
         storage_backend=fs_service_locator.get_storage_backend(),
         configuration=fs_service_locator.get_configuration(),
     )
@@ -1349,9 +1377,8 @@ async def test_drop_removes_sub_queues_from_a_previous_run(fs_service_locator: S
     manager = await _open_fs_manager(fs_service_locator)
     await manager.add_request(f'https://{THROTTLED_DOMAIN}/page1')
 
-    sub_queue_path = (
-        Path(fs_service_locator.get_configuration().storage_dir) / 'request_queues' / f'throttled-{THROTTLED_DOMAIN}'
-    )
+    storage_dir = Path(fs_service_locator.get_configuration().storage_dir)
+    sub_queue_path = storage_dir / 'request_queues' / f'throttled-persistent-{THROTTLED_DOMAIN}'
     assert sub_queue_path.exists()
 
     restarted = await _restart_fs_manager(fs_service_locator)
@@ -1661,13 +1688,14 @@ async def test_delays_must_be_positive(
     delay: timedelta,
 ) -> None:
     """A non-positive `base_delay` or `max_delay` is rejected."""
+    delay_option: dict[str, Any] = {option: delay}
     with pytest.raises(ValueError, match=option):
         ThrottlingRequestManager(
             inner_queue,
             domains=TEST_DOMAINS,
             request_manager_opener=RequestQueue.open,
             service_locator=service_locator,
-            **{option: delay},
+            **delay_option,
         )
 
 

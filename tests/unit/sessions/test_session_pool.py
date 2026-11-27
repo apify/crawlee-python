@@ -206,6 +206,18 @@ async def test_reset_discards_sessions_and_keeps_record(kvs: KeyValueStore) -> N
     assert len(saved_pool.sessions) == MAX_POOL_SIZE
 
 
+async def test_default_persist_state_key_uses_id(kvs: KeyValueStore) -> None:
+    """Without a `persist_state_key`, each pool persists under a key derived from its `id`."""
+    async with SessionPool(id='my-pool', persistence_enabled=True, persist_state_kvs_name=KVS_NAME):
+        pass
+    async with SessionPool(persistence_enabled=True, persist_state_kvs_name=KVS_NAME) as generated_id_pool:
+        pass
+
+    assert await kvs.get_value('CRAWLEE_SESSION_POOL_STATE_my-pool') is not None
+    assert await kvs.get_value(f'CRAWLEE_SESSION_POOL_STATE_{generated_id_pool._id}') is not None
+    assert generated_id_pool._id != 'my-pool'
+
+
 async def test_reentering_keeps_sessions() -> None:
     """Entering the pool again keeps the sessions of the previous entry."""
     session_pool = SessionPool(max_pool_size=MAX_POOL_SIZE)
