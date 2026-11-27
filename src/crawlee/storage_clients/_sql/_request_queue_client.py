@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -8,7 +9,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import CursorResult, exists, func, or_, select, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 from sqlalchemy.orm import load_only
 from typing_extensions import NotRequired, Self, override
 
@@ -225,12 +226,10 @@ class SqlRequestQueueClient(
 
         # Deduplicate requests by unique_key upfront
         unique_requests = {}
-        unique_key_by_request_id = {}
         for req in requests:
-            if req.unique_key not in unique_requests:
-                request_id = self._get_int_id_from_unique_key(req.unique_key)
+            request_id = self._get_int_id_from_unique_key(req.unique_key)
+            if request_id not in unique_requests:
                 unique_requests[request_id] = req
-                unique_key_by_request_id[request_id] = req.unique_key
 
         # Get existing requests by unique keys
         stmt = (
@@ -249,7 +248,24 @@ class SqlRequestQueueClient(
         )
 
         async with self.get_session() as session:
-            result = await session.execute(stmt)
+            try:
+                result = await session.execute(stmt)
+            except ProgrammingError:
+                # A `ProgrammingError`, such as a missing table or permission on PostgreSQL, doesn't go away on a retry.
+                raise
+            except (SQLAlchemyError, OSError, asyncio.TimeoutError) as e:
+                logger.debug(f'Failed to add requests to DB with error: {e}')
+                # asyncpg raises connection errors as a plain `OSError` and a connect timeout as `asyncio.TimeoutError`,
+                # which isn't an `OSError` on Python 3.10. Nothing has been written yet, so the caller can retry the
+                # whole batch.
+                return AddRequestsResponse(
+                    processed_requests=[],
+                    unprocessed_requests=[
+                        UnprocessedRequest(unique_key=request.unique_key, url=request.url, method=request.method)
+                        for request in unique_requests.values()
+                    ],
+                )
+
             result = cast('CursorResult', result) if not isinstance(result, CursorResult) else result
             existing_requests = {req.request_id: req for req in result.scalars()}
             insert_values: list[dict] = []
@@ -372,15 +388,23 @@ class SqlRequestQueueClient(
 
                 await session.commit()
                 processed_requests.extend(transaction_processed_requests)
-            except SQLAlchemyError as e:
-                await session.rollback()
+            except ProgrammingError:
+                # A `ProgrammingError`, such as a missing table or permission on PostgreSQL, doesn't go away on a retry.
+                raise
+            except (SQLAlchemyError, OSError, asyncio.TimeoutError) as e:
                 logger.debug(f'Failed add requests to DB with error: {e}')
-                await self._add_buffer_record(
-                    session,
-                    update_modified_at=True,
-                    recalculate=True,
-                )
-                await session.commit()
+                # The rollback and recount are best effort, so the requests come back unprocessed even when the database
+                # is unreachable.
+                try:
+                    await session.rollback()
+                    await self._add_buffer_record(
+                        session,
+                        update_modified_at=True,
+                        recalculate=True,
+                    )
+                    await session.commit()
+                except (SQLAlchemyError, OSError, asyncio.TimeoutError) as recount_error:
+                    logger.debug(f'Failed to recount requests after a failed add: {recount_error}')
                 transaction_processed_requests.clear()
                 unprocessed_requests.extend(
                     [
@@ -389,7 +413,7 @@ class SqlRequestQueueClient(
                             url=request.url,
                             method=request.method,
                         )
-                        for request in requests
+                        for request in unique_requests.values()
                         if request.unique_key in transaction_processed_requests_unique_keys
                     ]
                 )
