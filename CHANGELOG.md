@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 - **redis:** Avoid lost and duplicate requests in RQ ([#2508](https://github.com/apify/crawlee-python/pull/2508)) ([1b9418c](https://github.com/apify/crawlee-python/commit/1b9418cf9c0236ab309c4fe5444223baea51d489)) by [@Mantisus](https://github.com/Mantisus)
 - **statistics:** Show only file names in error groups on Windows ([#2515](https://github.com/apify/crawlee-python/pull/2515)) ([843d5f6](https://github.com/apify/crawlee-python/commit/843d5f612965f3a0786eda75304d210af9cb6964)) by [@goranai](https://github.com/goranai), closes [#2514](https://github.com/apify/crawlee-python/issues/2514)
 - **http-clients:** Map proxy errors in `stream()` to `ProxyError` ([#2529](https://github.com/apify/crawlee-python/pull/2529)) ([515d5c4](https://github.com/apify/crawlee-python/commit/515d5c4200c2b4b241b53a002023dda9cbca304e)) by [@goranai](https://github.com/goranai), closes [#2528](https://github.com/apify/crawlee-python/issues/2528)
+- **redis:** Keep request queue counts right and allow large adds ([#2535](https://github.com/apify/crawlee-python/pull/2535)) ([b5413f0](https://github.com/apify/crawlee-python/commit/b5413f0462b7274c506c7d2c09de7705cfcfb53d)) by [@Mantisus](https://github.com/Mantisus)
+- **redis:** Read key-value store records atomically ([#2523](https://github.com/apify/crawlee-python/pull/2523)) ([4b22cc6](https://github.com/apify/crawlee-python/commit/4b22cc62c060e18c9d586fdf5495a261dc84ff31)) by [@Mantisus](https://github.com/Mantisus)
+- **sql:** Retry adding requests after a database error ([#2522](https://github.com/apify/crawlee-python/pull/2522)) ([54bee5c](https://github.com/apify/crawlee-python/commit/54bee5c6bb7486a50bf13c07b458e379cf7f4314)) by [@Mantisus](https://github.com/Mantisus)
 
 <!-- git-cliff-unreleased-end -->
 
