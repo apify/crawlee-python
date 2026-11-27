@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 - Apply `robots.txt` rules to URLs with the default port ([#2533](https://github.com/apify/crawlee-python/pull/2533)) ([4d50067](https://github.com/apify/crawlee-python/commit/4d50067cad2f99d79b59e1cb3fe054dc0121bf01)) by [@shlokbam](https://github.com/shlokbam), closes [#2532](https://github.com/apify/crawlee-python/issues/2532)
 - **throttling-manager:** Respect crawl-delay under concurrency ([#2506](https://github.com/apify/crawlee-python/pull/2506)) ([d0a953e](https://github.com/apify/crawlee-python/commit/d0a953ec72eb620683190a5fec3942001a43e5a2)) by [@Mantisus](https://github.com/Mantisus)
 - **redis:** Avoid lost and duplicate requests in RQ ([#2508](https://github.com/apify/crawlee-python/pull/2508)) ([1b9418c](https://github.com/apify/crawlee-python/commit/1b9418cf9c0236ab309c4fe5444223baea51d489)) by [@Mantisus](https://github.com/Mantisus)
+- **statistics:** Show only file names in error groups on Windows ([#2515](https://github.com/apify/crawlee-python/pull/2515)) ([843d5f6](https://github.com/apify/crawlee-python/commit/843d5f612965f3a0786eda75304d210af9cb6964)) by [@goranai](https://github.com/goranai), closes [#2514](https://github.com/apify/crawlee-python/issues/2514)
+- **http-clients:** Map proxy errors in `stream()` to `ProxyError` ([#2529](https://github.com/apify/crawlee-python/pull/2529)) ([515d5c4](https://github.com/apify/crawlee-python/commit/515d5c4200c2b4b241b53a002023dda9cbca304e)) by [@goranai](https://github.com/goranai), closes [#2528](https://github.com/apify/crawlee-python/issues/2528)
 
 <!-- git-cliff-unreleased-end -->
 
