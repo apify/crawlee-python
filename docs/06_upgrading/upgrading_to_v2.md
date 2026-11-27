@@ -560,6 +560,14 @@ A `Cookie` header passed with a request or set on the client is merged with the 
 
 Without a session, or with `save_response_cookies=False` on the crawler, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
 
+### Host-only cookies stay on their host
+
+The HTTP clients send a host-only cookie only to its own host, not to its subdomains, the same as browsers. A cookie is host-only when a server sets it without the `Domain` attribute, or when you set it with a `domain` that has no leading dot, such as `example.com`. To send a cookie to the subdomains as well, set `domain` to `.example.com`. A cookie without a `domain` is still sent to every host.
+
+In v1, `ImpitHttpClient` and `HttpxHttpClient` sent the host-only cookies from servers to the subdomains too. Every client did so for a cookie set with a `domain` without a leading dot, although the browser of `PlaywrightCrawler` treated it as host-only.
+
+A `CookieJar` that you pass to `Session` or `SessionCookies` follows the same rule, since its cookie policy is replaced. In v1, it kept its own policy.
+
 ### `save_response_cookies` replaces `persist_cookies_per_session`
 
 `persist_cookies_per_session` is removed from the HTTP clients. To stop saving the response cookies to the session, pass `save_response_cookies=False` to the crawler. The session cookies are still sent. `PlaywrightCrawler` and `StagehandCrawler` take the same option, which stops saving the cookies of the page to the session after the request handler. In `AdaptivePlaywrightCrawler`, the option applies to both the HTTP and the browser crawling.

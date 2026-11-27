@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from http.cookiejar import Cookie, CookieJar
+from typing import TYPE_CHECKING
+
 import pytest
 
 from crawlee.sessions._cookies import CookieParam, PlaywrightCookieParam, SessionCookies
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @pytest.fixture
@@ -231,3 +237,114 @@ def test_get_cookie_string_round_trip() -> None:
     session_cookies.extract_cookies_from_headers('https://example.com/login', ['sid=abc123; Path=/'])
 
     assert session_cookies.get_cookie_string('https://example.com/dashboard') == 'sid=abc123'
+
+
+def _from_header(set_cookie_header: str) -> SessionCookies:
+    session_cookies = SessionCookies()
+    session_cookies.extract_cookies_from_headers('https://example.com/', [set_cookie_header])
+    return session_cookies
+
+
+def _from_set(domain: str) -> SessionCookies:
+    session_cookies = SessionCookies()
+    session_cookies.set('a', '1', domain=domain)
+    return session_cookies
+
+
+def _from_playwright(domain: str) -> SessionCookies:
+    session_cookies = SessionCookies()
+    session_cookies.set_cookies_from_playwright_format([PlaywrightCookieParam(name='a', value='1', domain=domain)])
+    return session_cookies
+
+
+def _cookie(domain: str, *, domain_specified: bool) -> Cookie:
+    return Cookie(
+        version=0,
+        name='a',
+        value='1',
+        port=None,
+        port_specified=False,
+        domain=domain,
+        domain_specified=domain_specified,
+        domain_initial_dot=domain.startswith('.'),
+        path='/',
+        path_specified=True,
+        secure=False,
+        expires=None,
+        discard=True,
+        comment=None,
+        comment_url=None,
+        rest={},
+    )
+
+
+def _from_cookie(domain: str, *, domain_specified: bool) -> SessionCookies:
+    session_cookies = SessionCookies()
+    session_cookies.store_cookie(_cookie(domain, domain_specified=domain_specified))
+    return session_cookies
+
+
+def _from_cookie_jar(domain: str) -> SessionCookies:
+    jar = CookieJar()
+    jar.set_cookie(_cookie(domain, domain_specified=False))
+    return SessionCookies(jar)
+
+
+@pytest.mark.parametrize(
+    'make_cookies',
+    [
+        pytest.param(lambda: _from_header('a=1'), id='header_without_domain'),
+        pytest.param(lambda: _from_set('example.com'), id='set_without_leading_dot'),
+        pytest.param(lambda: _from_playwright('example.com'), id='playwright_without_leading_dot'),
+        pytest.param(lambda: _from_cookie('example.com', domain_specified=True), id='stored_without_leading_dot'),
+        pytest.param(lambda: SessionCookies(_from_header('a=1').get_cookies_as_dicts()), id='reloaded_from_dicts'),
+        pytest.param(lambda: _from_cookie_jar('example.com'), id='passed_cookie_jar'),
+    ],
+)
+def test_host_only_cookie_not_sent_to_subdomains(make_cookies: Callable[[], SessionCookies]) -> None:
+    """Test that a host-only cookie is sent to its own host and not to its subdomains."""
+    session_cookies = make_cookies()
+
+    assert session_cookies.get_cookie_string('https://example.com/') == 'a=1'
+    assert session_cookies.get_cookie_string('https://sub.example.com/') == ''
+
+
+@pytest.mark.parametrize(
+    'make_cookies',
+    [
+        pytest.param(lambda: _from_header('a=1; Domain=example.com'), id='header_with_domain'),
+        pytest.param(lambda: _from_set('.example.com'), id='set_with_leading_dot'),
+        pytest.param(lambda: _from_playwright('.example.com'), id='playwright_with_leading_dot'),
+        pytest.param(lambda: _from_cookie('.example.com', domain_specified=False), id='stored_with_leading_dot'),
+    ],
+)
+def test_domain_cookie_sent_to_subdomains(make_cookies: Callable[[], SessionCookies]) -> None:
+    """Test that a domain cookie is sent to subdomains."""
+    session_cookies = make_cookies()
+
+    assert session_cookies.get_cookie_string('https://sub.example.com/') == 'a=1'
+
+
+def test_cookie_without_domain_sent_to_every_host() -> None:
+    """Test that a cookie set without a domain is sent to every host."""
+    session_cookies = SessionCookies()
+    session_cookies.set('a', '1')
+
+    assert session_cookies.get_cookie_string('https://example.com/') == 'a=1'
+    assert session_cookies.get_cookie_string('https://other.com/') == 'a=1'
+
+
+def test_stored_cookie_without_domain_sent_to_every_host() -> None:
+    """Test that a stored `Cookie` without a domain and without `domain_specified` is sent to every host."""
+    session_cookies = _from_cookie('', domain_specified=False)
+
+    assert session_cookies.get_cookie_string('https://example.com/') == 'a=1'
+
+
+def test_store_cookie_keeps_passed_cookie() -> None:
+    """Test that `store_cookie` doesn't change the `Cookie` it's given."""
+    cookie = _cookie('example.com', domain_specified=True)
+
+    SessionCookies().store_cookie(cookie)
+
+    assert cookie.domain_specified is True

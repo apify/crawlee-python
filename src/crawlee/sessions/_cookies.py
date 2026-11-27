@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy, deepcopy
 from email.message import Message
-from http.cookiejar import Cookie, CookieJar
+from http.cookiejar import Cookie, CookieJar, DefaultCookiePolicy
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required
 from urllib.request import Request as UrlRequest
 
@@ -38,7 +38,9 @@ class CookieParam(TypedDict, total=False, closed=True):
     """Cookie value."""
 
     domain: NotRequired[str]
-    """Domain for which the cookie is set."""
+    """Domain for which the cookie is set. Without a leading dot, the cookie is host-only and isn't sent to subdomains.
+    An empty domain sends the cookie to every host.
+    """
 
     path: NotRequired[str]
     """Path on the specified domain for which the cookie is set."""
@@ -72,14 +74,21 @@ class PlaywrightCookieParam(TypedDict, total=False):
 
 @docs_group('Session management')
 class SessionCookies:
-    """Storage cookies for session with browser-compatible serialization and deserialization."""
+    """Storage cookies for session with browser-compatible serialization and deserialization.
+
+    A `CookieJar` passed to the constructor is used as is, and its cookie policy is replaced, so host-only cookies go
+    only to their own host.
+    """
 
     def __init__(self, cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None) -> None:
+        policy = DefaultCookiePolicy(strict_ns_domain=DefaultCookiePolicy.DomainStrictNonDomain)
+
         if isinstance(cookies, CookieJar):
+            cookies.set_policy(policy)
             self._jar = cookies
             return
 
-        self._jar = CookieJar()
+        self._jar = CookieJar(policy=policy)
 
         if isinstance(cookies, list):
             for item in cookies:
@@ -117,7 +126,8 @@ class SessionCookies:
         Args:
             name: Cookie name.
             value: Cookie value.
-            domain: Cookie domain.
+            domain: Cookie domain. With a leading dot, the cookie is also sent to subdomains, without it only to this
+                host, as in Playwright. A cookie without a domain is sent to every host.
             path: Cookie path.
             expires: Cookie expiration timestamp.
             http_only: Whether cookie is HTTP-only.
@@ -131,7 +141,7 @@ class SessionCookies:
             port=None,
             port_specified=False,
             domain=domain,
-            domain_specified=bool(domain),
+            domain_specified=not domain or domain.startswith('.'),
             domain_initial_dot=domain.startswith('.'),
             path=path,
             path_specified=bool(path),
@@ -212,10 +222,14 @@ class SessionCookies:
     def store_cookie(self, cookie: Cookie) -> None:
         """Store a Cookie object in the session cookie jar.
 
+        The domain decides where the cookie is sent, the same as in `set()`.
+
         Args:
             cookie: The Cookie object to store in the jar.
         """
-        self.jar.set_cookie(cookie)
+        stored_cookie = copy(cookie)
+        stored_cookie.domain_specified = not cookie.domain or cookie.domain.startswith('.')
+        self.jar.set_cookie(stored_cookie)
 
     def store_cookies(self, cookies: list[Cookie]) -> None:
         """Store multiple cookie objects in the session cookie jar.
