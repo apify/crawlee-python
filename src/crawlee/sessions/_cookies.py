@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy, deepcopy
 from email.message import Message
 from http.cookiejar import Cookie, CookieJar, DefaultCookiePolicy
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required
@@ -76,15 +76,19 @@ class PlaywrightCookieParam(TypedDict, total=False):
 class SessionCookies:
     """Storage cookies for session with browser-compatible serialization and deserialization.
 
-    A `CookieJar` passed to the constructor is used as is and keeps its own cookie policy.
+    A `CookieJar` passed to the constructor is used as is, and its cookie policy is replaced, so host-only cookies go
+    only to their own host.
     """
 
     def __init__(self, cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None) -> None:
+        policy = DefaultCookiePolicy(strict_ns_domain=DefaultCookiePolicy.DomainStrictNonDomain)
+
         if isinstance(cookies, CookieJar):
+            cookies.set_policy(policy)
             self._jar = cookies
             return
 
-        self._jar = CookieJar(policy=DefaultCookiePolicy(strict_ns_domain=DefaultCookiePolicy.DomainStrictNonDomain))
+        self._jar = CookieJar(policy=policy)
 
         if isinstance(cookies, list):
             for item in cookies:
@@ -130,7 +134,6 @@ class SessionCookies:
             secure: Whether cookie requires secure context.
             same_site: SameSite cookie attribute value.
         """
-        host_only = bool(domain) and not domain.startswith('.')
         cookie = Cookie(
             version=0,
             name=name,
@@ -138,7 +141,7 @@ class SessionCookies:
             port=None,
             port_specified=False,
             domain=domain,
-            domain_specified=not host_only,
+            domain_specified=not domain or domain.startswith('.'),
             domain_initial_dot=domain.startswith('.'),
             path=path,
             path_specified=bool(path),
@@ -219,14 +222,14 @@ class SessionCookies:
     def store_cookie(self, cookie: Cookie) -> None:
         """Store a Cookie object in the session cookie jar.
 
-        The domain decides where the cookie is sent, the same as in `set()`, and its `domain_specified` flag is
-        updated to match.
+        The domain decides where the cookie is sent, the same as in `set()`.
 
         Args:
             cookie: The Cookie object to store in the jar.
         """
-        cookie.domain_specified = not cookie.domain or cookie.domain.startswith('.')
-        self.jar.set_cookie(cookie)
+        stored_cookie = copy(cookie)
+        stored_cookie.domain_specified = not cookie.domain or cookie.domain.startswith('.')
+        self.jar.set_cookie(stored_cookie)
 
     def store_cookies(self, cookies: list[Cookie]) -> None:
         """Store multiple cookie objects in the session cookie jar.

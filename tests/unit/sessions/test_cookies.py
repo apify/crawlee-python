@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from http.cookiejar import Cookie
+from http.cookiejar import Cookie, CookieJar
 from typing import TYPE_CHECKING
 
 import pytest
@@ -257,8 +257,8 @@ def _from_playwright(domain: str) -> SessionCookies:
     return session_cookies
 
 
-def _from_cookie(domain: str, *, domain_specified: bool) -> SessionCookies:
-    cookie = Cookie(
+def _cookie(domain: str, *, domain_specified: bool) -> Cookie:
+    return Cookie(
         version=0,
         name='a',
         value='1',
@@ -276,9 +276,18 @@ def _from_cookie(domain: str, *, domain_specified: bool) -> SessionCookies:
         comment_url=None,
         rest={},
     )
+
+
+def _from_cookie(domain: str, *, domain_specified: bool) -> SessionCookies:
     session_cookies = SessionCookies()
-    session_cookies.store_cookie(cookie)
+    session_cookies.store_cookie(_cookie(domain, domain_specified=domain_specified))
     return session_cookies
+
+
+def _from_cookie_jar(domain: str) -> SessionCookies:
+    jar = CookieJar()
+    jar.set_cookie(_cookie(domain, domain_specified=False))
+    return SessionCookies(jar)
 
 
 @pytest.mark.parametrize(
@@ -289,6 +298,7 @@ def _from_cookie(domain: str, *, domain_specified: bool) -> SessionCookies:
         pytest.param(lambda: _from_playwright('example.com'), id='playwright_without_leading_dot'),
         pytest.param(lambda: _from_cookie('example.com', domain_specified=True), id='stored_without_leading_dot'),
         pytest.param(lambda: SessionCookies(_from_header('a=1').get_cookies_as_dicts()), id='reloaded_from_dicts'),
+        pytest.param(lambda: _from_cookie_jar('example.com'), id='passed_cookie_jar'),
     ],
 )
 def test_host_only_cookie_not_sent_to_subdomains(make_cookies: Callable[[], SessionCookies]) -> None:
@@ -329,3 +339,12 @@ def test_stored_cookie_without_domain_sent_to_every_host() -> None:
     session_cookies = _from_cookie('', domain_specified=False)
 
     assert session_cookies.get_cookie_string('https://example.com/') == 'a=1'
+
+
+def test_store_cookie_keeps_passed_cookie() -> None:
+    """Test that `store_cookie` doesn't change the `Cookie` it's given."""
+    cookie = _cookie('example.com', domain_specified=True)
+
+    SessionCookies().store_cookie(cookie)
+
+    assert cookie.domain_specified is True
