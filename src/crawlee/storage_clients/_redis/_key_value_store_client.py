@@ -56,10 +56,10 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     """Human-readable client type for error messages."""
 
     _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
-    """Maximum number of records fetched with a single HMGET call in `iterate_entries`."""
+    """Maximum number of records fetched in a single batch in `iterate_entries`."""
 
     _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
-    """Maximum total size of the records fetched with a single HMGET call in `iterate_entries`.
+    """Maximum total size of the records fetched in a single batch in `iterate_entries`.
 
     A single record larger than this is still fetched, but alone in its batch.
     """
@@ -175,23 +175,18 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-        serialized_metadata_item = await await_redis_response(self._redis.hget(self._metadata_items_key, key))
-
-        async with self._get_pipeline() as pipe:
+        async with self._get_pipeline(with_execute=False) as pipe:
+            await await_redis_response(pipe.hget(self._metadata_items_key, key))
+            await await_redis_response(pipe.hget(self._items_key, key))
             await self._update_metadata(pipe, **MetadataUpdateParams(update_accessed_at=True))
+            serialized_metadata_item, value, *_ = await pipe.execute()
 
         if not isinstance(serialized_metadata_item, (str, bytes, bytearray)):
             logger.warning(f'Metadata for key "{key}" is missing or invalid.')
             return None
 
         metadata_item = KeyValueStoreRecordMetadata.model_validate_json(serialized_metadata_item)
-
-        # Handle None values
-        if metadata_item.content_type == 'application/x-none':
-            return KeyValueStoreRecord(value=None, **metadata_item.model_dump())
-
-        # Query the record by key
-        value_bytes = expect_bytes(await await_redis_response(self._redis.hget(self._items_key, key)))
+        value_bytes = expect_bytes(value)
 
         return self._build_record(metadata_item, value_bytes)
 
@@ -289,7 +284,7 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
     ) -> AsyncIterator[KeyValueStoreRecord]:
         """Iterate over all the existing records in the key-value store, including their values.
 
-        The values are fetched in batches with a single HMGET call per batch, instead of several round trips per record
+        The records are fetched in batches with one MULTI transaction per batch, instead of one transaction per record
         as the default implementation does. The batches are bounded by the record sizes known from the metadata, so
         a store with large values does not load too many of them at once.
         """
@@ -307,17 +302,26 @@ class RedisKeyValueStoreClient(KeyValueStoreClient, RedisClientMixin):
 
     @retry_on_error(RedisError)
     async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> list[KeyValueStoreRecord]:
-        """Fetch the values of the given records with a single HMGET call and return the deserialized records."""
+        """Fetch the metadata and values of the given records in one MULTI transaction and return the records."""
         keys = [item.key for item in batch]
-        values = [expect_bytes(v) for v in await await_redis_response(self._redis.hmget(self._items_key, keys))]
 
-        # A missing value means the record was deleted after its metadata was listed, so it is skipped silently.
-        records = (
-            self._build_record(metadata_item, value_bytes)
-            for metadata_item, value_bytes in zip(batch, values, strict=True)
-            if value_bytes is not None
-        )
-        return [record for record in records if record is not None]
+        async with self._get_pipeline(with_execute=False) as pipe:
+            await await_redis_response(pipe.hmget(self._metadata_items_key, keys))
+            await await_redis_response(pipe.hmget(self._items_key, keys))
+            serialized_metadata_items, values = await pipe.execute()
+
+        records = []
+        for serialized_metadata_item, value in zip(serialized_metadata_items, values, strict=True):
+            # A missing entry means the record was deleted after it was listed, so it is skipped silently.
+            if serialized_metadata_item is None or value is None:
+                continue
+
+            metadata_item = KeyValueStoreRecordMetadata.model_validate_json(serialized_metadata_item)
+            record = self._build_record(metadata_item, expect_bytes(value))
+            if record is not None:
+                records.append(record)
+
+        return records
 
     @override
     async def get_public_url(self, *, key: str) -> str:
