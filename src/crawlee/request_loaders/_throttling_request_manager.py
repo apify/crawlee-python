@@ -4,8 +4,8 @@ import asyncio
 import ipaddress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from logging import getLogger
-from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
+from logging import DEBUG, getLogger
+from typing import TYPE_CHECKING, Generic, Literal, Protocol, TypeVar
 
 from typing_extensions import override
 from yarl import URL
@@ -13,6 +13,8 @@ from yarl import URL
 from crawlee._service_locator import ServiceLocator
 from crawlee._service_locator import service_locator as global_service_locator
 from crawlee._utils.docs import docs_group
+from crawlee._utils.log import LoggerOnce
+from crawlee._utils.public_suffix import public_suffix_list
 from crawlee.request_loaders._request_manager import RequestManager
 
 from ._types import FinishedStatus, StalledStatus, WaitingStatus
@@ -94,6 +96,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         inner: TRequestManager | None = None,
         *,
         domains: Sequence[str],
+        throttle_by: Literal['hostname', 'registrable_domain'] = 'hostname',
         request_manager_opener: _RequestManagerOpener[TRequestManager],
         service_locator: ServiceLocator | None = None,
         base_delay: timedelta = timedelta(seconds=2),
@@ -110,9 +113,16 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
             domains: Domains to throttle, each given as a bare hostname such as `api.example.com`, or as any URL on
                 the domain, of which only the hostname is used. Blank entries are ignored, so a list built by
                 splitting a string needs no pruning. Only requests matching these domains will be routed to
-                per-domain sub-managers. Matching is exact but spelling-insensitive: casing, punycode versus Unicode,
-                and a trailing root dot are all normalized away. Subdomain wildcards such as `*.example.com` are not
-                supported — list each subdomain explicitly if needed.
+                per-domain sub-managers. Matching is spelling-insensitive: casing, punycode versus Unicode, and a
+                trailing root dot are all normalized away. With the default `throttle_by`, it's also exact. Subdomain
+                wildcards such as `*.example.com` are not supported. List each subdomain explicitly, or set
+                `throttle_by='registrable_domain'`.
+            throttle_by: What counts as one domain. `'hostname'` paces each hostname on its own. `'registrable_domain'`
+                gives a site and its subdomains, such as `example.com` and `www.example.com`, one delay and one
+                sub-manager, and makes each `domains` entry cover its whole site. Sites come from the ICANN section of
+                the Public Suffix List, so sites on a shared hosting domain, such as `alice.github.io` and
+                `bob.github.io`, count as one. Hosts without a registrable domain, such as IP addresses and `localhost`,
+                stay per hostname.
             request_manager_opener: Async callable used to open one sub-manager per configured domain on first use.
                 Must accept `alias`, `storage_backend`, and `configuration` keyword arguments and return the same
                 concrete subclass as `inner` (e.g. `RequestQueue.open` when `inner` is a `RequestQueue`). Without
@@ -129,8 +139,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         Raises:
             ValueError: If a non-blank entry of `domains` does not yield a hostname a crawled URL could match, if
-                `base_delay`, `max_delay` or `max_domain_stall` is not positive, or if `min_crawl_delay` is negative.
+                `throttle_by` is unknown, if `base_delay`, `max_delay` or `max_domain_stall` is not positive, or if
+                `min_crawl_delay` is negative.
         """
+        if throttle_by not in ('hostname', 'registrable_domain'):
+            raise ValueError(f"throttle_by must be 'hostname' or 'registrable_domain', got {throttle_by!r}.")
+
         # A zero delay would let the crawler defer a rate-limited request and dispatch it again at once.
         if base_delay <= timedelta(0):
             raise ValueError(f'base_delay must be positive, got {base_delay}.')
@@ -154,6 +168,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         self._max_domain_stall = max_domain_stall
         self._min_crawl_delay = min_crawl_delay
         self._request_manager_opener = request_manager_opener
+        self._throttle_by = throttle_by
+        self._logger_once = LoggerOnce(logger)
         # Padding on an entry would otherwise survive parsing into a key no crawled hostname can match.
         domain_keys = [self._parse_configured_domain(entry) for d in domains if (entry := d.strip())]
         self._domain_states: dict[str, _DomainState] = {key: _DomainState(domain=key) for key in domain_keys}
@@ -455,28 +471,45 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 no-op.
 
         Raises:
-            ValueError: If the signal's `scope` is wider than a hostname, or one this manager doesn't know.
+            ValueError: If the signal's `scope` is wider than `throttle_by`, or one this manager doesn't know.
         """
         if signal.reason == 'rate_limited':
-            self._check_scope(signal.scope)
+            self._check_scope(signal.scope, signal.url)
             return self._record_rate_limit(signal.url, signal.wait)
 
         if signal.reason == 'min_interval':
-            self._check_scope(signal.scope)
+            self._check_scope(signal.scope, signal.url)
             return self._record_declared_interval(signal.url, signal.interval)
 
         return False
 
-    @staticmethod
-    def _check_scope(scope: PacingScope | None) -> None:
+    def _check_scope(self, scope: PacingScope | None, url: str) -> None:
         """Raise unless a signal scoped to `scope` can be honored as declared or wider."""
-        # No scope means the reporter can't tell how far the signal reaches, so the hostname grouping is as good as any.
-        if scope is None or scope == 'hostname':
+        # No scope means the reporter can't tell how far the signal reaches, so `throttle_by` is as good as any.
+        if scope is None or scope == self._throttle_by:
             return
 
+        if scope == 'hostname' and self._throttle_by == 'registrable_domain':
+            state = self._get_domain_state(url)
+            # A host without a registrable domain is paced on its own, so the signal isn't widened.
+            if state is not None and public_suffix_list.get_registrable_domain(state.domain) is not None:
+                self._logger_once.log(
+                    'Applying a pacing signal scoped to "hostname" to the whole registrable domain "%s", as '
+                    '`throttle_by` groups requests that way. Sibling subdomains are paced with it.',
+                    state.domain,
+                    key=state.domain,
+                    level=DEBUG,
+                )
+            return
+
+        if scope == 'registrable_domain':
+            hint = "Set `throttle_by='registrable_domain'` to group requests that way."
+        else:
+            hint = f'Pace by "{scope}" with a request manager that groups requests by it.'
+
         raise ValueError(
-            f'Cannot honor a pacing signal scoped to "{scope}": this manager paces by hostname, so it would leave part '
-            f'of what the signal covers unpaced. Pace by "{scope}" with a request manager that groups requests by it.'
+            f'Cannot honor a pacing signal scoped to "{scope}": this manager paces by "{self._throttle_by}", so it '
+            f'would leave part of what the signal covers unpaced. {hint}'
         )
 
     def _record_rate_limit(self, url: str, wait: timedelta | None) -> bool:
@@ -554,8 +587,14 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         """Reduce a parsed hostname to the form domain keys are stored in: lowercase, without the root dot."""
         return hostname.lower().removesuffix('.')
 
-    @classmethod
-    def _parse_configured_domain(cls, domain: str) -> str:
+    def _group_hostname(self, hostname: str) -> str:
+        """Return the key that requests to a normalized hostname are grouped under."""
+        if self._throttle_by == 'hostname':
+            return hostname
+        # IP addresses and single-label hosts such as `localhost` have no registrable domain to group by.
+        return public_suffix_list.get_registrable_domain(hostname) or hostname
+
+    def _parse_configured_domain(self, domain: str) -> str:
         """Turn one `domains` entry, a bare hostname or a URL, into the key its requests are looked up under."""
         if '://' in domain:
             url_text = domain
@@ -574,7 +613,7 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         except ValueError:
             host = None
 
-        key = cls._normalize_domain(host) if host else ''
+        key = self._normalize_domain(host) if host else ''
 
         # A wildcard passes through the parser untouched, so it would become a key no crawled hostname can match.
         if not key or '*' in key:
@@ -583,12 +622,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
                 '"example.com", or any URL on the domain.'
             )
 
-        return key
+        return self._group_hostname(key)
 
-    @classmethod
-    def _extract_domain(cls, url: str) -> str:
+    def _extract_domain(self, url: str) -> str:
         """Extract the domain key from a URL."""
-        return cls._normalize_domain(URL(url).host or '')
+        hostname = self._normalize_domain(URL(url).host or '')
+        return self._group_hostname(hostname)
 
     @staticmethod
     def _get_url_from_request(request: str | Request) -> str:
