@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from crawlee._utils.file import export_csv_to_stream, json_dumps, validate_subdirectory
+from crawlee._utils.file import export_csv_to_stream, json_dumps, parse_content_type_charset, validate_subdirectory
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping
@@ -264,3 +264,20 @@ def test_validate_subdirectory_rejects_invalid_segments(tmp_path: Path, subdirec
     base_dir = tmp_path / 'key_value_stores'
     with pytest.raises(ValueError, match='Invalid storage name or alias'):
         validate_subdirectory(base_dir, subdirectory)
+
+
+@pytest.mark.parametrize(
+    ('content_type', 'expected'),
+    [
+        pytest.param('text/html; charset=windows-1250', 'windows-1250', id='plain'),
+        pytest.param('text/html; charset="windows-1250"', 'windows-1250', id='quoted'),
+        pytest.param('text/html;charset = windows-1250 ; foo=bar', 'windows-1250', id='spaces'),
+        pytest.param('text/html; CHARSET=Windows-1250', 'Windows-1250', id='uppercase'),
+        pytest.param('multipart/form-data; boundary="charset=foo"', None, id='inside-other-parameter'),
+        pytest.param('text/html', None, id='missing'),
+        pytest.param(None, None, id='no-header'),
+    ],
+)
+def test_parse_content_type_charset(content_type: str | None, expected: str | None) -> None:
+    """The charset parameter is read from a `Content-Type` header."""
+    assert parse_content_type_charset(content_type) == expected

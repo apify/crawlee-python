@@ -4,6 +4,7 @@ import asyncio
 import csv
 import json
 import os
+import re
 import sys
 import tempfile
 from logging import getLogger
@@ -103,20 +104,27 @@ def infer_mime_type(value: Any) -> str:
     Returns:
         The inferred MIME content type.
     """
-    # If the value is bytes (or bytearray), return binary content type.
-    if isinstance(value, (bytes, bytearray)):
+    if isinstance(value, (bytes, bytearray, memoryview)):
         return 'application/octet-stream'
 
-    # If the value is a dict or list, assume JSON.
-    if isinstance(value, (dict, list)):
-        return 'application/json; charset=utf-8'
-
-    # If the value is a string, number or boolean, assume plain text.
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, str):
         return 'text/plain; charset=utf-8'
 
-    # Default fallback.
-    return 'application/octet-stream'
+    # Any other value is stored as JSON.
+    return 'application/json; charset=utf-8'
+
+
+_CHARSET_PATTERN = re.compile(r'(?:^|;)\s*charset\s*=\s*(?:"([^"]*)"|([^;\s]*))', re.IGNORECASE)
+
+
+def parse_content_type_charset(value: str | None) -> str | None:
+    """Get the `charset` parameter of a MIME content type, such as a `Content-Type` header value, if it has one."""
+    if not value:
+        return None
+    match = _CHARSET_PATTERN.search(value)
+    if match is None:
+        return None
+    return (match.group(1) or match.group(2) or '').strip() or None
 
 
 async def json_dumps(obj: Any) -> str:

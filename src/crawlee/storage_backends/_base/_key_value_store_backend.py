@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from crawlee.storage_backends.models import KeyValueStoreRecordMetadata
+from crawlee.storage_backends.models import KeyValueStoreRecord
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import Mapping, Sequence
 
-    from crawlee.storage_backends.models import KeyValueStoreMetadata, KeyValueStoreRecord
+    from crawlee.storage_backends.models import KeyValueStoreKeysListPage, KeyValueStoreMetadata
 
 
 class KeyValueStoreBackend(ABC):
@@ -20,6 +20,9 @@ class KeyValueStoreBackend(ABC):
     These backends are specific to the type of storage they manage (`Dataset`, `KeyValueStore`,
     `RequestQueue`), and can operate with various storage systems including memory, file system,
     databases, and cloud storage solutions.
+
+    A backend stores and returns the record values as raw bytes together with their content type. `KeyValueStore`
+    serializes the values before writing them and parses them after reading them.
 
     This abstract class defines the interface that all specific KVS backends must implement.
     """
@@ -44,13 +47,31 @@ class KeyValueStoreBackend(ABC):
 
     @abstractmethod
     async def get_value(self, *, key: str) -> KeyValueStoreRecord | None:
-        """Retrieve the given record from the key-value store.
+        """Retrieve the given record from the key-value store, with its value as stored.
 
-        The backend method for the `KeyValueStore.get_value` call.
+        The backend method for the `KeyValueStore.get_value` and `KeyValueStore.get_record` calls.
         """
 
+    async def get_values(self, *, keys: Sequence[str]) -> Mapping[str, KeyValueStoreRecord]:
+        """Retrieve the given records from the key-value store, with their values as stored.
+
+        The backend method for the `KeyValueStore.iterate_entries` and `KeyValueStore.iterate_values` calls.
+
+        The default implementation reads the records one by one with `get_value`. Backends that can read several
+        records in a single call should override this method, and return the same records as `get_value` does.
+
+        Returns:
+            The record of each key that has one. Keys without a record are left out.
+        """
+        records = dict[str, KeyValueStoreRecord]()
+        for key in keys:
+            record = await self.get_value(key=key)
+            if record is not None:
+                records[key] = record
+        return records
+
     @abstractmethod
-    async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
+    async def set_value(self, *, key: str, value: bytes, content_type: str) -> None:
         """Set a value in the key-value store by its key.
 
         The backend method for the `KeyValueStore.set_value` call.
@@ -60,45 +81,32 @@ class KeyValueStoreBackend(ABC):
     async def delete_value(self, *, key: str) -> None:
         """Delete a value from the key-value store by its key.
 
-        The backend method for the `KeyValueStore.delete_value` call.
+        The backend method for the `KeyValueStore.delete_value` call, and for `KeyValueStore.set_value` with a `None`
+        value.
         """
 
     @abstractmethod
-    async def iterate_keys(
+    async def list_keys(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        """Iterate over all the existing keys in the key-value store.
+        limit: int = 1000,
+    ) -> KeyValueStoreKeysListPage:
+        """List a single page of the existing keys in the key-value store, ordered by key.
 
-        The backend method for the `KeyValueStore.iterate_keys` call.
+        The backend method for the `KeyValueStore.iterate_keys`, `KeyValueStore.list_keys`,
+        `KeyValueStore.iterate_values` and `KeyValueStore.iterate_entries` calls.
+
+        The keys follow an order that stays the same between calls, and `exclusive_start_key` is compared in that
+        order. A page may hold fewer than `limit` keys, or none, even when more keys follow, so the caller continues
+        from `next_exclusive_start_key` until it's `None`. That key doesn't have to be one of the keys on the page.
+
+        Args:
+            prefix: List only the keys that start with this prefix.
+            exclusive_start_key: List only the keys that follow this key.
+            limit: Maximum number of keys on the page, at least 1.
         """
-        # This syntax is to make type checker properly work with abstract AsyncIterator.
-        raise NotImplementedError
-        if False:
-            yield KeyValueStoreRecordMetadata()
-
-    async def iterate_entries(
-        self,
-        *,
-        exclusive_start_key: str | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[KeyValueStoreRecord]:
-        """Iterate over all the existing records in the key-value store, including their values.
-
-        The backend method for the `KeyValueStore.iterate_entries` and `KeyValueStore.iterate_values` calls.
-
-        The default implementation lists the keys with `iterate_keys` and reads each value separately with
-        `get_value` as the iteration advances, so only a single value is held in memory at a time. Whether a record
-        deleted while the iteration is in progress is yielded depends on the implementation. Backends that can read
-        the keys together with their values more efficiently should override this method; such an implementation
-        must still keep the memory usage bounded, e.g. by streaming or by batching on the known record sizes.
-        """
-        async for metadata in self.iterate_keys(exclusive_start_key=exclusive_start_key, limit=limit):
-            record = await self.get_value(key=metadata.key)
-            if record is not None:
-                yield record
 
     @abstractmethod
     async def get_public_url(self, *, key: str) -> str:

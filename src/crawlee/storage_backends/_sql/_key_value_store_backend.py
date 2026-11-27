@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
-from logging import getLogger
 from typing import TYPE_CHECKING, Any, Self, cast
 
 from sqlalchemy import CursorResult, delete, select
@@ -10,11 +8,10 @@ from sqlalchemy import func as sql_func
 from sqlalchemy.exc import SQLAlchemyError
 from typing_extensions import override
 
-from crawlee._utils.file import infer_mime_type
 from crawlee._utils.retry import retry_on_error
 from crawlee.storage_backends._base import KeyValueStoreBackend
-from crawlee.storage_backends._utils import batch_records_by_size
 from crawlee.storage_backends.models import (
+    KeyValueStoreKeysListPage,
     KeyValueStoreMetadata,
     KeyValueStoreRecord,
     KeyValueStoreRecordMetadata,
@@ -24,14 +21,11 @@ from ._backend_mixin import MetadataUpdateParams, SqlBackendMixin
 from ._db_models import KeyValueStoreMetadataBufferDb, KeyValueStoreMetadataDb, KeyValueStoreRecordDb
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import Mapping, Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from ._storage_backend import SqlStorageBackend
-
-
-logger = getLogger(__name__)
 
 
 class SqlKeyValueStoreBackend(
@@ -49,10 +43,8 @@ class SqlKeyValueStoreBackend(
     and size information
     - `key_value_store_metadata_buffer` table: Buffers metadata updates for performance optimization
 
-    Values are serialized based on their type: JSON objects are stored as formatted JSON,
-    text values as UTF-8 encoded strings, and binary data as-is in the `LargeBinary` column.
-    The implementation automatically handles content type detection and maintains metadata
-    about each record including size and MIME type information.
+    The values are stored as the bytes `KeyValueStore` serializes them to, in the `LargeBinary` column, together with
+    the content type and the size of each record.
 
     All database operations are wrapped in transactions with proper error handling and rollback
     mechanisms. The backend supports atomic upsert operations and handles race conditions when
@@ -61,15 +53,6 @@ class SqlKeyValueStoreBackend(
 
     _DEFAULT_NAME = 'default'
     """Default dataset name used when no name is provided."""
-
-    _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
-    """Maximum number of records listed or read with a single query in `iterate_entries`."""
-
-    _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
-    """Maximum total size of the records read with a single query in `iterate_entries`.
-
-    A single record larger than this is still read, but alone in its batch.
-    """
 
     _METADATA_TABLE = KeyValueStoreMetadataDb
     """SQLAlchemy model for key-value store metadata."""
@@ -158,32 +141,13 @@ class SqlKeyValueStoreBackend(
 
     @retry_on_error(SQLAlchemyError)
     @override
-    async def set_value(self, *, key: str, value: Any, content_type: str | None = None) -> None:
-        # Special handling for None values
-        if value is None:
-            content_type = 'application/x-none'  # Special content type to identify None values
-            value_bytes = b''
-        else:
-            content_type = content_type or infer_mime_type(value)
-
-            # Serialize the value to bytes.
-            if 'application/json' in content_type:
-                value_bytes = json.dumps(value, default=str, ensure_ascii=False).encode('utf-8')
-            elif isinstance(value, str):
-                value_bytes = value.encode('utf-8')
-            elif isinstance(value, (bytes, bytearray)):
-                value_bytes = value
-            else:
-                # Fallback: attempt to convert to string and encode.
-                value_bytes = str(value).encode('utf-8')
-
-        size = len(value_bytes)
+    async def set_value(self, *, key: str, value: bytes, content_type: str) -> None:
         insert_values = {
             'key_value_store_id': self._id,
             'key': key,
-            'value': value_bytes,
+            'value': value,
             'content_type': content_type,
-            'size': size,
+            'size': len(value),
         }
 
         upsert_stmt = self._build_upsert_stmt(
@@ -214,43 +178,36 @@ class SqlKeyValueStoreBackend(
         if not record_db:
             return None
 
-        return self._build_record(
+        return KeyValueStoreRecord(
             key=record_db.key,
+            value=record_db.value,
             content_type=record_db.content_type,
             size=record_db.size,
-            value_bytes=record_db.value,
         )
 
-    @staticmethod
-    def _build_record(
-        *, key: str, content_type: str, size: int | None, value_bytes: bytes
-    ) -> KeyValueStoreRecord | None:
-        """Deserialize a stored value based on its content type into a record.
+    @retry_on_error(SQLAlchemyError)
+    @override
+    async def get_values(self, *, keys: Sequence[str]) -> Mapping[str, KeyValueStoreRecord]:
+        stmt = select(
+            self._ITEM_TABLE.key,
+            self._ITEM_TABLE.content_type,
+            self._ITEM_TABLE.size,
+            self._ITEM_TABLE.value,
+        ).where(
+            self._ITEM_TABLE.key_value_store_id == self._id,
+            self._ITEM_TABLE.key.in_(keys),
+        )
 
-        Returns None, after logging a warning, when the stored bytes cannot be decoded as the content type claims.
-        """
-        # Handle None values
-        if content_type == 'application/x-none':
-            value = None
-        # Handle JSON values
-        elif 'application/json' in content_type:
-            try:
-                value = json.loads(value_bytes.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.warning('Failed to decode JSON value for key "%s"', key)
-                return None
-        # Handle text values
-        elif content_type.startswith('text/'):
-            try:
-                value = value_bytes.decode('utf-8')
-            except UnicodeDecodeError:
-                logger.warning('Failed to decode text value for key "%s"', key)
-                return None
-        # Handle binary values
-        else:
-            value = value_bytes
+        async with self.get_session(with_simple_commit=True) as session:
+            result = await session.execute(stmt)
+            rows = result.all()
 
-        return KeyValueStoreRecord(key=key, value=value, content_type=content_type, size=size)
+            await self._add_buffer_record(session)
+
+        return {
+            row.key: KeyValueStoreRecord(key=row.key, value=row.value, content_type=row.content_type, size=row.size)
+            for row in rows
+        }
 
     @retry_on_error(SQLAlchemyError)
     @override
@@ -267,129 +224,57 @@ class SqlKeyValueStoreBackend(
             if result.rowcount > 0:
                 await self._add_buffer_record(session, update_modified_at=True)
 
+    @retry_on_error(SQLAlchemyError)
     @override
-    async def iterate_keys(
+    async def list_keys(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
-        # Build query for record metadata
+        limit: int = 1000,
+    ) -> KeyValueStoreKeysListPage:
+        # One row over the limit shows whether more keys follow.
         stmt = (
             select(self._ITEM_TABLE.key, self._ITEM_TABLE.content_type, self._ITEM_TABLE.size)
             .where(self._ITEM_TABLE.key_value_store_id == self._id)
             .order_by(self._ITEM_TABLE.key)
+            .limit(limit + 1)
         )
 
-        # Apply exclusive_start_key filter
+        if prefix is not None:
+            # The lower bound lets the database start the scan at the prefix instead of at the first key.
+            stmt = stmt.where(
+                self._ITEM_TABLE.key >= prefix,
+                self._ITEM_TABLE.key.startswith(prefix, autoescape=True),
+            )
+
         if exclusive_start_key is not None:
             stmt = stmt.where(self._ITEM_TABLE.key > exclusive_start_key)
-
-        # Apply limit
-        if limit is not None:
-            stmt = stmt.limit(limit)
-
-        async with self.get_session(with_simple_commit=True) as session:
-            result = await session.stream(stmt.execution_options(stream_results=True))
-
-            async for row in result:
-                yield KeyValueStoreRecordMetadata(
-                    key=row.key,
-                    content_type=row.content_type,
-                    size=row.size,
-                )
-
-            await self._add_buffer_record(session)
-
-    @override
-    async def iterate_entries(
-        self,
-        *,
-        exclusive_start_key: str | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[KeyValueStoreRecord]:
-        """Iterate over all the existing records in the key-value store, including their values.
-
-        The records are read in keyset-paginated pages of metadata, and the values of each page are then fetched with
-        a single query per batch, instead of one query per record as the default implementation does. The batches are
-        bounded by the record sizes, so a store with large values does not load too many of them at once. Every query
-        runs in its own short session, so no transaction stays open while the consumer processes the records.
-        """
-        last_key = exclusive_start_key
-        remaining = limit
-
-        while remaining is None or remaining > 0:
-            page_size = self._ITERATE_ENTRIES_BATCH_MAX_KEYS
-            if remaining is not None:
-                page_size = min(page_size, remaining)
-
-            page = await self._list_record_metadata(exclusive_start_key=last_key, limit=page_size)
-            if not page:
-                return
-
-            for batch in batch_records_by_size(
-                page,
-                max_records=self._ITERATE_ENTRIES_BATCH_MAX_KEYS,
-                max_bytes=self._ITERATE_ENTRIES_BATCH_MAX_BYTES,
-            ):
-                for record in await self._fetch_records(batch):
-                    yield record
-
-            last_key = page[-1].key
-            if remaining is not None:
-                remaining -= len(page)
-            if len(page) < page_size:
-                return
-
-    @retry_on_error(SQLAlchemyError)
-    async def _list_record_metadata(
-        self, *, exclusive_start_key: str | None, limit: int
-    ) -> list[KeyValueStoreRecordMetadata]:
-        """Read one page of record metadata, ordered by key and starting after `exclusive_start_key`."""
-        stmt = (
-            select(self._ITEM_TABLE.key, self._ITEM_TABLE.content_type, self._ITEM_TABLE.size)
-            .where(self._ITEM_TABLE.key_value_store_id == self._id)
-            .order_by(self._ITEM_TABLE.key)
-            .limit(limit)
-        )
-        if exclusive_start_key is not None:
-            stmt = stmt.where(self._ITEM_TABLE.key > exclusive_start_key)
-
-        async with self.get_session(with_simple_commit=True) as session:
-            result = await session.execute(stmt)
-            page = [
-                KeyValueStoreRecordMetadata(key=row.key, content_type=row.content_type, size=row.size) for row in result
-            ]
-            await self._add_buffer_record(session)
-
-        return page
-
-    @retry_on_error(SQLAlchemyError)
-    async def _fetch_records(self, batch: list[KeyValueStoreRecordMetadata]) -> list[KeyValueStoreRecord]:
-        """Fetch the values of the given records with a single query and return the deserialized records."""
-        stmt = (
-            select(
-                self._ITEM_TABLE.key,
-                self._ITEM_TABLE.content_type,
-                self._ITEM_TABLE.size,
-                self._ITEM_TABLE.value,
-            )
-            .where(
-                self._ITEM_TABLE.key_value_store_id == self._id,
-                self._ITEM_TABLE.key.in_([item.key for item in batch]),
-            )
-            .order_by(self._ITEM_TABLE.key)
-        )
 
         async with self.get_session(with_simple_commit=True) as session:
             result = await session.execute(stmt)
             rows = result.all()
 
-        records = (
-            self._build_record(key=row.key, content_type=row.content_type, size=row.size, value_bytes=row.value)
+            await self._add_buffer_record(session)
+
+        is_truncated = len(rows) > limit
+        rows = rows[:limit]
+
+        # `LIKE` ignores the case in some databases, so the prefix is checked again here. A page can then hold fewer
+        # keys than the limit, while the next page still starts after the last row the database returned.
+        items = [
+            KeyValueStoreRecordMetadata(key=row.key, content_type=row.content_type, size=row.size)
             for row in rows
+            if prefix is None or row.key.startswith(prefix)
+        ]
+
+        return KeyValueStoreKeysListPage(
+            items=items,
+            count=len(items),
+            limit=limit,
+            exclusive_start_key=exclusive_start_key,
+            next_exclusive_start_key=rows[-1].key if is_truncated else None,
         )
-        return [record for record in records if record is not None]
 
     @retry_on_error(SQLAlchemyError)
     @override

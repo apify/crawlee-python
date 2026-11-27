@@ -1,26 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-import re
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
-from crawlee.configuration import Configuration
-from crawlee.storage_backends import FileSystemStorageBackend, MemoryStorageBackend
+from crawlee.storage_backends import MemoryStorageBackend
+from crawlee.storage_backends._utils import SortedKeys
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-    from pathlib import Path
 
     from crawlee.storage_backends._memory import MemoryKeyValueStoreBackend
 
-
-def circular_dict() -> dict[str, Any]:
-    value: dict[str, Any] = {}
-    value['self'] = value
-    return value
+_BACKEND_MODULE = 'crawlee.storage_backends._memory._key_value_store_backend'
 
 
 @pytest.fixture
@@ -38,12 +32,12 @@ async def test_memory_specific_purge_behavior() -> None:
     kvs_backend1 = await MemoryStorageBackend().create_kvs_backend(
         name='test-purge-kvs',
     )
-    await kvs_backend1.set_value(key='test-key', value='initial value')
+    await kvs_backend1.set_value(key='test-key', value=b'initial value', content_type='text/plain')
 
     # Verify value was set
     record = await kvs_backend1.get_value(key='test-key')
     assert record is not None
-    assert record.value == 'initial value'
+    assert record.value == b'initial value'
 
     # Reopen with same storage backend instance
     kvs_backend2 = await MemoryStorageBackend().create_kvs_backend(
@@ -81,7 +75,7 @@ async def test_memory_metadata_updates(kvs_backend: MemoryKeyValueStoreBackend) 
     await asyncio.sleep(0.01)
 
     # Perform a write operation
-    await kvs_backend.set_value(key='test', value='test-value')
+    await kvs_backend.set_value(key='test', value=b'test-value', content_type='text/plain')
 
     # Verify timestamps were updated
     metadata = await kvs_backend.get_metadata()
@@ -90,56 +84,51 @@ async def test_memory_metadata_updates(kvs_backend: MemoryKeyValueStoreBackend) 
     assert metadata.accessed_at > accessed_after_read
 
 
-async def test_iterate_keys_skips_record_deleted_during_iteration(kvs_backend: MemoryKeyValueStoreBackend) -> None:
-    """Test that a record deleted while `iterate_keys` is suspended is skipped."""
-    await kvs_backend.set_value(key='key1', value='a')
-    await kvs_backend.set_value(key='key2', value='b')
+async def test_get_value_returns_copy(kvs_backend: MemoryKeyValueStoreBackend) -> None:
+    """Changing a returned record doesn't change the stored one."""
+    await kvs_backend.set_value(key='key', value=b'value', content_type='text/plain')
 
-    collected_keys = []
-    async for metadata in kvs_backend.iterate_keys():
-        if metadata.key == 'key1':
-            await kvs_backend.delete_value(key='key2')
-        collected_keys.append(metadata.key)
+    record = await kvs_backend.get_value(key='key')
+    assert record is not None
+    record.value = b'changed'
 
-    assert collected_keys == ['key1']
-
-
-@pytest.mark.parametrize(
-    'value',
-    [
-        pytest.param(circular_dict(), id='circular reference'),
-        pytest.param({'nested': {(1, 2): 'tuple key'}}, id='tuple key'),
-    ],
-)
-async def test_set_value_rejects_what_file_system_rejects(
-    kvs_backend: MemoryKeyValueStoreBackend,
-    tmp_path: Path,
-    value: dict[str, Any],
-) -> None:
-    """A JSON value the file-system backend can't serialize raises the same error and stores nothing."""
-    configuration = Configuration(storage_dir=str(tmp_path))
-    fs_backend = await FileSystemStorageBackend().create_kvs_backend(configuration=configuration)
-
-    with pytest.raises((TypeError, ValueError)) as fs_error:
-        await fs_backend.set_value(key='test-key', value=value)
-
-    with pytest.raises(fs_error.type, match=re.escape(str(fs_error.value))):
-        await kvs_backend.set_value(key='test-key', value=value)
-
-    assert await kvs_backend.get_value(key='test-key') is None
+    stored_record = await kvs_backend.get_value(key='key')
+    assert stored_record is not None
+    assert stored_record.value == b'value'
 
 
-async def test_set_value_serializes_like_file_system(kvs_backend: MemoryKeyValueStoreBackend, tmp_path: Path) -> None:
-    """A JSON value with types JSON doesn't support is stored as the file-system backend reads it back."""
-    value = {'created_at': datetime(2026, 1, 1, tzinfo=UTC), 1: 'int key'}
-    configuration = Configuration(storage_dir=str(tmp_path))
-    fs_backend = await FileSystemStorageBackend().create_kvs_backend(configuration=configuration)
+@pytest.mark.parametrize('operation', [pytest.param('purge', id='purge'), pytest.param('drop', id='drop')])
+async def test_purge_or_drop_empties_the_listing(kvs_backend: MemoryKeyValueStoreBackend, operation: str) -> None:
+    """A listing that continues after a purge or drop lists no keys."""
+    for key in ['a', 'b']:
+        await kvs_backend.set_value(key=key, value=b'value', content_type='text/plain')
+    first_page = await kvs_backend.list_keys(limit=1)
 
-    await fs_backend.set_value(key='test-key', value=value)
-    await kvs_backend.set_value(key='test-key', value=value)
+    await getattr(kvs_backend, operation)()
 
-    fs_record = await fs_backend.get_value(key='test-key')
-    memory_record = await kvs_backend.get_value(key='test-key')
-    assert fs_record is not None
-    assert memory_record is not None
-    assert memory_record.value == fs_record.value == {'created_at': '2026-01-01 00:00:00+00:00', '1': 'int key'}
+    page = await kvs_backend.list_keys(exclusive_start_key=first_page.next_exclusive_start_key)
+    assert page.items == []
+
+
+async def test_list_keys_follows_writes_between_pages(kvs_backend: MemoryKeyValueStoreBackend) -> None:
+    """A listing sorts the keys once, sees writes between its pages and stops tracking writes after its last page."""
+    original_add = SortedKeys.add
+
+    with (
+        patch(f'{_BACKEND_MODULE}.SortedKeys', wraps=SortedKeys) as sorted_keys_class,
+        patch.object(SortedKeys, 'add', autospec=True, side_effect=original_add) as add,
+    ):
+        for key in ['c', 'a', 'b']:
+            await kvs_backend.set_value(key=key, value=b'value', content_type='text/plain')
+        first_page = await kvs_backend.list_keys(limit=1)
+        await kvs_backend.set_value(key='d', value=b'value', content_type='text/plain')
+        await kvs_backend.set_value(key='c', value=b'new value', content_type='text/plain')
+        await kvs_backend.delete_value(key='b')
+        second_page = await kvs_backend.list_keys(exclusive_start_key=first_page.next_exclusive_start_key)
+        await kvs_backend.set_value(key='e', value=b'value', content_type='text/plain')
+
+    assert [item.key for item in first_page.items] == ['a']
+    assert [item.key for item in second_page.items] == ['c', 'd']
+    assert second_page.next_exclusive_start_key is None
+    assert sorted_keys_class.call_count == 1
+    assert [call.args[1] for call in add.call_args_list] == ['d', 'c']

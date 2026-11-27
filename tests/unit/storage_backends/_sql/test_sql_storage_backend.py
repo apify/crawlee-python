@@ -65,7 +65,7 @@ async def test_closed_backend_raises(tmp_path: Path) -> None:
         kvs_backend = await storage_backend.create_kvs_backend(configuration=configuration)
 
     with pytest.raises(RuntimeError, match=r'SqlStorageBackend is closed'):
-        await kvs_backend.set_value(key='key', value='value')
+        await kvs_backend.set_value(key='key', value=b'value', content_type='text/plain')
 
     with pytest.raises(RuntimeError, match=r'SqlStorageBackend is closed'):
         await storage_backend.create_kvs_backend(configuration=configuration)

@@ -12,10 +12,11 @@ from crawlee import service_locator
 from crawlee._types import JsonSerializable  # noqa: TC001
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
+from crawlee.storage_backends._utils import batch_records_by_size
 from crawlee.storage_backends.models import KeyValueStoreMetadata
 
 from ._base import Storage
-from ._utils import validate_storage_name
+from ._utils import parse_value, serialize_value, validate_storage_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Awaitable, Callable
@@ -23,7 +24,11 @@ if TYPE_CHECKING:
     from crawlee.configuration import Configuration
     from crawlee.storage_backends import StorageBackend
     from crawlee.storage_backends._base import KeyValueStoreBackend
-    from crawlee.storage_backends.models import KeyValueStoreMetadata, KeyValueStoreRecordMetadata
+    from crawlee.storage_backends.models import (
+        KeyValueStoreMetadata,
+        KeyValueStoreRecord,
+        KeyValueStoreRecordMetadata,
+    )
 else:
     from crawlee._utils.recoverable_state import RecoverableState
 
@@ -62,7 +67,7 @@ class KeyValueStore(Storage):
     kvs = await KeyValueStore.open(name='my-store')
 
     # Store and retrieve data
-    await kvs.set_value('product-1234.json', [{'name': 'Smartphone', 'price': 799.99}])
+    await kvs.set_value('product-1234', [{'name': 'Smartphone', 'price': 799.99}])
     product = await kvs.get_value('product-1234')
     ```
     """
@@ -74,6 +79,15 @@ class KeyValueStore(Storage):
         ]
     ] = {}
     """Cache for recoverable (auto-saved) values."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_KEYS = 100
+    """Maximum number of records read with a single storage backend call in `iterate_entries`."""
+
+    _ITERATE_ENTRIES_BATCH_MAX_BYTES = 8 * 1024 * 1024
+    """Maximum total size of the records read with a single storage backend call in `iterate_entries`.
+
+    A single record larger than this is still read, but alone in its batch.
+    """
 
     def __init__(self, backend: KeyValueStoreBackend, id: str, name: str | None) -> None:
         """Initialize a new instance.
@@ -159,15 +173,35 @@ class KeyValueStore(Storage):
     async def get_value(self, key: str, default_value: T | None = None) -> T | None:
         """Get a value from the KVS.
 
+        The value is parsed according to the content type of the record. JSON is parsed, text and XML are returned as
+        `str`, and a value with any other content type is returned as `bytes`.
+
         Args:
             key: Key of the record to retrieve.
             default_value: Default value returned in case the record does not exist.
 
         Returns:
             The value associated with the given key. `default_value` is used in case the record does not exist.
+
+        Raises:
+            ValueError: If the stored value has a JSON content type but isn't valid JSON.
         """
         record = await self._backend.get_value(key=key)
-        return record.value if record else default_value
+        if record is None:
+            return default_value
+
+        return self._parse_record(record)
+
+    async def get_record(self, key: str) -> KeyValueStoreRecord | None:
+        """Get a record from the KVS without parsing its value.
+
+        Args:
+            key: Key of the record to retrieve.
+
+        Returns:
+            The record with its value as the stored bytes and its content type, or `None` if the record does not exist.
+        """
+        return await self._backend.get_value(key=key)
 
     async def set_value(
         self,
@@ -180,10 +214,26 @@ class KeyValueStore(Storage):
 
         Args:
             key: Key of the record to set.
-            value: Value to set.
-            content_type: The MIME content type string.
+            value: Value to set. `bytes`, `bytearray`, `memoryview` and `str` values are stored as they are, and any
+                other value is stored as JSON. Objects JSON doesn't support, such as a `datetime` or a Pydantic
+                model, are converted with `pydantic_core.to_jsonable_python`. `None` deletes the record.
+            content_type: The MIME content type string. If not provided, it's `application/octet-stream` for bytes,
+                `text/plain` for `str` and `application/json` for other values.
+
+        Raises:
+            TypeError: If `value` is neither `str` nor bytes, and `content_type` isn't JSON, or if JSON can't represent
+                it, for example a `dict` with `tuple` keys or an object of a type Pydantic can't serialize.
+            ValueError: If `value` is stored as JSON and JSON can't serialize it, for example because of a circular
+                reference.
+            LookupError: If `value` isn't bytes, and the charset of `content_type` is unknown.
+            UnicodeEncodeError: If `value` isn't bytes, and the charset of `content_type` can't encode it.
         """
-        await self._backend.set_value(key=key, value=value, content_type=content_type)
+        if value is None:
+            await self._backend.delete_value(key=key)
+            return
+
+        value_bytes, content_type = await serialize_value(value, content_type)
+        await self._backend.set_value(key=key, value=value_bytes, content_type=content_type)
 
     async def delete_value(self, key: str) -> None:
         """Delete a value from the KVS.
@@ -196,68 +246,120 @@ class KeyValueStore(Storage):
     async def iterate_keys(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
+        chunk_size: int = 1000,
     ) -> AsyncIterator[KeyValueStoreRecordMetadata]:
         """Iterate over the existing keys in the KVS.
 
+        The keys are listed page by page, so a key set while the iteration is in progress may be yielded if it follows
+        the keys listed so far.
+
         Args:
+            prefix: Iterate only over the keys that start with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of keys to return. None means no limit.
+            chunk_size: Maximum number of keys listed with a single storage backend call.
+
+        Raises:
+            ValueError: If `chunk_size` is less than 1.
 
         Yields:
             Information about the key.
         """
-        async for item in self._backend.iterate_keys(
+        async for page in self._iterate_key_pages(
+            prefix=prefix,
             exclusive_start_key=exclusive_start_key,
             limit=limit,
+            chunk_size=chunk_size,
         ):
-            yield item
+            for item in page:
+                yield item
 
     async def iterate_values(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
+        chunk_size: int = 1000,
     ) -> AsyncIterator[Any]:
         """Iterate over the values of the existing records in the KVS.
 
-        The records are fetched lazily as the iteration advances, so only a bounded number of values is held in
-        memory at a time. By default this means one request per record on top of the key listing, unless the storage
-        backend reads the values in bounded batches instead.
+        The records are fetched lazily as the iteration advances, in batches bounded by the record count and by the
+        total record size, so only a bounded number of values is held in memory at a time. A record set while the
+        iteration is in progress may be yielded if its key follows the keys listed so far.
 
         Args:
+            prefix: Iterate only over the records whose key starts with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of records to iterate over. None means no limit.
+            chunk_size: Maximum number of keys listed with a single storage backend call. The values are read in
+                separate batches, bounded by the record count and size.
+
+        Raises:
+            ValueError: If a stored value has a JSON content type but isn't valid JSON, or if `chunk_size` is less
+                than 1.
 
         Yields:
             The value of each record.
         """
-        async for _, value in self.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
+        async for _, value in self.iterate_entries(
+            prefix=prefix,
+            exclusive_start_key=exclusive_start_key,
+            limit=limit,
+            chunk_size=chunk_size,
+        ):
             yield value
 
     async def iterate_entries(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int | None = None,
+        chunk_size: int = 1000,
     ) -> AsyncIterator[tuple[str, Any]]:
         """Iterate over the existing records in the KVS as `(key, value)` pairs.
 
-        The records are fetched lazily as the iteration advances, so only a bounded number of values is held in
-        memory at a time. By default this means one request per record on top of the key listing, unless the storage
-        backend reads the values in bounded batches instead. A record deleted while the iteration is in
-        progress may or may not be yielded, depending on whether its value was already read.
+        The records are fetched lazily as the iteration advances, in batches bounded by the record count and by the
+        total record size, so only a bounded number of values is held in memory at a time. A record deleted while
+        the iteration is in progress may or may not be yielded, depending on whether its value was already read. A
+        record set while it's in progress may be yielded if its key follows the keys listed so far.
 
         Args:
+            prefix: Iterate only over the records whose key starts with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of records to iterate over. None means no limit.
+            chunk_size: Maximum number of keys listed with a single storage backend call. The values are read in
+                separate batches, bounded by the record count and size.
+
+        Raises:
+            ValueError: If a stored value has a JSON content type but isn't valid JSON, or if `chunk_size` is less
+                than 1.
 
         Yields:
             A `(key, value)` tuple for each record.
         """
-        async for record in self._backend.iterate_entries(exclusive_start_key=exclusive_start_key, limit=limit):
-            yield record.key, record.value
+        async for page in self._iterate_key_pages(
+            prefix=prefix,
+            exclusive_start_key=exclusive_start_key,
+            limit=limit,
+            chunk_size=chunk_size,
+        ):
+            batches = batch_records_by_size(
+                page,
+                max_records=self._ITERATE_ENTRIES_BATCH_MAX_KEYS,
+                max_bytes=self._ITERATE_ENTRIES_BATCH_MAX_BYTES,
+            )
+            for batch in batches:
+                keys = [item.key for item in batch]
+                records = await self._backend.get_values(keys=keys)
+                for key in keys:
+                    record = records.get(key)
+                    if record is not None:
+                        yield key, self._parse_record(record)
 
     def __aiter__(self) -> AsyncIterator[str]:
         """Iterate over all keys in the KVS.
@@ -278,14 +380,14 @@ class KeyValueStore(Storage):
     async def list_keys(
         self,
         *,
+        prefix: str | None = None,
         exclusive_start_key: str | None = None,
         limit: int = 1000,
     ) -> list[KeyValueStoreRecordMetadata]:
-        """List all the existing keys in the KVS.
-
-        It uses the backend's `iterate_keys` method to get the keys.
+        """List the existing keys in the KVS, up to `limit` of them.
 
         Args:
+            prefix: List only the keys that start with this prefix.
             exclusive_start_key: Key to start the iteration from.
             limit: Maximum number of keys to return.
 
@@ -294,7 +396,8 @@ class KeyValueStore(Storage):
         """
         return [
             key
-            async for key in self._backend.iterate_keys(
+            async for key in self.iterate_keys(
+                prefix=prefix,
                 exclusive_start_key=exclusive_start_key,
                 limit=limit,
             )
@@ -368,6 +471,50 @@ class KeyValueStore(Storage):
                 cache = self._autosaved_values[self.id]
                 for value in cache.values():
                     await value.persist_state()
+
+    async def _iterate_key_pages(
+        self,
+        *,
+        prefix: str | None,
+        exclusive_start_key: str | None,
+        limit: int | None,
+        chunk_size: int,
+    ) -> AsyncIterator[list[KeyValueStoreRecordMetadata]]:
+        """Iterate over the pages of keys listed by the storage backend, up to `limit` keys in total."""
+        if chunk_size < 1:
+            raise ValueError(f'`chunk_size` must be at least 1, got {chunk_size}.')
+
+        remaining = limit
+
+        while remaining is None or remaining > 0:
+            page_limit = chunk_size
+            if remaining is not None:
+                page_limit = min(page_limit, remaining)
+
+            page = await self._backend.list_keys(
+                prefix=prefix,
+                exclusive_start_key=exclusive_start_key,
+                limit=page_limit,
+            )
+            yield page.items
+
+            if page.next_exclusive_start_key is None:
+                return
+
+            exclusive_start_key = page.next_exclusive_start_key
+            if remaining is not None:
+                remaining -= len(page.items)
+
+    @staticmethod
+    def _parse_record(record: KeyValueStoreRecord) -> Any:
+        try:
+            return parse_value(record.value, record.content_type)
+        except ValueError as exc:
+            exc.add_note(
+                f"The record under key '{record.key}' can't be parsed as '{record.content_type}'. Use "
+                '`KeyValueStore.get_record` to read its raw value.'
+            )
+            raise
 
     async def _clear_store_and_cache(self, clear_method: Callable[[], Awaitable[None]]) -> None:
         """Clear the store with the backend's `clear_method`, and the cache of autosaved values with it."""

@@ -1688,7 +1688,10 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         for (id, name, alias), changes in result.key_value_store_changes.items():
             store = await get_kvs(id=id, name=name, alias=alias)
             for key, value in changes.updates.items():
-                await store.set_value(key, value.content, content_type=value.content_type)
+                if value is None:
+                    await store.set_value(key, None)
+                else:
+                    await store.set_value(key, value.content, content_type=value.content_type)
 
     async def __is_finished_function(self) -> bool:
         self._stop_if_max_requests_count_exceeded()
