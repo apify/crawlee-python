@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from dataclasses import dataclass
 from itertools import zip_longest
 from logging import getLogger
@@ -41,7 +40,10 @@ class RenderingTypePredictorState(BaseModel):
         PlainSerializer(sklearn_model_serializer),
     ]
 
-    labels_coefficients: Annotated[defaultdict[str, float], Field(alias='labelsCoefficients')]
+    detection_results: Annotated[
+        dict[RenderingType, dict[str, list[UrlComponents]]], Field(alias='detectionResults', default_factory=dict)
+    ]
+    """URL components of the detected requests by rendering type and label, which the model is trained on."""
 
 
 @docs_group('Other')
@@ -130,28 +132,17 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
 
         Args:
             detection_ratio: A number between 0 and 1 that determines the desired ratio of rendering type detections.
-            persist_state_key: Key in the key-value storage where the trained model parameters will be saved.
+            persist_state_key: Key in the key-value storage where the predictor state will be saved.
             If None, defaults to 'rendering-type-predictor-state'.
-            persistence_enabled: Whether to enable persistence of the trained model parameters for reuse.
+            persistence_enabled: Whether to persist the trained model and its detection results for reuse.
 
         """
         super().__init__()
 
-        self._rendering_type_detection_results: dict[RenderingType, dict[str, list[UrlComponents]]] = {
-            'static': defaultdict(list),
-            'client only': defaultdict(list),
-        }
         self._detection_ratio = max(0, min(1, detection_ratio))
 
-        # Used to increase detection probability recommendation for initial recommendations of each label.
-        # Reaches 1 (no additional increase) after n samples of specific label is already present in
-        # `self._rendering_type_detection_results`.
-        n = 3
-
         self._state = RecoverableState(
-            default_state=RenderingTypePredictorState(
-                model=LogisticRegression(max_iter=1000), labels_coefficients=defaultdict(lambda: n + 2)
-            ),
+            default_state=RenderingTypePredictorState(model=LogisticRegression(max_iter=1000)),
             persist_state_key=persist_state_key,
             persistence_enabled=persistence_enabled,
             logger=logger,
@@ -195,8 +186,8 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
                 detection_probability_recommendation = 1.0
             else:
                 detection_probability_recommendation = self._detection_ratio
-                # Increase recommendation for uncommon labels.
-                detection_probability_recommendation *= self._state.current_value.labels_coefficients[label]
+                # Increase recommendation for labels with fewer than four detection results.
+                detection_probability_recommendation *= max(1, 5 - self._count_detection_results(label))
 
             return RenderingTypePrediction(
                 rendering_type=('client only', 'static')[int(prediction)],
@@ -214,16 +205,19 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
             rendering_type: Known suitable `RenderingType` for the used `Request` instance.
         """
         label = request.label or ''
-        self._rendering_type_detection_results[rendering_type][label].append(get_url_components(request.url))
-        if self._state.current_value.labels_coefficients[label] > 1:
-            self._state.current_value.labels_coefficients[label] -= 1
+        urls_by_label = self._state.current_value.detection_results.setdefault(rendering_type, {})
+        urls_by_label.setdefault(label, []).append(get_url_components(request.url))
         self._retrain()
+
+    def _count_detection_results(self, label: str) -> int:
+        detection_results = self._state.current_value.detection_results
+        return sum(len(urls_by_label.get(label, [])) for urls_by_label in detection_results.values())
 
     def _retrain(self) -> None:
         x: list[FeatureVector] = [(0, 1), (1, 0)]
         y: list[float] = [0, 1]
 
-        for rendering_type, urls_by_label in self._rendering_type_detection_results.items():
+        for rendering_type, urls_by_label in self._state.current_value.detection_results.items():
             encoded_rendering_type = 1 if rendering_type == 'static' else 0
             for label, urls in urls_by_label.items():
                 for url_components in urls:
@@ -233,12 +227,10 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
         self._state.current_value.model.fit(x, y)
 
     def _calculate_mean_similarity(self, url: UrlComponents, label: str, rendering_type: RenderingType) -> float:
-        if not self._rendering_type_detection_results[rendering_type][label]:
+        known_urls = self._state.current_value.detection_results.get(rendering_type, {}).get(label, [])
+        if not known_urls:
             return 0
-        return mean(
-            calculate_url_similarity(url, known_url_components)
-            for known_url_components in self._rendering_type_detection_results[rendering_type][label]
-        )
+        return mean(calculate_url_similarity(url, known_url_components) for known_url_components in known_urls)
 
     def _calculate_feature_vector(self, url: UrlComponents, label: str) -> tuple[float, float]:
         return (
