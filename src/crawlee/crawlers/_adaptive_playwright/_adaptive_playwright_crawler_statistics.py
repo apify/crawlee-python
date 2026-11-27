@@ -11,7 +11,7 @@ from crawlee.statistics import StatisticsState
 
 @docs_group('Statistics')
 class AdaptivePlaywrightCrawlerStatisticState(StatisticsState):
-    """Statistic data about a crawler run with additional information related to adaptive crawling."""
+    """Statistic data about a crawl with additional information related to adaptive crawling."""
 
     model_config = ConfigDict(
         alias_generator=to_camel, validate_by_name=True, validate_by_alias=True, ser_json_inf_nan='constants'
