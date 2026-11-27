@@ -116,6 +116,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         self._fetch_script: AsyncScript | None = None
         self._reclaim_stale_script: AsyncScript | None = None
         self._add_requests_script: AsyncScript | None = None
+        self._mark_request_as_handled_script: AsyncScript | None = None
+        self._reclaim_request_script: AsyncScript | None = None
 
         self._next_reclaim_stale: datetime | None = None
 
@@ -396,56 +398,36 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
     @retry_on_error(RedisError)
     @override
     async def mark_request_as_handled(self, request: Request) -> ProcessedRequest | None:
-        # `hdel` is an atomic operation, so we can be sure that if it returns 1, the request was in progress and is now
-        # removed from `in_progress`.
-        deleted = await await_redis_response(self._redis.hdel(self._in_progress_key, request.unique_key))
+        if self._mark_request_as_handled_script is None:
+            raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
 
-        # If not deleted, the request was not in progress.
-        if not deleted:
+        now = datetime.now(timezone.utc)
+        handled_at = request.handled_at or now
+        request_data = request.model_copy(update={'handled_at': handled_at}).model_dump_json()
+
+        if self._dedup_strategy == 'bloom':
+            dedup_keys = [self._handled_filter_key]
+        else:
+            dedup_keys = [self._handled_set_key, self._pending_set_key]
+
+        # One script, so a connection error can't leave the request out of `in_progress` without marking it handled.
+        marked = await self._mark_request_as_handled_script(
+            keys=[self._in_progress_key, self._data_key, self.metadata_key, *dedup_keys],
+            args=[request.unique_key, request_data, json.dumps(now.isoformat()), self._dedup_strategy],
+        )
+
+        if not marked:
             logger.warning(f'Marking request {request.unique_key} as handled that is not in progress.')
             return None
 
-        # Update the request's handled_at timestamp.
-        if request.handled_at is None:
-            request.handled_at = datetime.now(timezone.utc)
+        # Set only once the script has marked the request, so a request that isn't in progress doesn't look handled.
+        request.handled_at = handled_at
 
-        try:
-            async with self._get_pipeline() as pipe:
-                if self._dedup_strategy == 'default':
-                    await await_redis_response(pipe.sadd(self._handled_set_key, request.unique_key))
-                    await await_redis_response(pipe.srem(self._pending_set_key, request.unique_key))
-                elif self._dedup_strategy == 'bloom':
-                    await await_redis_response(pipe.bf().add(self._handled_filter_key, request.unique_key))
-
-                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
-
-                await self._update_metadata(
-                    pipe,
-                    **_QueueMetadataUpdateParams(
-                        update_accessed_at=True,
-                        update_modified_at=True,
-                        delta_handled_request_count=1,
-                        delta_pending_request_count=-1,
-                    ),
-                )
-
-            return ProcessedRequest(
-                unique_key=request.unique_key,
-                was_already_present=True,
-                was_already_handled=True,
-            )
-        except Exception:
-            blocked_until = int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
-            # If we fail to mark the request as handled after removing it from in_progress, we restore request in
-            # `in_progress` hash.
-            await await_redis_response(
-                self._redis.hset(
-                    self._in_progress_key,
-                    request.unique_key,
-                    json.dumps({'client_id': self.client_key, 'blocked_until_timestamp': blocked_until}),
-                )
-            )
-            raise
+        return ProcessedRequest(
+            unique_key=request.unique_key,
+            was_already_present=True,
+            was_already_handled=True,
+        )
 
     @retry_on_error(RedisError)
     @override
@@ -455,37 +437,31 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         *,
         forefront: bool = False,
     ) -> ProcessedRequest | None:
-        check_in_progress = await await_redis_response(self._redis.hexists(self._in_progress_key, request.unique_key))
-        if not check_in_progress:
+        if self._reclaim_request_script is None:
+            raise RuntimeError('Scripts not loaded. Call _ensure_scripts_loaded() before using the client.')
+
+        now = datetime.now(timezone.utc)
+        blocked_until_timestamp = int(now.timestamp() * 1000) + self._BLOCK_REQUEST_TIME
+
+        reclaimed = await self._reclaim_request_script(
+            keys=[self._in_progress_key, self._queue_key, self._data_key, self.metadata_key],
+            args=[
+                request.unique_key,
+                request.model_dump_json(),
+                json.dumps(now.isoformat()),
+                int(forefront),
+                self.client_key,
+                blocked_until_timestamp,
+            ],
+        )
+
+        if not reclaimed:
             logger.info(f'Reclaiming request {request.unique_key} that is not in progress.')
             return None
 
-        async with self._get_pipeline() as pipe:
-            if forefront:
-                blocked_until_timestamp = (
-                    int(datetime.now(tz=timezone.utc).timestamp() * 1000) + self._BLOCK_REQUEST_TIME
-                )
-
-                await await_redis_response(
-                    pipe.hset(
-                        self._in_progress_key,
-                        request.unique_key,
-                        f'{{"client_id":"{self.client_key}","blocked_until_timestamp":{blocked_until_timestamp}}}',
-                    )
-                )
-                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
-                self._pending_fetch_cache.appendleft(request)
-            else:
-                await await_redis_response(pipe.rpush(self._queue_key, request.unique_key))
-                await await_redis_response(pipe.hset(self._data_key, request.unique_key, request.model_dump_json()))
-                await await_redis_response(pipe.hdel(self._in_progress_key, request.unique_key))
-            await self._update_metadata(
-                pipe,
-                **_QueueMetadataUpdateParams(
-                    update_modified_at=True,
-                    update_accessed_at=True,
-                ),
-            )
+        # Cache the request only after the script has run, so a retried call doesn't cache it twice.
+        if forefront:
+            self._pending_fetch_cache.appendleft(request)
 
         return ProcessedRequest(
             unique_key=request.unique_key,
@@ -522,6 +498,8 @@ class RedisRequestQueueClient(RequestQueueClient, RedisClientMixin):
         """Ensure Lua scripts are loaded in Redis."""
         self._fetch_script = await self._create_script('atomic_fetch_request.lua')
         self._reclaim_stale_script = await self._create_script('reclaim_stale_requests.lua')
+        self._mark_request_as_handled_script = await self._create_script('atomic_mark_request_as_handled.lua')
+        self._reclaim_request_script = await self._create_script('atomic_reclaim_request.lua')
         if self._dedup_strategy == 'bloom':
             self._add_requests_script = await self._create_script('atomic_bloom_add_requests.lua')
         elif self._dedup_strategy == 'default':
