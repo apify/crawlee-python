@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "crawlee"
-version = "1.11.4"
+version = "1.11.5"
 description = "Crawlee for Python"
 authors = [{ name = "Apify Technologies s.r.o.", email = "support@apify.com" }]
 license = "Apache-2.0"
@@ -96,6 +96,7 @@ sql_sqlite = [
 sql_mysql = [
     "sqlalchemy[asyncio]>=2.0.0",
     "aiomysql>=0.3.2",
+    "pymysql<1.2.1", # aiomysql 0.3.2 doesn't work with newer PyMySQL.
     "cryptography>=46.0.5",
 ]
 redis = ["redis[hiredis] >= 7.0.0"]
