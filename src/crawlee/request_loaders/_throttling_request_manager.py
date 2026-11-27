@@ -463,8 +463,8 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         A `RateLimitedSignal` backs the domain off for the signal's `wait` if it's positive, and exponentially from
         `base_delay` otherwise. Only the first refusal of a burst advances the backoff. A `MinIntervalSignal` becomes
         the domain's crawl-delay, unless the domain already has a longer one or `min_crawl_delay` is longer. So the
-        strictest robots.txt among the hosts a domain covers sets the pace, and a robots.txt re-fetch can't speed up the
-        dispatch cadence.
+        strictest robots.txt among the origins a domain covers sets the pace, and a robots.txt re-fetch can't speed up
+        the dispatch cadence.
 
         Returns:
             `True` if the URL's domain is in `domains`, so the manager paces it by the signal. `False` if the domain
