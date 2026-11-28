@@ -11,7 +11,6 @@ from crawlee.errors import (
     ContextPipelineInitializationError,
     ContextPipelineInterruptedError,
     RequestHandlerError,
-    SessionError,
 )
 
 if TYPE_CHECKING:
@@ -98,8 +97,6 @@ class ContextPipeline(Generic[TCrawlingContext]):
                     middleware_instance = _Middleware(middleware=member._middleware, input_context=crawling_context)  # noqa: SLF001
                     try:
                         result = await middleware_instance.action()
-                    except SessionError:  # Session errors get special treatment
-                        raise
                     except StopAsyncIteration as e:
                         raise RuntimeError('The middleware did not yield') from e
                     except ContextPipelineInterruptedError:
@@ -112,9 +109,6 @@ class ContextPipeline(Generic[TCrawlingContext]):
 
             try:
                 await final_context_consumer(cast('TCrawlingContext', crawling_context))
-            except SessionError as e:  # Session errors get special treatment
-                final_consumer_exception = e
-                raise
             except Exception as e:
                 final_consumer_exception = e
                 raise RequestHandlerError(e, crawling_context) from e

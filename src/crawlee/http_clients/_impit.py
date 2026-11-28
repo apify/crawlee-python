@@ -197,7 +197,7 @@ class ImpitHttpClient(HttpClient):
             raise TimeoutError from exc
         except (TransportError, HTTPError) as exc:
             if self._is_proxy_error(exc):
-                raise ProxyError from exc
+                raise ProxyError(str(exc)) from exc
             raise
 
         return _ImpitResponse(response, deadline=deadline)

@@ -74,6 +74,6 @@ A custom `Statistics` logs its periodic messages through the `crawlee.statistics
 
 ## Error tracking
 
-Each `Statistics` instance holds an `error_tracker`, which groups errors from failed request attempts by their type, the place in the code where they were raised, and a similar message. Its `total` and `unique_error_count` properties count all errors and the distinct groups, and `get_most_common_errors()` returns the most frequent groups with their counts. At the end of a run, the crawler logs both counts if there are any errors. A repeated `run()` keeps the errors of the earlier runs in the tracker, so the counts include them too. A second tracker, `error_tracker_retry`, collects session errors that caused a retry with a new session.
+Each `Statistics` instance holds an `error_tracker`, which groups errors from failed request attempts by their type, the place in the code where they were raised, and a similar message. Its `total` and `unique_error_count` properties count all errors and the distinct groups, and `get_most_common_errors()` returns the most frequent groups with their counts. At the end of a run, the crawler logs both counts if there are any errors. A repeated `run()` keeps the errors of the earlier runs in the tracker, so the counts include them too.
 
 With `save_error_snapshots=True`, the error tracker also saves a snapshot of the page on the first occurrence of each unique error. For details and examples, see [Capturing page snapshots on errors](./error-handling#capturing-page-snapshots-on-errors).

@@ -19,7 +19,7 @@ This page demonstrates how Crawlee deals with errors during crawling and the tec
 
 ## Handling proxy errors
 
-Low-quality proxies can cause problems even with high settings for `max_request_retries` and `max_session_rotations` in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>. If you can't get data because of proxy errors, you might want to try again. You can do this using <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink>:
+Low-quality proxies can cause problems even with a high `max_request_retries` setting in <ApiLink to="class/BasicCrawlerOptions">`BasicCrawlerOptions`</ApiLink>. If you can't get data because of proxy errors, you might want to try again. You can do this using <ApiLink to="class/BasicCrawler#failed_request_handler">`failed_request_handler`</ApiLink>:
 
 <RunnableCodeBlock className="language-python" language="python">
     {HandleProxyError}

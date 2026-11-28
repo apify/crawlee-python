@@ -122,18 +122,17 @@ async def test_handles_client_errors(
 
 
 @pytest.mark.parametrize(
-    ('ignore_http_error_status_codes', 'expected_session_rotate', 'expected_number_error'),
+    ('ignore_http_error_status_codes', 'expected_number_error'),
     [
         # change session and retry for no block 4xx statuses
-        pytest.param([], 4, 1, id='default_behavior'),
+        pytest.param([], 4, id='default_behavior'),
         # take as successful status codes from the `ignore_http_error_status_codes` list
-        pytest.param([403], 0, 0, id='ignore_error_status_codes'),
+        pytest.param([403], 0, id='ignore_error_status_codes'),
     ],
 )
 async def test_handles_session_block_errors(
     *,
     ignore_http_error_status_codes: list[int],
-    expected_session_rotate: int,
     expected_number_error: int,
     mock_request_handler: AsyncMock,
     server_url: URL,
@@ -142,14 +141,12 @@ async def test_handles_session_block_errors(
         request_handler=mock_request_handler,
         ignore_http_error_status_codes=ignore_http_error_status_codes,
         max_request_retries=3,
-        max_session_rotations=5,
     )
 
     await crawler.add_requests([str(server_url / 'status/403')])
     await crawler.run()
 
     assert crawler.statistics.error_tracker.total == expected_number_error
-    assert crawler.statistics.error_tracker_retry.total == expected_session_rotate
 
     # Request handler should not be called for error status codes.
     if expected_number_error:
@@ -228,7 +225,7 @@ async def test_http_status_statistics(crawler: HttpCrawler, server_url: URL) -> 
     await crawler.run()
     assert crawler.statistics.state.requests_with_status_code == {
         '200': 10,
-        '403': 100,  # block errors change session and retry
+        '403': 40,  # block errors change session and retry
         '402': 10,  # client errors are not retried by default
         '500': 40,  # server errors are retried by default
     }
@@ -852,7 +849,6 @@ async def test_persistent_429_raises_after_stall(
         request_manager=throttler,
         retry_on_blocked=retry_on_blocked,
         max_request_retries=0,
-        max_session_rotations=0,
     )
     crawler.failed_request_handler(failed_request_handler)
     is_finished = cast('Any', crawler)._BasicCrawler__is_finished_function

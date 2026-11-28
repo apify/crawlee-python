@@ -792,6 +792,8 @@ The warnings about an HTTP 429 that the request manager doesn't pace are reworde
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
 
+The WARNING `Encountered "<error>", rotating session and retrying...` is removed. Session errors log the regular retry WARNING, and the message of a `SessionError` starts with `Detected a session error, retiring session...`. For details, see [`max_session_rotations` is removed](#max_session_rotations-is-removed).
+
 The error of an `AdaptivePlaywrightCrawler` sub crawler that timed out now reads `rendering_type=static timed out after 60.0 seconds`, with a space before `seconds`.
 
 Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
@@ -802,7 +804,7 @@ The `use_session_pool` option is removed from the crawlers. Every crawler proces
 
 `context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer usable still fails with a `RequestCollisionError`, now with the message `The Session (id: <id>) bound to the Request is no longer usable`. Its failed request handler gets that session while the pool still holds it, or a retired session with the bound id, instead of `None`.
 
-Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. To fail the request without a retry, as in v1, pass `retry_on_blocked=False`. This option also turns off the check of the response content for blocking. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
+Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_request_retries` times. To fail the request without a retry, as in v1, pass `retry_on_blocked=False`. This option also turns off the check of the response content for blocking. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
 
 To keep the response cookies out of the sessions, pass `save_response_cookies=False`. With `BasicCrawler`, which doesn't take this option, and with the HTTP crawlers, `context.send_request` still saves its response cookies to the session. To keep them out, pass `cookies=SessionCookies()` to `context.send_request`. To retire every session after its first request, set `max_usage_count` to 1:
 
@@ -853,3 +855,28 @@ On a retired session, `mark_good()` does nothing, so its error score and usage c
 When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
 
 Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.
+
+## `max_session_rotations` is removed
+
+Session errors no longer have their own retry budget, the same as in Crawlee JS v4. The `max_session_rotations` crawler option and the `Request.session_rotation_count` property are removed. A `SessionError`, which includes a `ProxyError` and a blocked response, retires the session and counts towards `max_request_retries` like any other error. With the defaults, a request that keeps failing with session errors gets 4 attempts instead of 10. To allow more attempts on blocked requests, raise `max_request_retries`.
+
+A session error now goes through the same error handling as other errors:
+
+- The `error_handler` runs only while the request has retries left. In v1, it also ran once the session rotations ran out.
+- For a `SessionError` raised in the `request_handler`, the `error_handler` and the `failed_request_handler` get the crawler's own context, such as a `PlaywrightCrawlingContext` with `page`. In v1, they got a `BasicCrawlingContext`.
+- The session is retired on the last attempt too, before the `failed_request_handler` runs.
+- A session error that leads to a retry is recorded in `statistics.error_tracker` instead of `statistics.error_tracker_retry`.
+- The WARNING `Encountered "<error>", rotating session and retrying...` is removed. The crawler logs the same `Retrying request to <url> due to: <error>. <location>` WARNING as for other errors.
+- The message of a `SessionError` starts with `Detected a session error, retiring session...`. A `ProxyError` raised by an HTTP client also includes the message of the original error.
+- With `abort_on_error=True`, a session error aborts the crawler run. In v1, session errors didn't abort it.
+- `ContextPipeline` wraps a `SessionError` in `ContextPipelineInitializationError` or `RequestHandlerError`, like any other error. In v1, it passed the `SessionError` through unwrapped.
+
+With `max_session_rotations=0`, a session error failed the request and the session stayed in the pool. Now the session is always retired. To keep the session when a response has a blocked status code, pass `blocked_status_codes=[]`. Such a response then fails the request as a client error, without a retry. Like other errors, it adds to the session's error score, so the session is retired once the score reaches `max_error_score`. The crawler still checks the page content for blocking, and a blocked page retires the session. To turn off that check too, pass `retry_on_blocked=False` instead. A blocked page with a successful status code then reaches the `request_handler`.
+
+```python
+# v1
+crawler = ParselCrawler(max_session_rotations=0)
+
+# v2
+crawler = ParselCrawler(blocked_status_codes=[])
+```

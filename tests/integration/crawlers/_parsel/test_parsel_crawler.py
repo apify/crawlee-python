@@ -191,14 +191,14 @@ async def test_enqueue_links_with_transform_request_function(server_url: URL, ht
 
 
 async def test_handle_blocked_request(server_url: URL, http_client: HttpClient) -> None:
-    crawler = ParselCrawler(max_session_rotations=1, http_client=http_client)
+    crawler = ParselCrawler(max_request_retries=0, http_client=http_client)
 
     stats = await crawler.run([str(server_url / 'incapsula')])
     assert stats.requests_failed == 1
 
 
 async def test_handle_blocked_status_code(server_url: URL, http_client: HttpClient) -> None:
-    crawler = ParselCrawler(max_session_rotations=1, http_client=http_client)
+    crawler = ParselCrawler(max_request_retries=0, http_client=http_client)
 
     # Patch internal calls and run crawler
     with (

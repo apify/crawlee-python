@@ -11,8 +11,6 @@ async def main() -> None:
     crawler = HttpCrawler(
         # Limit requests per minute to reduce the chance of being blocked
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=50),
-        # Disable session rotation
-        max_session_rotations=0,
         # 403 status usually indicates you're already blocked
         blocked_status_codes=[403],
         session_pool=SessionPool(

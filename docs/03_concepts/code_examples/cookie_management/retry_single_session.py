@@ -7,8 +7,6 @@ from crawlee.sessions import SessionPool
 
 async def main() -> None:
     crawler = HttpCrawler(
-        # With a single session, don't burn retries trying to rotate to another one.
-        max_session_rotations=0,
         session_pool=SessionPool(
             # A single session, so every attempt runs on the same one.
             max_pool_size=1,
