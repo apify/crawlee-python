@@ -26,7 +26,7 @@ async def main() -> None:
         SitemapRequestLoader(
             sitemap_urls=['https://crawlee.dev/sitemap.xml'],
             http_client=http_client,
-            # Enable persistence
+            # Store the state under a key of its own.
             persist_state_key='my-persist-state',
         ) as sitemap_loader,
     ):

@@ -62,7 +62,7 @@ class _NonPersistentStatistics(Statistics):
     """
 
     def __init__(self) -> None:
-        super().__init__(state_model=StatisticsState)
+        super().__init__(state_model=StatisticsState, persistence_enabled=False)
 
     async def __aenter__(self) -> Self:
         self._active = True
@@ -170,6 +170,7 @@ class AdaptivePlaywrightCrawler(
             state_model=AdaptivePlaywrightCrawlerStatisticState,
             periodic_message_logger=kwargs.get('logger')
             or logging.getLogger(f'crawlee.crawlers.{type(self).__name__}'),
+            persist_state_kvs_factory=self.get_key_value_store,
         )
 
         # This crawler and both sub crawlers read the same status code options, so a one-shot iterable must survive the
@@ -183,7 +184,10 @@ class AdaptivePlaywrightCrawler(
 
         super().__init__(statistics=adaptive_statistics, **kwargs)
 
-        self._rendering_type_predictor = self._own_or_borrow(rendering_type_predictor, DefaultRenderingTypePredictor)
+        self._rendering_type_predictor = self._own_or_borrow(
+            rendering_type_predictor,
+            lambda: DefaultRenderingTypePredictor(persist_state_kvs_factory=self.get_key_value_store),
+        )
 
         # Sub crawlers related.
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()

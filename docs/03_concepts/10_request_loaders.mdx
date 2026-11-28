@@ -146,7 +146,7 @@ The loader supports filtering URLs using glob patterns and regular expressions, 
 
 ### Sitemap request loader with persistence
 
-Similarly, the <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> supports state persistence to resume processing from where it left off. This is especially valuable when processing large sitemaps that may take considerable time to complete. Requests that were in progress when the state was saved are served again after a restart.
+The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> persists its state by default to resume processing from where it left off. This is especially valuable when processing large sitemaps that may take considerable time to complete. Requests that were in progress when the state was saved are served again after a restart. Crawlee purges the default key-value store on start, so to resume after a restart, disable `purge_on_start` as the example does. All sitemap loaders store their state under the same default key, so give each loader its own `persist_state_key` when you use more than one. To turn persistence off, pass `persistence_enabled=False`.
 
 <RunnableCodeBlock className="language-python" language="python">
     {SitemapPersistExample}

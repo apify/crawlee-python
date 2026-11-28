@@ -416,7 +416,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Core components
         self._request_manager = request_manager
-        self._session_pool = self._own_or_borrow(session_pool, SessionPool)
+        self._session_pool = self._own_or_borrow(
+            session_pool, lambda: SessionPool(persist_state_kvs_factory=self.get_key_value_store)
+        )
         self._proxy_configuration = proxy_configuration
 
         self._additional_http_error_status_codes = (
@@ -500,7 +502,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             self._statistics = cast(
                 'Statistics[TStatisticsState]',
                 Statistics.with_default_state(
-                    persistence_enabled=True,
                     periodic_message_logger=self._logger,
                     statistics_log_format=self._statistics_log_format,
                     log_message='Current request statistics:',

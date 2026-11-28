@@ -1451,6 +1451,18 @@ async def test_default_statistics_use_crawler_id(crawler_id: str | None, expecte
     assert persisted_state['statsId'] == expected_id
 
 
+async def test_default_session_pool_persists_to_crawler_store() -> None:
+    """The session pool a crawler creates persists to the crawler's key-value store."""
+    crawler = BasicCrawler(request_handler=AsyncMock(), storage_backend=MemoryStorageBackend())
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    crawler_kvs = await crawler.get_key_value_store()
+    global_kvs = await KeyValueStore.open()
+    assert await crawler_kvs.get_value('CRAWLEE_SESSION_POOL_STATE') is not None
+    assert await global_kvs.get_value('CRAWLEE_SESSION_POOL_STATE') is None
+
+
 def test_generated_id_follows_creation_order() -> None:
     """A crawler without an ID takes its creation index, which crawlers with an explicit ID advance too."""
     assert BasicCrawler()._id == '0'

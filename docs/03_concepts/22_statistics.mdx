@@ -54,11 +54,11 @@ The crawler's constructor also accepts `statistics_log_format`. When the crawler
 
 The following options control persistence:
 
-- `persistence_enabled` turns persistence on.
+- `persistence_enabled` turns persistence off when set to `False`.
 - `persist_state_key` is the key the state is stored under. It defaults to `__CRAWLER_STATISTICS_<n>`, where `<n>` is a per-process counter of `Statistics` instances.
 - `persist_state_kvs_name` selects a named key-value store. Without it, the default key-value store is used.
 
-The statistics a crawler creates for itself have persistence enabled and use the crawler's key-value store. The exception is <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink>, whose default statistics don't persist. A `Statistics` instance you create yourself has `persistence_enabled=False` by default. For how to resume an interrupted crawl, see [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers).
+The statistics a crawler creates for itself use the crawler's key-value store, and every crawler except <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> puts its ID in the key instead of the counter. Crawler IDs count from zero too, so a `Statistics` instance you create can get the same key as a crawler's default statistics and pick up its counts. To avoid that, give your instance its own `persist_state_key`. For how to resume an interrupted crawl, see [Stopping and resuming crawlers](../guides/stopping-and-resuming-crawlers).
 
 ## Custom statistics
 

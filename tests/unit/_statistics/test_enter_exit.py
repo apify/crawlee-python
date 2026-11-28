@@ -17,7 +17,7 @@ from crawlee.statistics import Statistics
 )
 async def test_failed_enter_frees_stats(monkeypatch: pytest.MonkeyPatch, error: BaseException) -> None:
     """Statistics whose entry fails or is cancelled stay inactive and can be entered again."""
-    statistics = Statistics.with_default_state()
+    statistics = Statistics.with_default_state(persistence_enabled=False)
     monkeypatch.setattr(statistics._state, 'initialize', AsyncMock(side_effect=error))
 
     with pytest.raises(type(error)):

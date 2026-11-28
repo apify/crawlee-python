@@ -21,9 +21,11 @@ from crawlee._utils.recoverable_state import RecoverableState
 from ._utils import sklearn_model_serializer, sklearn_model_validator
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
     from types import TracebackType
 
     from crawlee import Request
+    from crawlee.storages import KeyValueStore
 
 logger = getLogger(__name__)
 
@@ -129,8 +131,9 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
         self,
         detection_ratio: float = 0.1,
         *,
-        persistence_enabled: bool = False,
+        persistence_enabled: bool = True,
         persist_state_key: str = 'rendering-type-predictor-state',
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -139,6 +142,8 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
             persist_state_key: Key in the key-value storage where the trained model parameters will be saved.
             If None, defaults to 'rendering-type-predictor-state'.
             persistence_enabled: Whether to enable persistence of the trained model parameters for reuse.
+            persist_state_kvs_factory: A function that opens the `KeyValueStore` used for persistence. Without it, the
+                default `KeyValueStore` is used.
 
         """
         super().__init__()
@@ -160,6 +165,7 @@ class DefaultRenderingTypePredictor(RenderingTypePredictor):
             ),
             persist_state_key=persist_state_key,
             persistence_enabled=persistence_enabled,
+            persist_state_kvs_factory=persist_state_kvs_factory,
             logger=logger,
         )
 

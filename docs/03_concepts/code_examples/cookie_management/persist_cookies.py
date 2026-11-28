@@ -17,7 +17,6 @@ async def main() -> None:
             'max_age': timedelta(hours=999_999),
             'max_error_score': 100,
         },
-        persistence_enabled=True,
         persist_state_kvs_name='my-cookie-store',
     )
 

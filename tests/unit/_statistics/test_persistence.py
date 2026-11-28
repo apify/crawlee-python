@@ -4,6 +4,7 @@ import asyncio
 import itertools
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -14,6 +15,26 @@ from crawlee.events import Event, EventPersistStateData
 from crawlee.statistics import Statistics, StatisticsState
 from crawlee.statistics import _models as statistics_models
 from crawlee.storages import KeyValueStore
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+@pytest.mark.parametrize(
+    'build_statistics',
+    [
+        pytest.param(Statistics.with_default_state, id='with_default_state'),
+        pytest.param(lambda: Statistics(state_model=StatisticsState), id='constructor'),
+    ],
+)
+async def test_persists_by_default(build_statistics: Callable[[], Statistics[StatisticsState]]) -> None:
+    """Without `persistence_enabled`, the statistics persist their state under their default key."""
+    async with build_statistics() as statistics:
+        statistics.state.requests_failed = 42
+
+    kvs = await KeyValueStore.open()
+    record = await kvs.get_value(f'__CRAWLER_STATISTICS_{statistics.state.stats_id}')
+    assert record['requestsFailed'] == 42
 
 
 async def test_basic_persistence() -> None:

@@ -728,6 +728,27 @@ Entering `Statistics` or `SessionPool` again keeps their in-memory state. In v1,
 
 A component, such as the session pool, a `RequestList` or a `use_state` dictionary, now saves its state on a `PERSIST_STATE` event only if the state has changed since it was last saved or loaded. On exit, on a direct `persist_state()` call and in `KeyValueStore.persist_autosaved_values()`, it still saves the state every time. `Statistics` saves on every event, since its record includes the time of the save. In v1, every `PERSIST_STATE` event saved the state.
 
+## Persistence is on by default
+
+`Statistics`, `SessionPool`, `DefaultRenderingTypePredictor` and `SitemapRequestLoader` now persist their state by default, the same as Crawlee JS. In v1, they persisted only with `persistence_enabled=True`, and `SitemapRequestLoader` only with a `persist_state_key`.
+
+The session pool and the predictor that a crawler creates persist to the crawler's key-value store, like its default statistics. The default statistics of `AdaptivePlaywrightCrawler` now persist there too. Instances you create yourself use the default key-value store of the global storage backend, even when the crawler has a storage backend of its own. A `Statistics` instance you create can get the same key as the default statistics of a crawler, so give it its own `persist_state_key`. `SitemapRequestLoader` stores its state under `CRAWLEE_SITEMAP_REQUEST_LOADER_STATE` unless you pass a `persist_state_key`, which no longer accepts `None`. Loaders without their own key share it, so a loader created after another one in the same process has saved its state resumes that state instead of loading its own sitemaps. Give each loader its own `persist_state_key`.
+
+To keep the v1 behavior, pass `persistence_enabled=False` to the instances you create. A crawler has no option to turn off persistence of the objects it creates, so pass your own instead. As described in [Crawlers manage only what they create](#crawlers-manage-only-what-they-create), enter a session pool or a predictor with `async with` before the run, but not the statistics, which the crawler enters itself:
+
+```python
+# v1
+crawler = ParselCrawler()
+await crawler.run(urls)
+
+# v2
+session_pool = SessionPool(persistence_enabled=False)
+crawler = ParselCrawler(session_pool=session_pool)
+
+async with session_pool:
+    await crawler.run(urls)
+```
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.

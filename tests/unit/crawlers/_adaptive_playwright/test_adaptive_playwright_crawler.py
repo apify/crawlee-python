@@ -8,11 +8,16 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 
+from crawlee import service_locator
 from crawlee.autoscaling import ConcurrencySystem
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlerStatisticState, BasicCrawler
+from crawlee.crawlers._adaptive_playwright._adaptive_playwright_crawler import _NonPersistentStatistics
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
+from crawlee.events import Event, EventManager, EventPersistStateData
 from crawlee.statistics import Statistics
+from crawlee.storage_backends import MemoryStorageBackend
+from crawlee.storages import KeyValueStore
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -124,6 +129,46 @@ def test_default_statistics_log_to_default_crawler_logger() -> None:
     crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser()
 
     assert crawler.statistics._periodic_message_logger is crawler.log
+
+
+async def test_default_statistics_persist_to_crawler_store() -> None:
+    """The statistics the crawler creates persist to the crawler's key-value store."""
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(storage_backend=MemoryStorageBackend())
+
+    async with crawler.statistics:
+        pass
+
+    key = f'__CRAWLER_STATISTICS_{crawler.statistics.state.stats_id}'
+    crawler_kvs = await crawler.get_key_value_store()
+    global_kvs = await KeyValueStore.open()
+    assert await crawler_kvs.get_value(key) is not None
+    assert await global_kvs.get_value(key) is None
+
+
+async def test_default_predictor_persists_to_crawler_store() -> None:
+    """The predictor the crawler creates persists to the crawler's key-value store."""
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(storage_backend=MemoryStorageBackend())
+
+    async with crawler.rendering_type_predictor:
+        pass
+
+    crawler_kvs = await crawler.get_key_value_store()
+    global_kvs = await KeyValueStore.open()
+    assert await crawler_kvs.get_value('rendering-type-predictor-state') is not None
+    assert await global_kvs.get_value('rendering-type-predictor-state') is None
+
+
+async def test_sub_crawler_statistics_do_not_persist() -> None:
+    """The statistics of the sub crawlers write nothing on `PERSIST_STATE`."""
+    async with EventManager() as event_manager:
+        service_locator.set_event_manager(event_manager)
+
+        async with _NonPersistentStatistics():
+            event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
+            await event_manager.wait_for_all_listeners_to_complete()
+
+    kvs = await KeyValueStore.open()
+    assert await kvs.list_keys() == []
 
 
 def test_lock_time_counts_both_runs() -> None:
