@@ -252,7 +252,7 @@ class CurlImpersonateHttpClient(HttpClient):
             raise TimeoutError from exc
         except CurlRequestError as exc:
             if self._is_proxy_error(exc):
-                raise ProxyError from exc
+                raise ProxyError(str(exc)) from exc
             raise
 
         return _CurlImpersonateResponse(response, deadline=deadline)

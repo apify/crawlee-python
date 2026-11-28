@@ -27,8 +27,7 @@ async def main() -> None:
         session = await session_pool.get_session()
         print(f'Cookies before run: {session.cookies.get_cookies_as_dicts()}')
 
-        # With a single session, don't burn retries trying to rotate to another one.
-        crawler = HttpCrawler(max_session_rotations=0, session_pool=session_pool)
+        crawler = HttpCrawler(session_pool=session_pool)
 
         @crawler.router.default_handler
         async def handler(context: HttpCrawlingContext) -> None:

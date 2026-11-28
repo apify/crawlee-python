@@ -7,17 +7,15 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
-from crawlee.crawlers import HttpCrawler
-from crawlee.errors import HttpClientStatusCodeError
+from crawlee.crawlers import HttpCrawler, HttpCrawlingContext
+from crawlee.errors import HttpClientStatusCodeError, SessionError
 from crawlee.http_clients import HttpClient, HttpResponse
 from crawlee.request_loaders import RateLimitedSignal, RequestList, RequestManagerTandem
-from crawlee.sessions import SessionPool
+from crawlee.sessions import Session, SessionPool
 from tests._utils import open_throttler_held_until_reclaim
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-
-    from crawlee.crawlers import HttpCrawlingContext
 
 
 @pytest.fixture
@@ -97,12 +95,16 @@ async def test_body_read_bound_by_navigation_timeout() -> None:
         pytest.param({'blocked_status_codes': [402]}, 402, id='custom_code'),
     ],
 )
-async def test_blocked_code_rotates_session(*, crawler_kwargs: dict[str, Any], status_code: int) -> None:
-    """Test that a status code in `blocked_status_codes` retires the session and retries with another one."""
+async def test_blocked_code_rotates_session(
+    *, crawler_kwargs: dict[str, Any], status_code: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that a blocked status code retires the session without `mark_bad()` and retries with another one."""
     url = 'https://a.placeholder.com'
     http_client = AsyncMock(spec=HttpClient, active=True)
     http_client.send_request.side_effect = [mock_response(status_code, url), mock_response(200, url)]
-    crawler = HttpCrawler(http_client=http_client, max_request_retries=0, **crawler_kwargs)
+    mark_bad = Mock()
+    monkeypatch.setattr(Session, 'mark_bad', mark_bad)
+    crawler = HttpCrawler(http_client=http_client, max_request_retries=1, **crawler_kwargs)
     pre_navigation_hook = AsyncMock()
     crawler.pre_navigation_hook(pre_navigation_hook)
     handler = AsyncMock()
@@ -111,9 +113,10 @@ async def test_blocked_code_rotates_session(*, crawler_kwargs: dict[str, Any], s
     await crawler.run([url])
 
     handler.assert_awaited_once()
-    assert handler.call_args.args[0].request.session_rotation_count == 1
+    assert handler.call_args.args[0].request.retry_count == 1
     sessions = [hook_call.args[0].session for hook_call in pre_navigation_hook.call_args_list]
     assert [session.retired for session in sessions] == [True, False]
+    mark_bad.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -150,7 +153,7 @@ async def test_non_blocked_code_fails(blocked_status_codes: list[int]) -> None:
     ],
 )
 async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
-    """A throttled 429 is retried later without spending a retry, a session rotation or session reputation."""
+    """A throttled 429 is retried later without spending a retry or session reputation."""
     throttler = await open_throttler_held_until_reclaim(monkeypatch)
     http_client = AsyncMock(spec=HttpClient, active=True)
     url = 'https://throttled.placeholder.com/page'
@@ -162,7 +165,6 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
         request_manager=throttler,
         session_pool=session_pool,
         max_request_retries=0,
-        max_session_rotations=0,
         **crawler_kwargs,
     )
     crawler.failed_request_handler(failed_request_handler)
@@ -179,7 +181,6 @@ async def test_throttled_429_is_deferred(crawler_kwargs: dict[str, Any], monkeyp
     failed_request_handler.assert_not_called()
     request = handled[0].request
     assert request.retry_count == 0
-    assert (request.session_rotation_count or 0) == 0
     session = handled[0].session
     assert session.error_score == 0
     assert session.is_usable
@@ -208,7 +209,6 @@ async def test_tandem_429_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
     assert context.http_response.status_code == 200
     failed_request_handler.assert_not_called()
     assert context.request.retry_count == 0
-    assert (context.request.session_rotation_count or 0) == 0
     assert throttler._domain_states['throttled.placeholder.com'].consecutive_429_count == 1
 
 
@@ -226,6 +226,27 @@ async def test_429_reported_once(monkeypatch: pytest.MonkeyPatch) -> None:
     await crawler.run([url])
 
     record_pacing_signal.assert_called_once_with(RateLimitedSignal(url))
+
+
+async def test_session_error_handlers_get_crawler_context() -> None:
+    """For a `SessionError` from the request handler, the error handlers get the crawler's own context."""
+    url = 'https://a.placeholder.com'
+    http_client = AsyncMock(spec=HttpClient, active=True)
+    http_client.send_request.side_effect = [mock_response(200, url) for _ in range(2)]
+    error_handler = AsyncMock(return_value=None)
+    failed_request_handler = AsyncMock()
+    crawler = HttpCrawler(
+        http_client=http_client,
+        max_request_retries=1,
+        request_handler=AsyncMock(side_effect=SessionError('blocked')),
+    )
+    crawler.error_handler(error_handler)
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run([url])
+
+    assert isinstance(error_handler.call_args.args[0], HttpCrawlingContext)
+    assert isinstance(failed_request_handler.call_args.args[0], HttpCrawlingContext)
 
 
 def test_lock_time_counts_navigation() -> None:

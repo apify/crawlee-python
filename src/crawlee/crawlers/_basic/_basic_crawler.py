@@ -147,23 +147,14 @@ class _BasicCrawlerOptions(TypedDict):
 
     max_request_retries: NotRequired[int]
     """Specifies the maximum number of retries allowed for a request if its processing fails.
-    This includes retries due to navigation errors or errors thrown from user-supplied functions
-    (`request_handler`, `pre_navigation_hooks` etc.).
-
-    This limit does not apply to retries triggered by session rotation (see `max_session_rotations`)."""
+    This includes retries due to navigation errors, session and proxy errors, or errors thrown from user-supplied
+    functions (`request_handler`, `pre_navigation_hooks` etc.)."""
 
     max_requests_per_crawl: NotRequired[int | None]
     """Maximum number of pages to open during a crawl. The crawl stops upon reaching this limit.
     Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means no limit.
     Due to concurrency settings, the actual number of pages visited may slightly exceed this value. The limit counts
     the requests in the statistics, so it includes earlier runs and other crawlers that share the statistics."""
-
-    max_session_rotations: NotRequired[int]
-    """Maximum number of session rotations per request. The crawler rotates the session if a proxy error occurs
-    or if the website blocks the request.
-
-    The session rotations are not counted towards the `max_request_retries` limit.
-    """
 
     max_crawl_depth: NotRequired[int | None]
     """Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond this depth.
@@ -313,7 +304,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         request_handler: Callable[[TCrawlingContext], Awaitable[None]] | None = None,
         max_request_retries: int = 3,
         max_requests_per_crawl: int | None = None,
-        max_session_rotations: int = 10,
         max_crawl_depth: int | None = None,
         retry_on_blocked: bool = True,
         additional_http_error_status_codes: Iterable[int] | None = None,
@@ -349,18 +339,14 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 until every crawler using it has finished.
             request_handler: A callable responsible for handling requests.
             max_request_retries: Specifies the maximum number of retries allowed for a request if its processing fails.
-                This includes retries due to navigation errors or errors thrown from user-supplied functions
-                (`request_handler`, `pre_navigation_hooks` etc.).
-                This limit does not apply to retries triggered by session rotation (see `max_session_rotations`).
+                This includes retries due to navigation errors, session and proxy errors, or errors thrown from
+                user-supplied functions (`request_handler`, `pre_navigation_hooks` etc.).
             max_requests_per_crawl: Maximum number of pages to open during a crawl. The crawl stops upon reaching
                 this limit. Setting this value can help avoid infinite loops in misconfigured crawlers. `None` means
                 no limit. Due to concurrency settings, the actual number of pages visited may slightly exceed
                 this value. If used together with `keep_alive`, then the crawler will be kept alive only until
                 `max_requests_per_crawl` is achieved. The limit counts the requests in the statistics, so it includes
                 earlier runs and other crawlers that share the statistics.
-            max_session_rotations: Maximum number of session rotations per request. The crawler rotates the session
-                if a proxy error occurs or if the website blocks the request.
-                The session rotations are not counted towards the `max_request_retries` limit.
             max_crawl_depth: Specifies the maximum crawl depth. If set, the crawler will stop processing links beyond
                 this depth. The crawl depth starts at 0 for initial requests and increases with each subsequent level
                 of links. Requests at the maximum depth will still be processed, but no new links will be enqueued
@@ -373,7 +359,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 is retried later.
             blocked_status_codes: HTTP status codes that mean the website blocked the session. With `retry_on_blocked`,
                 such a response retires the session and the request is retried with another one, limited by
-                `max_session_rotations`. Defaults to 401, 403 and 429. Doesn't apply to codes in
+                `max_request_retries`. Defaults to 401, 403 and 429. Doesn't apply to codes in
                 `ignore_http_error_status_codes` or to a 429 from a domain the crawler's request manager paces.
             concurrency_settings: Settings to fine-tune concurrency levels.
             concurrency_system: A concurrency system to use instead of the default one, e.g. one shared between
@@ -474,7 +460,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         # Crawl settings
         self._max_request_retries = max_request_retries
         self._max_requests_per_crawl = max_requests_per_crawl
-        self._max_session_rotations = max_session_rotations
         self._max_crawl_depth = max_crawl_depth
         self._respect_robots_txt_file = respect_robots_txt_file
 
@@ -1251,9 +1236,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
         if isinstance(error, HttpClientStatusCodeError):
             return False
 
-        if isinstance(error, SessionError):
-            return ((context.request.session_rotation_count or 0) + 1) < self._max_session_rotations
-
         max_request_retries = context.request.max_retries
         if max_request_retries is None:
             max_request_retries = self._max_request_retries
@@ -1393,6 +1375,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
     ) -> None:
         request_manager = await self.get_request_manager()
         request = context.request
+        # The session is retired before the request goes back to the queue, so that its retry can't get the same one.
+        retire_session = isinstance(error, SessionError)
 
         if self._abort_on_error:
             self._logger.error('Aborting crawler run due to error (abort_on_error=True)', exc_info=error)
@@ -1413,9 +1397,13 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     reduced_error,
                     get_one_line_error_summary_if_possible(error),
                 )
+                if retire_session:
+                    context.session.retire()
                 await request_manager.reclaim_request(request)
                 return
 
+        if retire_session:
+            context.session.retire()
         request.state = RequestState.ERROR
         await self._mark_request_as_handled(request)
         await self._handle_failed_request(context, error)
@@ -1444,7 +1432,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             context.request.state = RequestState.ERROR
             raise
 
-        context.session.mark_bad()
+        # A session error has already retired the session.
+        if not isinstance(error, SessionError):
+            context.session.mark_bad()
 
     async def _handle_failed_request(self, context: TCrawlingContext | BasicCrawlingContext, error: Exception) -> None:
         self._logger.error(
@@ -1796,34 +1786,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 exc_info=primary_error.wrapped_exception,
             )
             await self._handle_request_error(primary_error.crawling_context, primary_error.wrapped_exception)
-
-        except SessionError as session_error:
-            request.state = RequestState.ERROR_HANDLER
-            should_retry = self._should_retry_request(context, session_error)
-
-            await self._call_error_handler(context, session_error)
-
-            # Retire before checking `no_retry`, so the blocked session leaves the pool even when the error handler
-            # stops the retries.
-            if should_retry:
-                session.retire()
-
-            if should_retry and not request.no_retry:
-                await self._statistics.error_tracker_retry.add(error=session_error, context=context)
-                exc_only = ''.join(traceback.format_exception_only(session_error)).strip()
-                self._logger.warning('Encountered "%s", rotating session and retrying...', exc_only)
-
-                # Increment session rotation count.
-                request.session_rotation_count = (request.session_rotation_count or 0) + 1
-
-                await request_manager.reclaim_request(request)
-            else:
-                request.state = RequestState.ERROR
-                await self._mark_request_as_handled(request)
-
-                await self._statistics.error_tracker.add(error=session_error, context=context)
-                await self._handle_failed_request(context, session_error)
-                self._statistics.record_request_processing_failure(request.unique_key)
 
         except ContextPipelineInterruptedError as interrupted_error:
             self._logger.debug('The context pipeline was interrupted', exc_info=interrupted_error)

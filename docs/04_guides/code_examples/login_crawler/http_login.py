@@ -13,8 +13,8 @@ from crawlee.sessions import SessionPool
 async def main() -> None:
     crawler = HttpCrawler(
         max_requests_per_crawl=10,
-        # Configure to use a single persistent session throughout the crawl
-        max_session_rotations=0,
+        # Fail a blocked request instead of retiring the logged-in session
+        retry_on_blocked=False,
         # Limit request rate to avoid triggering anti-scraping measures
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=30),
         session_pool=SessionPool(

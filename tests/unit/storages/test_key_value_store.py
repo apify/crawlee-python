@@ -1779,6 +1779,7 @@ async def test_purge_drops_autosaved_values(kvs: KeyValueStore) -> None:
     autosaved_value['count'] = 1
 
     await kvs.purge()
+    autosaved_value['count'] = 2
     await kvs.persist_autosaved_values()
     await _emit_persist_state()
 
@@ -1848,6 +1849,27 @@ async def test_failed_purge_or_drop_keeps_autosaved_values(
 
     assert await kvs.get_value('state') == {'count': 1}
     assert await kvs.get_auto_saved_value('state') is autosaved_value
+
+
+async def test_purge_failing_partway_saves_autosaved_value_again(
+    kvs: KeyValueStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unchanged autosaved value is saved on `PERSIST_STATE` again after a failed purge deleted its record."""
+    await kvs.get_auto_saved_value('state', {'count': 1})
+    purge = kvs._backend.purge
+
+    async def purge_then_fail() -> None:
+        await purge()
+        raise NotImplementedError
+
+    with monkeypatch.context() as failing_backend:
+        failing_backend.setattr(kvs._backend, 'purge', AsyncMock(side_effect=purge_then_fail))
+        with pytest.raises(NotImplementedError):
+            await kvs.purge()
+
+    await _emit_persist_state()
+
+    assert await kvs.get_value('state') == {'count': 1}
 
 
 async def test_failed_drop_keeps_store_cached(

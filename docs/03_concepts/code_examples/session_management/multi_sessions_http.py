@@ -30,8 +30,6 @@ async def main() -> None:
     crawler = HttpCrawler(
         # Adjust request limits according to your pool size
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=500),
-        # Requests are bound to specific sessions, no rotation needed
-        max_session_rotations=0,
         # 403 status usually indicates you're already blocked
         blocked_status_codes=[403],
         session_pool=SessionPool(

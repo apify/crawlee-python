@@ -67,7 +67,7 @@ To make a crawler log to a logger of your choice, pass it as the `logger` argume
 Crawlee picks the level of a message by who needs to act on it:
 
 - ERROR: a request failed after all its retries, or the crawler can't go on.
-- WARNING: a request is retried, a session is rotated, or something looks misconfigured.
+- WARNING: a request is retried or something looks misconfigured.
 - INFO: the crawler starts or finishes, and the periodic status and statistics.
 - DEBUG: the steps of every request and the internal decisions, such as the autoscaling.
 

@@ -400,7 +400,7 @@ async def _fetch_and_process_sitemap(
     depth: int,
     visited_sitemap_urls: set[str],
     sources: list[SitemapSource],
-    retries_left: int,
+    attempts_left: int,
     proxy_info: ProxyInfo | None = None,
     timeout: timedelta | None = None,
     emit_nested_sitemaps: bool,
@@ -413,8 +413,8 @@ async def _fetch_and_process_sitemap(
 
     sitemap_url = source['url']
 
-    while retries_left > 0:
-        retries_left -= 1
+    while attempts_left > 0:
+        attempts_left -= 1
         try:
             response = await http_client.send_request(
                 sitemap_url, method='GET', headers=SITEMAP_HEADERS, proxy_info=proxy_info, timeout=timeout
@@ -514,12 +514,12 @@ async def _fetch_and_process_sitemap(
             parsed_ok.append(True)
 
         except _RetryableSitemapStatusError as e:
-            if retries_left > 0:
+            if attempts_left > 0:
                 logger.warning(
                     'Error fetching sitemap %s: HTTP status %s. Retries left: %s',
                     sitemap_url,
                     e.status_code,
-                    retries_left,
+                    attempts_left,
                 )
                 await asyncio.sleep(SITEMAP_RETRY_DELAY)
             else:
@@ -527,8 +527,8 @@ async def _fetch_and_process_sitemap(
                     'Failed to fetch sitemap %s, no retries left: HTTP status %s.', sitemap_url, e.status_code
                 )
         except Exception as e:
-            if retries_left > 0:
-                logger.warning('Error fetching sitemap %s: %s. Retries left: %s', sitemap_url, e, retries_left)
+            if attempts_left > 0:
+                logger.warning('Error fetching sitemap %s: %s. Retries left: %s', sitemap_url, e, attempts_left)
                 await asyncio.sleep(SITEMAP_RETRY_DELAY)
             else:
                 logger.exception('Failed to fetch sitemap %s, no retries left.', sitemap_url)
@@ -671,7 +671,7 @@ async def parse_sitemap(
                     depth=depth,
                     visited_sitemap_urls=visited_sitemap_urls,
                     sources=sources,
-                    retries_left=sitemap_retries,
+                    attempts_left=sitemap_retries + 1,
                     emit_nested_sitemaps=emit_nested_sitemaps,
                     enqueue_strategy=enqueue_strategy,
                     proxy_info=proxy_info,

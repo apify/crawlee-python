@@ -72,6 +72,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from crawlee._types import JsonSerializable
+    from crawlee.storage_backends.models import ProcessedRequest
 
 
 async def test_processes_requests_from_explicit_queue() -> None:
@@ -393,7 +394,7 @@ async def test_calls_error_handler() -> None:
 
 async def test_calls_error_handler_for_session_errors() -> None:
     crawler = BasicCrawler(
-        max_session_rotations=1,
+        max_request_retries=1,
     )
 
     @crawler.router.default_handler
@@ -421,7 +422,7 @@ async def test_calls_error_handler_for_session_errors() -> None:
 async def test_error_handler_return_ignored(error: Exception) -> None:
     """A request returned by the error handler isn't added, and the original request is retried until it fails."""
     queue = await RequestQueue.open()
-    crawler = BasicCrawler(request_manager=queue, max_request_retries=1, max_session_rotations=2)
+    crawler = BasicCrawler(request_manager=queue, max_request_retries=1)
     request = Request.from_url('https://a.placeholder.com')
     returned_request = Request.from_url('https://a.placeholder.com', unique_key='returned')
     handler_mock = AsyncMock(side_effect=error)
@@ -470,7 +471,6 @@ async def test_error_handler_no_retry_fails(error: Exception) -> None:
     stored_request = await queue.get_request(request.unique_key)
     assert stored_request is not None
     assert stored_request.retry_count == 0
-    assert stored_request.session_rotation_count is None
 
 
 async def test_no_retry_still_retires_session() -> None:
@@ -491,8 +491,8 @@ async def test_no_retry_still_retires_session() -> None:
 
 
 async def test_session_error_handler_exception_is_wrapped() -> None:
-    """Exceptions from error_handler on SessionError path become UserDefinedErrorHandlerError."""
-    crawler = BasicCrawler(max_session_rotations=2)
+    """Exceptions from error_handler on a SessionError become UserDefinedErrorHandlerError."""
+    crawler = BasicCrawler()
 
     @crawler.router.default_handler
     async def handler(context: BasicCrawlingContext) -> None:
@@ -504,6 +504,109 @@ async def test_session_error_handler_exception_is_wrapped() -> None:
 
     with pytest.raises(UserDefinedErrorHandlerError):
         await crawler.run(['https://a.placeholder.com'])
+
+
+async def test_session_errors_spend_retries() -> None:
+    """Session errors and other errors spend the same `max_request_retries` budget."""
+    request_handler = AsyncMock(
+        side_effect=[SessionError('blocked'), RuntimeError('crash'), SessionError('blocked'), RuntimeError('crash')]
+    )
+    failed_request_handler = AsyncMock()
+    crawler = BasicCrawler(max_request_retries=3, request_handler=request_handler)
+    crawler.failed_request_handler(failed_request_handler)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert request_handler.await_count == 4
+    failed_request_handler.assert_awaited_once()
+    context, error = failed_request_handler.call_args.args
+    assert context.request.retry_count == 3
+    assert isinstance(error, RuntimeError)
+
+
+async def test_session_retired_every_attempt() -> None:
+    """A session error retires the session on every attempt, including the last one, without marking it bad."""
+    sessions = list[Session]()
+
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        sessions.append(context.session)
+        raise SessionError('blocked')
+
+    session_pool = SessionPool(max_pool_size=1)
+    crawler = BasicCrawler(max_request_retries=2, request_handler=request_handler, session_pool=session_pool)
+
+    with patch.object(Session, 'mark_bad') as mark_bad:
+        async with session_pool:
+            await crawler.run(['https://a.placeholder.com'])
+
+    assert len(sessions) == 3
+    assert len({session.id for session in sessions}) == 3
+    assert all(session.retired for session in sessions)
+    mark_bad.assert_not_called()
+
+
+async def test_session_retire_order() -> None:
+    """A session error retires the session after the error handler, before the reclaim or failed request handler."""
+    queue = await RequestQueue.open()
+    sessions = list[Session]()
+    observe = Mock()
+
+    async def request_handler(context: BasicCrawlingContext) -> None:
+        sessions.append(context.session)
+        raise SessionError('blocked')
+
+    async def error_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        observe('error_handler', retired=context.session.retired)
+
+    async def failed_request_handler(context: BasicCrawlingContext, error: Exception) -> None:
+        observe('failed_request_handler', retired=context.session.retired)
+
+    reclaim_request = queue.reclaim_request
+
+    async def observed_reclaim_request(request: Request, **kwargs: Any) -> ProcessedRequest | None:
+        observe('reclaim_request', retired=sessions[-1].retired)
+        return await reclaim_request(request, **kwargs)
+
+    crawler = BasicCrawler(request_manager=queue, max_request_retries=1, request_handler=request_handler)
+    crawler.error_handler(error_handler)
+    crawler.failed_request_handler(failed_request_handler)
+
+    with patch.object(queue, 'reclaim_request', side_effect=observed_reclaim_request):
+        await crawler.run(['https://a.placeholder.com'])
+
+    assert observe.call_args_list == [
+        call('error_handler', retired=False),
+        call('reclaim_request', retired=True),
+        call('failed_request_handler', retired=True),
+    ]
+
+
+async def test_session_error_aborts_run() -> None:
+    """With `abort_on_error`, a session error aborts the run like any other error."""
+    request_handler = AsyncMock(side_effect=SessionError('blocked'))
+    crawler = BasicCrawler(
+        concurrency_settings=ConcurrencySettings(desired_concurrency=1, max_concurrency=1),
+        abort_on_error=True,
+        request_handler=request_handler,
+    )
+
+    await crawler.run(['https://a.placeholder.com', 'https://b.placeholder.com'])
+
+    request_handler.assert_awaited_once()
+
+
+async def test_session_error_retry_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """The retry warning of a session error says that the session is retired and keeps the error message."""
+    request_handler = AsyncMock(side_effect=SessionError('captcha'))
+    crawler = BasicCrawler(configure_logging=False, max_request_retries=1, request_handler=request_handler)
+
+    with caplog.at_level(logging.WARNING, logger='crawlee'):
+        await crawler.run(['https://a.placeholder.com'])
+
+    messages = [record.getMessage() for record in caplog.records]
+    retry_messages = [message for message in messages if message.startswith('Retrying request')]
+    assert len(retry_messages) == 1
+    assert 'due to: Detected a session error, retiring session... captcha.' in retry_messages[0]
 
 
 async def test_retry_reclaims_request_to_the_back() -> None:
@@ -3385,7 +3488,7 @@ async def test_unusable_bound_session_reaches_failed_request_handler() -> None:
 
 
 async def test_handles_session_error_in_failed_request_handler() -> None:
-    crawler = BasicCrawler(max_session_rotations=1)
+    crawler = BasicCrawler(max_request_retries=0)
     handler_requests = set()
 
     @crawler.router.default_handler

@@ -14,8 +14,8 @@ async def main() -> None:
         max_requests_per_crawl=10,
         headless=True,
         browser_type='chromium',
-        # We only have one session and it shouldn't rotate
-        max_session_rotations=0,
+        # Fail a blocked request instead of retiring the logged-in session
+        retry_on_blocked=False,
         # Limit crawling intensity to avoid blocking
         concurrency_settings=ConcurrencySettings(max_tasks_per_minute=30),
         session_pool=SessionPool(

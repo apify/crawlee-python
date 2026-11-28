@@ -553,6 +553,8 @@ async def test_persist_state_event_before_teardown_saves_nothing_after_it(
 
     event_manager.emit(event=Event.PERSIST_STATE, event_data=EventPersistStateData(is_migrating=False))
     await recoverable_state.teardown()
+    # Changed, so that a save after `teardown` wouldn't be skipped as unchanged.
+    recoverable_state.current_value.counter = 1
     await event_manager.wait_for_all_listeners_to_complete()
 
     set_value.assert_awaited_once()
@@ -611,3 +613,266 @@ async def test_initialize_skips_wait_for_save_in_progress(
     await recoverable_state.teardown()
 
     assert initialize_task in done
+
+
+async def test_unchanged_state_is_not_persisted_again(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PERSIST_STATE event writes the state only when it changed since it was last saved."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+
+    set_value = AsyncMock(side_effect=kvs.set_value)
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+
+    await _emit_persist_state(event_manager)
+    assert set_value.await_count == 0
+
+    recoverable_state.current_value.counter = 1
+    await _emit_persist_state(event_manager)
+    assert set_value.await_count == 1
+
+    await recoverable_state.teardown()
+
+
+async def test_teardown_writes_unchanged_state(event_manager: EventManager, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`teardown` writes the state even if it hasn't changed since it was last saved."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+
+    set_value = AsyncMock(side_effect=kvs.set_value)
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+
+    await recoverable_state.teardown()
+
+    assert set_value.await_count == 1
+
+
+async def test_debug_message_is_logged_only_for_writes(
+    event_manager: EventManager, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A PERSIST_STATE event logs the DEBUG message about persisting only when it writes the state."""
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        await _emit_persist_state(event_manager)
+        recoverable_state.current_value.counter = 1
+        await _emit_persist_state(event_manager)
+
+    messages = [record.message for record in caplog.records if record.message.startswith('Persisting RecoverableState')]
+    assert len(messages) == 1
+
+    await recoverable_state.teardown()
+
+
+async def test_failed_persist_is_retried_on_next_event(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PERSIST_STATE event after a failed write writes the state again, even though it hasn't changed."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+
+    with monkeypatch.context() as failing_store:
+        failing_store.setattr(kvs, 'set_value', AsyncMock(side_effect=RuntimeError('store is on fire')))
+        await _emit_persist_state(event_manager)
+
+    await _emit_persist_state(event_manager)
+    assert await kvs.get_value(KEY) == {'counter': 0, 'message': 'hello'}
+
+    await recoverable_state.teardown()
+
+
+async def test_failed_write_that_landed_is_retried(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PERSIST_STATE event after a failed write that landed writes the state, even if it changed back since."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+    set_value = kvs.set_value
+
+    async def set_value_then_time_out(key: str, value: object, *, content_type: str | None = None) -> None:
+        await set_value(key, value, content_type=content_type)
+        raise TimeoutError
+
+    recoverable_state.current_value.counter = 1
+    with monkeypatch.context() as failing_store:
+        failing_store.setattr(kvs, 'set_value', AsyncMock(side_effect=set_value_then_time_out))
+        await _emit_persist_state(event_manager)
+
+    recoverable_state.current_value.counter = 0
+    await _emit_persist_state(event_manager)
+    assert await kvs.get_value(KEY) == {'counter': 0, 'message': 'hello'}
+
+    await recoverable_state.teardown()
+
+
+async def test_change_during_write_is_persisted_by_next_event(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A change made while a write is in progress is written by the next PERSIST_STATE event."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    set_value = kvs.set_value
+
+    async def set_value_then_change(key: str, value: object, *, content_type: str | None = None) -> None:
+        await set_value(key, value, content_type=content_type)
+        recoverable_state.current_value.counter = 1
+
+    with monkeypatch.context() as changing_store:
+        changing_store.setattr(kvs, 'set_value', AsyncMock(side_effect=set_value_then_change))
+        await _emit_persist_state(event_manager)
+
+    await _emit_persist_state(event_manager)
+    assert await kvs.get_value(KEY) == {'counter': 1, 'message': 'hello'}
+
+    await recoverable_state.teardown()
+
+
+async def test_direct_persist_writes_unchanged_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A direct `persist_state` call writes the state even if it hasn't changed."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await recoverable_state.persist_state()
+
+    set_value = AsyncMock(side_effect=kvs.set_value)
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+
+    await recoverable_state.persist_state()
+    assert set_value.await_count == 1
+
+    await recoverable_state.teardown()
+
+
+async def test_loaded_state_is_not_written_back(event_manager: EventManager, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A state loaded from its record isn't written back until it changes."""
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(KEY, {'counter': 5, 'message': 'loaded'})
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+
+    set_value = AsyncMock(side_effect=kvs.set_value)
+    monkeypatch.setattr(kvs, 'set_value', set_value)
+
+    await _emit_persist_state(event_manager)
+    assert set_value.await_count == 0
+
+    await recoverable_state.teardown()
+
+
+async def test_load_cancelled_after_read_keeps_earlier_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A load cancelled after it read the record keeps the in-memory state established before it."""
+    kvs = await KeyValueStore.open()
+    await kvs.set_value(KEY, {'counter': 42, 'message': 'hello'})
+    recoverable_state = _build_state()
+    recoverable_state.reset()
+    recoverable_state.current_value.counter = 7
+    serialization_started = asyncio.Event()
+
+    async def hanging_serialize_value(_value: object, _content_type: str | None) -> tuple[bytes, str]:
+        serialization_started.set()
+        await asyncio.sleep(3600)
+        return b'', 'application/json'
+
+    monkeypatch.setattr('crawlee.storages._utils.serialize_value', AsyncMock(side_effect=hanging_serialize_value))
+    initialize_task = asyncio.create_task(recoverable_state.initialize())
+    await asyncio.wait_for(serialization_started.wait(), timeout=5)
+    initialize_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await initialize_task
+
+    assert recoverable_state.current_value.counter == 7
+
+
+async def test_reset_store_makes_next_persist_write(event_manager: EventManager) -> None:
+    """After the record is cleared, the next persist writes the state even though it hasn't changed."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+    await recoverable_state.teardown()
+
+    await recoverable_state.reset_store()
+    assert await kvs.get_value(KEY) is None
+
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+    assert await kvs.get_value(KEY) == {'counter': 0, 'message': 'hello'}
+
+    await recoverable_state.teardown()
+
+
+async def test_failed_reset_store_makes_next_persist_write(
+    event_manager: EventManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After a failed `reset_store` that cleared the record, the next persist writes the unchanged state."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+    await recoverable_state.teardown()
+    set_value = kvs.set_value
+
+    async def set_value_then_time_out(key: str, value: object, *, content_type: str | None = None) -> None:
+        await set_value(key, value, content_type=content_type)
+        raise TimeoutError
+
+    with monkeypatch.context() as failing_store:
+        failing_store.setattr(kvs, 'set_value', AsyncMock(side_effect=set_value_then_time_out))
+        with pytest.raises(TimeoutError):
+            await recoverable_state.reset_store()
+
+    await recoverable_state.initialize()
+    await _emit_persist_state(event_manager)
+    assert await kvs.get_value(KEY) == {'counter': 0, 'message': 'hello'}
+
+    await recoverable_state.teardown()
+
+
+async def test_persisted_record_matches_json_value_format() -> None:
+    """The state is written as the same bytes as an equal JSON value set in the store."""
+    kvs = await KeyValueStore.open()
+    recoverable_state = _build_state()
+    await recoverable_state.initialize()
+    await recoverable_state.persist_state()
+    await kvs.set_value('json-value', {'counter': 0, 'message': 'hello'})
+
+    state_record = await kvs.get_record(KEY)
+    json_record = await kvs.get_record('json-value')
+
+    assert state_record is not None
+    assert json_record is not None
+    assert state_record.value == json_record.value
+
+    await recoverable_state.teardown()
+
+
+async def test_infinite_float_is_restored() -> None:
+    """A state holding an infinite float is restored with it by a new instance."""
+
+    class _FloatState(BaseModel):
+        value: float = 0
+
+    recoverable_state = RecoverableState(
+        default_state=_FloatState(), persist_state_key=KEY, persistence_enabled=True, logger=logger
+    )
+    await recoverable_state.initialize()
+    recoverable_state.current_value.value = float('inf')
+    await recoverable_state.teardown()
+
+    restored_state = RecoverableState(
+        default_state=_FloatState(), persist_state_key=KEY, persistence_enabled=True, logger=logger
+    )
+
+    assert (await restored_state.initialize()).value == float('inf')
+    await restored_state.teardown()

@@ -504,6 +504,8 @@ If you have a custom request manager, implement `record_pacing_signal`. Return `
 
 `ThrottlingRequestManager` now rejects a `base_delay` or `max_delay` that isn't positive, so a zero `base_delay` no longer works as a way to honor only `Retry-After`.
 
+A domain's crawl-delay now follows the longest `MinIntervalSignal` it gets. In v1, `set_crawl_delay` kept the first value and ignored later ones.
+
 A `RequestThrottledError` you raise yourself now starts the domain's backoff, and the request is deferred if the request manager paces its domain. In v1, it was an ordinary error unless you had called `record_domain_delay` first. A deferred request never fails, so raise the error only when the server has refused the request. In `AdaptivePlaywrightCrawler`, such an error from the static run now defers the request instead of falling back to the browser.
 
 ## `ThrottlingRequestManager.inner` is optional
@@ -559,6 +561,14 @@ A `Cookie` header passed with a request or set on the client is merged with the 
 `send_request` and `context.send_request` take a new `cookies` argument, the cookies to send and store instead of the session cookies for a single call. To send no session cookies, pass `cookies=SessionCookies()`. With `PlaywrightCrawler`, the response cookies still reach the session through the browser context, unless `save_response_cookies` is disabled.
 
 Without a session, or with `save_response_cookies=False` on the crawler, the cookies a server sets during a redirect chain are sent with the following requests of that chain. In v1, `ImpitHttpClient` and `HttpxHttpClient` didn't send them.
+
+### Host-only cookies stay on their host
+
+The HTTP clients send a host-only cookie only to its own host, not to its subdomains, the same as browsers. A cookie is host-only when a server sets it without the `Domain` attribute, or when you set it with a `domain` that has no leading dot, such as `example.com`. To send a cookie to the subdomains as well, set `domain` to `.example.com`. A cookie without a `domain` is still sent to every host.
+
+In v1, `ImpitHttpClient` and `HttpxHttpClient` sent the host-only cookies from servers to the subdomains too. Every client did so for a cookie set with a `domain` without a leading dot, although the browser of `PlaywrightCrawler` treated it as host-only.
+
+A `CookieJar` that you pass to `Session` or `SessionCookies` follows the same rule, since its cookie policy is replaced. In v1, it kept its own policy.
 
 ### `save_response_cookies` replaces `persist_cookies_per_session`
 
@@ -642,6 +652,10 @@ class MyHttpClient(HttpClient):
 
 `SitemapRequestLoader.fetch_next_request` skips a URL while its request is still in progress, for example when another sitemap lists it too. In v1, it returned a request for the URL again, and `get_total_count` counted the URL twice.
 
+## Sitemap fetch retries
+
+`SitemapRequestLoader` now fetches a sitemap that keeps failing up to 4 times instead of 3. Its `sitemap_retries` counts the retries after the first attempt, as in Crawlee JS. To keep 3 attempts, pass `sitemap_retries=2`.
+
 ## Crawlers manage only what they create
 
 A crawler now enters and exits only the objects it creates, the same as Crawlee JS. An object you pass is yours to enter and exit. The `Statistics` and the event managers are the exceptions, since the crawler enters them on every run. You can enter an event manager yourself as well. In v1, the crawler entered a passed object that wasn't active yet and exited it when its run finished, even while another crawler still used it.
@@ -710,6 +724,10 @@ Entering `Statistics` or `SessionPool` again keeps their in-memory state. In v1,
 
 `persistence_enabled` of `Statistics` no longer accepts `'explicit_only'`. Pass `True` or `False`.
 
+## State is saved only when it has changed
+
+A component, such as the session pool, a `RequestList` or a `use_state` dictionary, now saves its state on a `PERSIST_STATE` event only if the state has changed since it was last saved or loaded. On exit, on a direct `persist_state()` call and in `KeyValueStore.persist_autosaved_values()`, it still saves the state every time. `Statistics` saves on every event, since its record includes the time of the save. In v1, every `PERSIST_STATE` event saved the state.
+
 ## Logs changed
 
 If you configure loggers by name or match log messages, update them for the following changes.
@@ -766,6 +784,8 @@ The crawler logs the first message once per run, the next time it looks for a ne
 
 When the statistics, the session pool or another component fails to persist its state on a `PERSIST_STATE` event, it now logs a WARNING `Failed to persist the state under key '<key>'.` with the traceback. The WARNING comes from the component's own logger, such as `crawlee.statistics._statistics`. In v1, the `crawlee.events._event_manager` logger logged the ERROR `Exception in the event listener`. A failed persist when the component is exited logs the same WARNING, where v1 raised the error.
 
+A component logs the DEBUG message `Persisting RecoverableState (model=..., event_data=...).` only for the saves it makes. For when it saves, see [State is saved only when it has changed](#state-is-saved-only-when-it-has-changed).
+
 When a crawl processes no requests because its request manager holds only handled ones, the crawler logs a new warning. It starts with `This crawl processed no requests` and explains how to crawl the requests again.
 
 Messages that mentioned a storage client name the storage backend instead. The DEBUG message about the implicit default backend now reads `No storage backend set, implicitly creating and using default FileSystemStorageBackend.` The warning about unsupported arguments of a dataset backend ends with the backend class name, for example `... of get_data are not supported by MemoryDatasetBackend.`
@@ -784,6 +804,8 @@ The warnings about an HTTP 429 that the request manager doesn't pace are reworde
 
 The `ThrottlingRequestManager` warning about capping a delay now calls it a "requested wait" delay instead of a "Retry-After header" delay. Its DEBUG messages about a 429 ignored during an active backoff and about resetting a domain's rate limit state are removed, and its DEBUG message about a domain's crawl-delay shows the delay with one decimal place.
 
+The WARNING `Encountered "<error>", rotating session and retrying...` is removed. Session errors log the regular retry WARNING, and the message of a `SessionError` starts with `Detected a session error, retiring session...`. For details, see [`max_session_rotations` is removed](#max_session_rotations-is-removed).
+
 The error of an `AdaptivePlaywrightCrawler` sub crawler that timed out now reads `rendering_type=static timed out after 60.0 seconds`, with a space before `seconds`.
 
 Log records hold the message template and its arguments separately. `record.msg` is the template, such as `Retrying request to %s due to: %s. %s`, and `record.args` holds the values. To read the final text, use `record.getMessage()`, which formatters and handlers already do.
@@ -794,7 +816,7 @@ The `use_session_pool` option is removed from the crawlers. Every crawler proces
 
 `context.session` is now a `Session` instead of `Session | None`, so you can drop the `if context.session` checks. A request bound by `session_id` to a session that's no longer usable still fails with a `RequestCollisionError`, now with the message `The Session (id: <id>) bound to the Request is no longer usable`. Its failed request handler gets that session while the pool still holds it, or a retired session with the bound id, instead of `None`.
 
-Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_session_rotations` times. To fail the request without a retry, as in v1, pass `retry_on_blocked=False`. This option also turns off the check of the response content for blocking. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
+Without the session pool, a 401, 403 or 429 response failed the request without a retry. Now it retires the session, and the request is retried with another one, up to `max_request_retries` times. To fail the request without a retry, as in v1, pass `retry_on_blocked=False`. This option also turns off the check of the response content for blocking. With `proxy_urls`, a session keeps its proxy, so the proxy changes when the session does, not on every request.
 
 To keep the response cookies out of the sessions, pass `save_response_cookies=False`. With `BasicCrawler`, which doesn't take this option, and with the HTTP crawlers, `context.send_request` still saves its response cookies to the session. To keep them out, pass `cookies=SessionCookies()` to `context.send_request`. To retire every session after its first request, set `max_usage_count` to 1:
 
@@ -845,6 +867,31 @@ On a retired session, `mark_good()` does nothing, so its error score and usage c
 When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
 
 Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.
+
+## `max_session_rotations` is removed
+
+Session errors no longer have their own retry budget, the same as in Crawlee JS v4. The `max_session_rotations` crawler option and the `Request.session_rotation_count` property are removed. A `SessionError`, which includes a `ProxyError` and a blocked response, retires the session and counts towards `max_request_retries` like any other error. With the defaults, a request that keeps failing with session errors gets 4 attempts instead of 10. To allow more attempts on blocked requests, raise `max_request_retries`.
+
+A session error now goes through the same error handling as other errors:
+
+- The `error_handler` runs only while the request has retries left. In v1, it also ran once the session rotations ran out.
+- For a `SessionError` raised in the `request_handler`, the `error_handler` and the `failed_request_handler` get the crawler's own context, such as a `PlaywrightCrawlingContext` with `page`. In v1, they got a `BasicCrawlingContext`.
+- The session is retired on the last attempt too, before the `failed_request_handler` runs.
+- A session error that leads to a retry is recorded in `statistics.error_tracker` instead of `statistics.error_tracker_retry`.
+- The WARNING `Encountered "<error>", rotating session and retrying...` is removed. The crawler logs the same `Retrying request to <url> due to: <error>. <location>` WARNING as for other errors.
+- The message of a `SessionError` starts with `Detected a session error, retiring session...`. A `ProxyError` raised by an HTTP client also includes the message of the original error.
+- With `abort_on_error=True`, a session error aborts the crawler run. In v1, session errors didn't abort it.
+- `ContextPipeline` wraps a `SessionError` in `ContextPipelineInitializationError` or `RequestHandlerError`, like any other error. In v1, it passed the `SessionError` through unwrapped.
+
+With `max_session_rotations=0`, a session error failed the request and the session stayed in the pool. Now the session is always retired. To keep the session when a response has a blocked status code, pass `blocked_status_codes=[]`. Such a response then fails the request as a client error, without a retry. Like other errors, it adds to the session's error score, so the session is retired once the score reaches `max_error_score`. The crawler still checks the page content for blocking, and a blocked page retires the session. To turn off that check too, pass `retry_on_blocked=False` instead. A blocked page with a successful status code then reaches the `request_handler`.
+
+```python
+# v1
+crawler = ParselCrawler(max_session_rotations=0)
+
+# v2
+crawler = ParselCrawler(blocked_status_codes=[])
+```
 
 ## `error_handler` doesn't replace the request
 
