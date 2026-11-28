@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, overload
 
 from crawlee._utils.crypto import crypto_random_object_id
 from crawlee._utils.docs import docs_group
@@ -15,9 +15,28 @@ if TYPE_CHECKING:
     from http.cookiejar import CookieJar
 
     from crawlee._types import JsonSerializable
+    from crawlee.proxy_configuration import ProxyInfo
     from crawlee.sessions._models import SessionModel
 
 logger = getLogger(__name__)
+
+
+@docs_group('Session management')
+class SessionOptions(TypedDict, total=False):
+    """Keyword arguments of the `Session` constructor."""
+
+    id: str | None
+    max_age: timedelta
+    user_data: Mapping[str, JsonSerializable] | None
+    max_error_score: float
+    error_score_decrement: float
+    created_at: datetime | None
+    usage_count: int
+    max_usage_count: int
+    error_score: float
+    retired: bool
+    cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None
+    proxy_info: ProxyInfo | None
 
 
 @docs_group('Session management')
@@ -44,6 +63,7 @@ class Session:
         error_score: float = 0.0,
         retired: bool = False,
         cookies: SessionCookies | CookieJar | dict[str, str] | list[CookieParam] | None = None,
+        proxy_info: ProxyInfo | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -59,6 +79,7 @@ class Session:
             error_score: Current error score of the session.
             retired: Whether the session has been permanently retired.
             cookies: Cookies associated with the session.
+            proxy_info: The proxy that the session sends its requests through, `None` for no proxy.
         """
         self._id = id or crypto_random_object_id(length=10)
         self._max_age = max_age
@@ -71,12 +92,13 @@ class Session:
         self._error_score = error_score
         self._retired = retired
         self._cookies = SessionCookies(cookies) or SessionCookies()
+        self._proxy_info = proxy_info
 
     @classmethod
     def from_model(cls, model: SessionModel) -> Session:
         """Initialize a new instance from a `SessionModel`."""
         cookies = SessionCookies(model.cookies)
-        return cls(**model.model_dump(exclude={'cookies'}), cookies=cookies)
+        return cls(**model.model_dump(exclude={'cookies', 'proxy_info'}), cookies=cookies, proxy_info=model.proxy_info)
 
     def __repr__(self) -> str:
         """Get a string representation."""
@@ -124,6 +146,15 @@ class Session:
     def cookies(self) -> SessionCookies:
         """Get the cookies."""
         return self._cookies
+
+    @property
+    def proxy_info(self) -> ProxyInfo | None:
+        """Get the proxy that the session sends its requests through.
+
+        `PlaywrightCrawler` applies it to a page only with `use_incognito_pages=True`, since by default all pages share
+        one browser context with the proxy of the first page.
+        """
+        return self._proxy_info
 
     @property
     def error_score(self) -> float:
@@ -187,6 +218,7 @@ class Session:
             error_score=self._error_score,
             retired=self._retired,
             cookies=self._cookies.get_cookies_as_dicts(),
+            proxy_info=self._proxy_info,
         )
         if as_dict:
             return model.model_dump()

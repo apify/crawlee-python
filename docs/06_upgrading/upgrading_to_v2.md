@@ -72,7 +72,6 @@ Secondary arguments of the public API are now keyword-only. The main argument of
 - `Dataset.export_to(key, *, content_type, to_kvs_id, ...)`.
 - `ConcurrencySettings(*, min_concurrency, max_concurrency, max_tasks_per_minute, desired_concurrency)`.
 - `RequestList(requests, *, name, persist_state_key, persist_requests_key, state)`.
-- `ProxyConfiguration.new_url(*, session_id, request)` and `ProxyConfiguration.new_proxy_info(*, session_id, request)`. Both arguments of `new_proxy_info` now default to `None`.
 - `AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(*, ...)` and `with_parsel_static_parser(*, ...)`.
 - `AdaptivePlaywrightCrawlingContext.wait_for_selector`, `query_selector_one`, `query_selector_all` and `parse_with_static_parser`, which take `timeout` by keyword only.
 - `HeaderGenerator.get_specific_headers(header_names, *, browser_type)`.
@@ -96,32 +95,34 @@ h2 = await context.query_selector_one('h2', timeout=timedelta(seconds=5))
 
 The `tiered_proxy_urls` option is removed, together with `ProxyInfo.proxy_tier`, `Request.last_proxy_tier` and the `proxy_tier` argument of `ProxyConfiguration.new_url` and `ProxyConfiguration.new_proxy_info`. Crawlee JS v4 removed proxy tiers too.
 
-To move from a cheap proxy to a more reliable one when a request fails, pass a `new_url_function` that picks the proxy by the request's `retry_count`:
+A session now gets its proxy once, when it's created, as described in [Sessions carry their proxy](#sessions-carry-their-proxy). A blocked request is retried with another session, which can have another proxy, but nothing moves it from a cheap proxy to a more reliable one.
+
+## Sessions carry their proxy
+
+A `Session` has a new `proxy_info` property. The session pool sets it when it creates the session and saves it with the session state. When the pool restores the session, it passes the saved proxy to `ProxyConfiguration.new_proxy_info`. `context.proxy_info` is the proxy of `context.session`, and the HTTP crawlers and `context.send_request` send the requests through it. Crawlee JS v4 does the same. `PlaywrightCrawler` applies it to a page only with `use_incognito_pages=True`, since by default all pages share one browser context with the proxy of the first page. In v1, the proxy of a session lived in `ProxyConfiguration`, so it was lost on a restart even with a persisted session pool.
+
+- `ProxyConfiguration.new_url()` takes no arguments. `ProxyConfiguration.new_proxy_info()` takes an optional `ProxyInfo` instead of `session_id` and `request`, and returns it unchanged. A subclass whose proxies depend on the environment returns an equivalent `ProxyInfo` that works in the current one.
+- `new_url_function` is called without arguments, once for every new session. It can't pick a proxy by the request anymore.
+- `ProxyInfo.session_id` is removed.
+- `SessionPool` takes a `proxy_configuration`. The crawler passes its own `proxy_configuration` to its default pool. Passing both `session_pool` and `proxy_configuration` to a crawler raises a `ValueError`, since a passed pool would ignore the proxies. Pass `proxy_configuration` to the pool instead:
 
 ```python
 # v1
-proxy_configuration = ProxyConfiguration(
-    tiered_proxy_urls=[
-        [None],
-        ['http://cheap-datacenter-proxy.com/'],
-        ['http://expensive-residential-proxy.com/'],
-    ]
+crawler = ParselCrawler(
+    proxy_configuration=proxy_configuration,
+    session_pool=SessionPool(max_pool_size=100),
 )
-
+await crawler.run(urls)
 
 # v2
-def pick_proxy_url(session_id=None, request=None):
-    if request is None or request.retry_count == 0:
-        return None
-    if request.retry_count == 1:
-        return 'http://cheap-datacenter-proxy.com/'
-    return 'http://expensive-residential-proxy.com/'
+session_pool = SessionPool(max_pool_size=100, proxy_configuration=proxy_configuration)
+crawler = ParselCrawler(session_pool=session_pool)
 
-
-proxy_configuration = ProxyConfiguration(new_url_function=pick_proxy_url)
+async with session_pool:
+    await crawler.run(urls)
 ```
 
-Unlike tiers, this function doesn't track blocking per domain, so every request starts again from the first proxy. For details, see [Switching proxies on retries](../concepts/proxy-management#switching-proxies-on-retries).
+A request bound by `session_id` to a session that's no longer in the pool gets a retired session without a proxy in its failed request handler. A `context.send_request` call there goes without a proxy.
 
 ## `Request.forefront` is removed
 
@@ -867,6 +868,28 @@ On a retired session, `mark_good()` does nothing, so its error score and usage c
 When `mark_good()` or `mark_bad()` retires a session because it expired, reached its usage limit, or reached its error score limit, it only sets the flag. In v1, it also added `max_error_score`. As a result, such sessions have a lower error score in v2, and `is_blocked` is `True` only when the error score itself reached `max_error_score`.
 
 Session state, including the persisted session pool state, has a new `retired` field. Sessions saved by v1 load with `retired=False` and keep their error score.
+
+## The session pool creates sessions on demand
+
+`SessionPool` no longer fills itself up to `max_pool_size` when you enter it. `get_session()` creates a new session while the pool has fewer than `max_pool_size` sessions, and picks a random one after that, as in Crawlee JS. `get_session_by_id()` no longer creates sessions, so a request bound by `session_id` to a session that the pool hasn't created yet fails with a `RequestCollisionError`.
+
+## `create_session_function` gets the session options
+
+The `create_session_function` of `SessionPool` now gets a `SessionOptions` dict, the keyword arguments of `Session`, and can be sync or async. The options hold `create_session_settings` and the proxy that the pool's `proxy_configuration` picked, so you can pass `create_session_settings` together with `create_session_function`. The pool also calls the function for every session it restores from the persisted state, with the saved state in the options. Build the session from the options, so that a restored session keeps its state:
+
+```python
+# v1
+def create_session() -> Session:
+    return Session(user_data={'token': get_token()})
+
+
+# v2
+async def create_session(options: SessionOptions) -> Session:
+    # A restored session keeps its saved token.
+    if 'user_data' not in options:
+        options['user_data'] = {'token': await get_token()}
+    return Session(**options)
+```
 
 ## `max_session_rotations` is removed
 

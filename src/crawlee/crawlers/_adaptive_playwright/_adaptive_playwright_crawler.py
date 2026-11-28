@@ -189,9 +189,11 @@ class AdaptivePlaywrightCrawler(
         playwright_crawler_specific_kwargs = playwright_crawler_specific_kwargs or _PlaywrightCrawlerAdditionalOptions()
 
         # The sub crawlers never run, so they would never enter or close defaults of their own. The client of the
-        # adaptive crawler already serves `send_request` in their contexts.
+        # adaptive crawler already serves `send_request` in their contexts. The sessions of its pool already carry the
+        # proxies of `proxy_configuration`.
         kwargs['session_pool'] = self._session_pool
         kwargs['http_client'] = self._http_client
+        kwargs.pop('proxy_configuration', None)
 
         # The sub crawlers log under the adaptive crawler's logger, and only errors, since the adaptive crawler reports
         # the outcome of each request itself.

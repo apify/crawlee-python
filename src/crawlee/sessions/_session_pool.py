@@ -2,26 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import random
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from logging import getLogger
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 from crawlee import service_locator
 from crawlee._utils.context import ensure_context
 from crawlee._utils.docs import docs_group
 from crawlee._utils.recoverable_state import RecoverableState
-from crawlee.sessions import Session
+from crawlee.sessions import Session, SessionOptions
 from crawlee.sessions._models import SessionPoolModel
 
 if TYPE_CHECKING:
     from types import TracebackType
 
     from crawlee.events import EventManager
+    from crawlee.proxy_configuration import ProxyConfiguration
 
 logger = getLogger(__name__)
 
-CreateSessionFunctionType = Callable[[], Session]
+CreateSessionFunctionType = Callable[[SessionOptions], Session | Awaitable[Session]]
 
 
 @docs_group('Session management')
@@ -37,8 +40,9 @@ class SessionPool:
         self,
         *,
         max_pool_size: int = 1000,
-        create_session_settings: dict | None = None,
+        create_session_settings: SessionOptions | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
+        proxy_configuration: ProxyConfiguration | None = None,
         event_manager: EventManager | None = None,
         persistence_enabled: bool = False,
         persist_state_kvs_name: str | None = None,
@@ -49,10 +53,16 @@ class SessionPool:
         Args:
             max_pool_size: Maximum number of sessions to maintain in the pool. You can add more sessions to the pool
                 by using the `add_session` method.
-            create_session_settings: Settings for creating new session instances. If None, default settings will
-                be used. Do not set it if you are providing a `create_session_function`.
-            create_session_function: A callable to create new session instances. If None, a default session settings
-                will be used. Do not set it if you are providing `create_session_settings`.
+            create_session_settings: Default options of the sessions that the pool creates.
+            create_session_function: A function, sync or async, that creates a session from the given options. The pool
+                calls it for every new session and for every session restored from the persisted state, with
+                `create_session_settings` merged with the state of the restored session. Build the session from these
+                options, so that a restored session keeps its state. Defaults to `Session(**options)`.
+            proxy_configuration: Assigns proxies to the sessions that the pool creates or restores. Before calling
+                `create_session_function`, the pool sets `proxy_info` in the options to the result of
+                `proxy_configuration.new_proxy_info()` called with the `proxy_info` already in the options, such as the
+                proxy of a restored session. A session added with `add_session` keeps its own `proxy_info`, but one
+                without a proxy gets a new one when the pool restores it.
             event_manager: The event manager to handle events like persist state.
             persistence_enabled: Flag to enable or disable state persistence of the pool.
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
@@ -73,12 +83,16 @@ class SessionPool:
         )
 
         self._max_pool_size = max_pool_size
-        self._session_settings = create_session_settings or {}
-        self._create_session_function = create_session_function
+        self._session_settings = create_session_settings or SessionOptions()
+        self._create_session_function = create_session_function or (lambda options: Session(**options))
+        self._proxy_configuration = proxy_configuration
         self._persistence_enabled = persistence_enabled
 
-        if self._create_session_function and self._session_settings:
-            raise ValueError('Both `create_session_settings` and `create_session_function` cannot be provided.')
+        # Keeps concurrent `get_session` calls from overfilling the pool while a session is being created.
+        self._lock = asyncio.Lock()
+
+        # Set once the sessions of the persisted record are recreated, so an entry that fails before that retries it.
+        self._restored_sessions_recreated = False
 
         # Flag to indicate the context state.
         self._active = False
@@ -123,8 +137,13 @@ class SessionPool:
             state.max_pool_size = self._max_pool_size
             self._remove_retired_sessions()
 
-            if not state.sessions:
-                await self._fill_sessions_to_max()
+            if not self._restored_sessions_recreated:
+                restored_sessions = dict[str, Session]()
+                for session in state.sessions.values():
+                    restored_session = await self._build_session(_get_session_options(session))
+                    restored_sessions[restored_session.id] = restored_session
+                state.sessions = restored_sessions
+                self._restored_sessions_recreated = True
         except BaseException:
             try:
                 if self._state.is_initialized:
@@ -187,30 +206,33 @@ class SessionPool:
 
     @ensure_context
     async def get_session(self) -> Session:
-        """Retrieve a random session from the pool.
+        """Retrieve a session from the pool.
 
-        This method first ensures the session pool is at its maximum capacity. If the random session is not usable,
-        retired sessions are removed and a new session is created and returned.
+        While the pool has fewer than `max_pool_size` sessions, this method creates a new one. Once the pool is full,
+        it picks a random session. If the random session is not usable, retired sessions are removed and a new session
+        is created and returned.
 
         Returns:
             The session object.
         """
-        await self._fill_sessions_to_max()
-        session = self._get_random_session()
+        async with self._lock:
+            if self.session_count < self._max_pool_size:
+                return await self._create_new_session()
 
-        if session.is_usable:
-            return session
+            session = self._get_random_session()
 
-        # If the random session is not usable, clean up and create a new session
-        self._remove_retired_sessions()
-        return await self._create_new_session()
+            if session.is_usable:
+                return session
+
+            # If the random session is not usable, clean up and create a new session
+            self._remove_retired_sessions()
+            return await self._create_new_session()
 
     @ensure_context
     async def get_session_by_id(self, session_id: str) -> Session | None:
         """Retrieve a session by ID from the pool.
 
-        This method first ensures the session pool is at its maximum capacity. It then tries to retrieve a specific
-        session by ID. If the session is not found or not usable, `None` is returned.
+        It doesn't create sessions. If the session is not found or not usable, `None` is returned.
 
         Args:
             session_id: The ID of the session to retrieve.
@@ -218,7 +240,6 @@ class SessionPool:
         Returns:
             The session object if found and usable, otherwise `None`.
         """
-        await self._fill_sessions_to_max()
         session = self._state.current_value.sessions.get(session_id)
 
         if not session:
@@ -247,19 +268,27 @@ class SessionPool:
         """
         await self._state.reset_store()
 
+    async def _build_session(self, options: SessionOptions) -> Session:
+        """Build a session from `options` merged over `create_session_settings`."""
+        merged_options = self._session_settings.copy()
+        merged_options.update(options)
+
+        if self._proxy_configuration:
+            merged_options['proxy_info'] = await self._proxy_configuration.new_proxy_info(
+                merged_options.get('proxy_info')
+            )
+
+        session = self._create_session_function(merged_options)
+        if inspect.isawaitable(session):
+            session = await session
+
+        return session
+
     async def _create_new_session(self) -> Session:
         """Create a new session, add it to the pool and return it."""
-        if self._create_session_function:
-            new_session = self._create_session_function()
-        else:
-            new_session = Session(**self._session_settings)
+        new_session = await self._build_session(SessionOptions())
         self._state.current_value.sessions[new_session.id] = new_session
         return new_session
-
-    async def _fill_sessions_to_max(self) -> None:
-        """Fill the pool with sessions to the maximum size."""
-        for _ in range(self._max_pool_size - self.session_count):
-            await self._create_new_session()
 
     def _get_random_session(self) -> Session:
         """Get a random session from the pool."""
@@ -272,3 +301,11 @@ class SessionPool:
         """Remove all sessions from the pool that are no longer usable."""
         state = self._state.current_value
         state.sessions = {session.id: session for session in state.sessions.values() if session.is_usable}
+
+
+def _get_session_options(session: Session) -> SessionOptions:
+    """Get the options that recreate the given session."""
+    state = session.get_state(as_dict=False)
+    options = cast('SessionOptions', state.model_dump(exclude={'proxy_info'}))
+    options['proxy_info'] = state.proxy_info
+    return options

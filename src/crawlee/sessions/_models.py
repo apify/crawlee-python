@@ -8,6 +8,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, GetPydanticSchema, 
 from pydantic.alias_generators import to_camel
 
 from crawlee._types import JsonSerializable
+from crawlee.proxy_configuration import ProxyInfo
 
 from ._cookies import CookieParam
 from ._session import Session
@@ -29,6 +30,7 @@ class SessionModel(BaseModel):
     error_score: float
     retired: bool = False
     cookies: list[CookieParam]
+    proxy_info: ProxyInfo | None = None
 
 
 class SessionPoolModel(BaseModel):

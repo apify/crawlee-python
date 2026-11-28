@@ -1,7 +1,7 @@
 ---
 id: proxy-management
 title: Proxy management
-description: How to use and rotate proxies in Crawlee - proxy configuration, IP rotation tied to sessions, and switching proxies on retries.
+description: How to use and rotate proxies in Crawlee - proxy configuration and IP rotation tied to sessions.
 ---
 
 import ApiLink from '@site/src/components/ApiLink';
@@ -13,8 +13,6 @@ import RunnableCodeBlock from '@site/src/components/RunnableCodeBlock';
 import QuickStartExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/quick_start_example.py';
 import IntegrationBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/integration_bs_example.py';
 import IntegrationPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/integration_pw_example.py';
-import RetryEscalationBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/retry_escalation_bs_example.py';
-import RetryEscalationPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/retry_escalation_pw_example.py';
 import InspectionBsExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/inspecting_bs_example.py';
 import InspectionPwExample from '!!raw-loader!roa-loader!./code_examples/proxy_management/inspecting_pw_example.py';
 
@@ -41,6 +39,8 @@ Examples of how to use our proxy URLs with crawlers are shown below in [Crawler 
 
 All our proxy needs are managed by the <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> class. We create an instance using the <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink> constructor function based on the provided options.
 
+Instead of `proxy_urls`, you can pass a `new_url_function`. It takes no arguments and returns a proxy URL, or `None` to use no proxy. It can be sync or async.
+
 ### Crawler integration
 
 `ProxyConfiguration` integrates seamlessly into <ApiLink to="class/BeautifulSoupCrawler">`BeautifulSoupCrawler`</ApiLink> and <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>.
@@ -62,11 +62,13 @@ Our crawlers will now use the selected proxies for all connections.
 
 ### IP Rotation and session management
 
-The <ApiLink to="class/ProxyConfiguration#new_url">`proxy_configuration.new_url()`</ApiLink> method allows us to pass a `session_id` parameter. This creates a `session_id`-`proxy_url` pair, ensuring that subsequent `new_url()` calls with the same `session_id` return the same `proxy_url`. This is extremely useful in scraping, because we want to create the impression of a real user. See the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how maintaining a real session helps avoid blocking.
+Each call to <ApiLink to="class/ProxyConfiguration#new_proxy_info">`proxy_configuration.new_proxy_info()`</ApiLink> picks a proxy: the next URL from `proxy_urls`, or the one that `new_url_function` returns. The crawler's session pool calls it for every session it creates, and the session sends all its requests through that proxy. The session keeps its IP address together with its cookies, which creates the impression of a real user. When a session is retired, a new session takes its place with a newly picked proxy. See the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> class for more information on how maintaining a real session helps avoid blocking.
+
+The proxy is picked once per session, not per request. In <ApiLink to="class/PlaywrightCrawler">`PlaywrightCrawler`</ApiLink>, pages share one browser context by default, and the context keeps the proxy of the session whose page opened it. To send every page through the proxy of its own session, pass `use_incognito_pages=True`.
+
+When you pass your own <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> to the crawler, pass `proxy_configuration` to the pool instead. The crawler doesn't accept both and raises an error.
 
 For more details on session management, check out the [Session management](./session-management) guide.
-
-When no `session_id` is provided, our proxy URLs are rotated round-robin.
 
 <Tabs>
     <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
@@ -78,25 +80,6 @@ When no `session_id` is provided, our proxy URLs are rotated round-robin.
         <CodeBlock className="language-python">
             {SessionPwExample}
         </CodeBlock>
-    </TabItem>
-</Tabs>
-
-### Switching proxies on retries
-
-When you use HTTP proxies in real world crawling scenarios, you have to decide which type of proxy to use to reach the sweet spot between cost efficiency and reliably avoiding blocking. Some websites may allow crawling with no proxy, on some you may get away with using datacenter proxies, which are cheap but easily detected, and sometimes you need to use expensive residential proxies.
-
-To start cheap and move to a more reliable proxy only when a request fails, pass a `new_url_function` to <ApiLink to="class/ProxyConfiguration">`ProxyConfiguration`</ApiLink>. The crawler calls it for every attempt with the current request, so the function can pick the proxy by the request's `retry_count`. In the following example, the first attempt goes without a proxy, the first retry uses a datacenter proxy and any further retry a residential one.
-
-<Tabs>
-    <TabItem value="BeautifulSoupCrawler" label="BeautifulSoupCrawler">
-        <RunnableCodeBlock className="language-python" language="python">
-            {RetryEscalationBsExample}
-        </RunnableCodeBlock>
-    </TabItem>
-    <TabItem value="PlaywrightCrawler" label="PlaywrightCrawler">
-        <RunnableCodeBlock className="language-python" language="python">
-            {RetryEscalationPwExample}
-        </RunnableCodeBlock>
     </TabItem>
 </Tabs>
 
