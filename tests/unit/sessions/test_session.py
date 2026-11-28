@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from crawlee.proxy_configuration import ProxyInfo
 from crawlee.sessions._cookies import SessionCookies
 from crawlee.sessions._models import SessionModel
 from crawlee.sessions._session import Session
@@ -115,6 +116,32 @@ def test_retirement_survives_serialization() -> None:
     assert restored.usage_count == 0
     assert not restored.is_blocked
     assert not restored.is_usable
+
+
+def test_proxy_info_survives_serialization() -> None:
+    """Test that the proxy of a session survives a JSON round trip of its state."""
+    proxy_info = ProxyInfo(
+        url='http://user:pass@proxy.com:8000',
+        scheme='http',
+        hostname='proxy.com',
+        port=8000,
+        username='user',
+        password='pass',
+        ignore_tls_errors=True,
+    )
+    state = Session(proxy_info=proxy_info).get_state(as_dict=False).model_dump_json(by_alias=True)
+    restored = Session.from_model(SessionModel.model_validate_json(state))
+
+    assert restored.proxy_info == proxy_info
+
+
+def test_session_without_proxy_info_field_can_be_restored() -> None:
+    """Test that a saved session without a proxy field loads without a proxy."""
+    state = Session().get_state(as_dict=True)
+    del state['proxy_info']
+    restored = Session.from_model(SessionModel.model_validate(state))
+
+    assert restored.proxy_info is None
 
 
 def test_session_without_retirement_field_can_be_restored() -> None:

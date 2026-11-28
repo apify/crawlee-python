@@ -12,8 +12,6 @@ from crawlee._utils.docs import docs_group
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    from crawlee import Request
-
 __all__ = ['ProxyConfiguration', 'ProxyInfo']
 
 
@@ -39,10 +37,6 @@ class ProxyInfo:
 
     password: str = ''
     """The password for the proxy."""
-
-    session_id: str | None = None
-    """The identifier of the used proxy session, if used.
-    Using the same session ID guarantees getting the same proxy URL."""
 
     ignore_tls_errors: bool = False
     """Whether the proxy intercepts HTTPS traffic, so that `HttpClient.send_request` and the browser contexts of
@@ -75,11 +69,10 @@ class ProxyConfiguration:
 
         Args:
             proxy_urls: A list of URLs of proxies that will be rotated in a round-robin fashion
-            new_url_function: A function that returns a proxy URL for a given Request. This provides full control over
-                the proxy selection mechanism.
+            new_url_function: A function, sync or async, that returns a new proxy URL, or `None` to use no proxy. This
+                provides full control over the proxy selection mechanism.
         """
         self._next_custom_url_index = 0
-        self._used_proxy_urls = dict[str, URL | None]()
         self._url_validator = TypeAdapter(AnyHttpUrl)
 
         # Validation
@@ -97,17 +90,18 @@ class ProxyConfiguration:
         self._url_validator.validate_python(url)
         return URL(url)
 
-    async def new_proxy_info(
-        self, *, session_id: str | None = None, request: Request | None = None
-    ) -> ProxyInfo | None:
-        """Return a new ProxyInfo object based on the configured proxy rotation strategy.
+    async def new_proxy_info(self, proxy_info: ProxyInfo | None = None) -> ProxyInfo | None:
+        """Pick a `ProxyInfo` by the configured proxy rotation strategy, or return the passed one.
 
         Args:
-            session_id: Session identifier. If provided, same proxy URL will be returned for
-                subsequent calls with this ID.
-            request: Request object passed to `new_url_function`.
+            proxy_info: A previously created `ProxyInfo`, such as the one of a restored session. It's returned
+                unchanged. A subclass whose proxies depend on the environment returns an equivalent `ProxyInfo` that
+                works in the current one.
         """
-        url = await self._pick_url(session_id, request)
+        if proxy_info is not None:
+            return proxy_info
+
+        url = await self._pick_url()
 
         if url is None:
             return None
@@ -118,7 +112,7 @@ class ProxyConfiguration:
         if url.host is None:
             raise ValueError(f'Host is None for URL: {url}')
 
-        info = ProxyInfo(
+        return ProxyInfo(
             url=str(url),
             scheme=url.scheme,
             hostname=url.host,
@@ -127,26 +121,15 @@ class ProxyConfiguration:
             password=url.password or '',
         )
 
-        if session_id is not None:
-            info.session_id = session_id
-
-        return info
-
-    async def new_url(self, *, session_id: str | None = None, request: Request | None = None) -> str | None:
-        """Return a proxy URL string based on the configured proxy rotation strategy.
-
-        Args:
-            session_id: Session identifier. If provided, same proxy URL will be returned for
-                subsequent calls with this ID.
-            request: Request object passed to `new_url_function`.
-        """
-        proxy_info = await self.new_proxy_info(session_id=session_id, request=request)
+    async def new_url(self) -> str | None:
+        """Return a proxy URL string based on the configured proxy rotation strategy."""
+        proxy_info = await self.new_proxy_info()
         return proxy_info.url if proxy_info else None
 
-    async def _pick_url(self, session_id: str | None, request: Request | None) -> URL | None:
+    async def _pick_url(self) -> URL | None:
         if self._new_url_function:
             try:
-                result = self._new_url_function(session_id, request)
+                result = self._new_url_function()
                 if inspect.isawaitable(result):
                     result = await result
 
@@ -158,22 +141,10 @@ class ProxyConfiguration:
             raise RuntimeError('Invalid state')
 
         urls = self._proxy_urls
-
-        if session_id is None:
-            url = urls[self._next_custom_url_index % len(urls)]
-            self._next_custom_url_index += 1
-            return url
-
-        if session_id not in self._used_proxy_urls:
-            self._used_proxy_urls[session_id] = urls[self._next_custom_url_index % len(urls)]
-            self._next_custom_url_index += 1
-
-        return self._used_proxy_urls[session_id]
+        url = urls[self._next_custom_url_index % len(urls)]
+        self._next_custom_url_index += 1
+        return url
 
 
 class _NewUrlFunction(Protocol):
-    def __call__(
-        self,
-        session_id: str | None = None,
-        request: Request | None = None,
-    ) -> str | Awaitable[str | None] | None: ...
+    def __call__(self) -> str | Awaitable[str | None] | None: ...

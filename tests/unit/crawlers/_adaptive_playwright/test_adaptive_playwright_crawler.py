@@ -12,6 +12,7 @@ from crawlee.autoscaling import ConcurrencySystem
 from crawlee.browsers import BrowserPool
 from crawlee.crawlers import AdaptivePlaywrightCrawler, AdaptivePlaywrightCrawlerStatisticState, BasicCrawler
 from crawlee.crawlers._adaptive_playwright._rendering_type_predictor import DefaultRenderingTypePredictor
+from crawlee.proxy_configuration import ProxyConfiguration
 from crawlee.statistics import Statistics
 
 if TYPE_CHECKING:
@@ -109,6 +110,14 @@ def test_sub_crawlers_log_errors_under_crawler_logger() -> None:
 
     assert logging.getLogger(f'{logger.name}.static').level == logging.ERROR
     assert logging.getLogger(f'{logger.name}.playwright').level == logging.ERROR
+
+
+def test_proxy_configuration_reaches_session_pool() -> None:
+    """Test that a `proxy_configuration` goes to the crawler's default session pool and not to its sub crawlers."""
+    proxy_configuration = ProxyConfiguration(proxy_urls=['http://proxy.placeholder.com:8000'])
+    crawler = AdaptivePlaywrightCrawler.with_parsel_static_parser(proxy_configuration=proxy_configuration)
+
+    assert crawler._session_pool._proxy_configuration is proxy_configuration
 
 
 def test_default_statistics_log_to_given_logger() -> None:

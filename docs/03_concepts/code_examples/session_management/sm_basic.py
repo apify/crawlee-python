@@ -12,12 +12,13 @@ async def main() -> None:
         # options
     )
 
+    session_pool = SessionPool(max_pool_size=100, proxy_configuration=proxy_configuration)
+
     # Initialize crawler with a custom SessionPool configuration
     # to manage concurrent sessions and proxy rotation
     crawler = BasicCrawler(
-        proxy_configuration=proxy_configuration,
         # Overrides default Session pool configuration.
-        session_pool=SessionPool(max_pool_size=100),
+        session_pool=session_pool,
     )
 
     # Define the default request handler that manages session states
@@ -40,7 +41,8 @@ async def main() -> None:
         else:
             context.session.mark_good()  # BasicCrawler handles this automatically.
 
-    await crawler.run(['https://crawlee.dev/'])
+    async with session_pool:
+        await crawler.run(['https://crawlee.dev/'])
 
 
 if __name__ == '__main__':

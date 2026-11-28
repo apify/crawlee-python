@@ -4,8 +4,7 @@ from itertools import cycle
 
 import pytest
 
-from crawlee import Request
-from crawlee.proxy_configuration import ProxyConfiguration
+from crawlee.proxy_configuration import ProxyConfiguration, ProxyInfo
 
 
 async def test_returns_proxy_info() -> None:
@@ -25,9 +24,7 @@ async def test_returns_proxy_info() -> None:
 
 
 async def test_throws_on_invalid_new_url_function() -> None:
-    config = ProxyConfiguration(
-        new_url_function=lambda session_id=None, request=None: 'http://proxy.com:1111*invalid_url'  # noqa: ARG005
-    )
+    config = ProxyConfiguration(new_url_function=lambda: 'http://proxy.com:1111*invalid_url')
 
     with pytest.raises(ValueError):  # noqa: PT011
         await config.new_proxy_info()
@@ -37,7 +34,7 @@ async def test_returns_proxy_info_with_new_url_function() -> None:
     """Test that new_url_function can return string and None."""
     proxy_iterator = cycle([None, 'http://proxy.com:1111'])
 
-    config = ProxyConfiguration(new_url_function=lambda session_id=None, request=None: next(proxy_iterator))  # noqa: ARG005
+    config = ProxyConfiguration(new_url_function=lambda: next(proxy_iterator))
 
     proxy_info = await config.new_proxy_info()
     assert proxy_info is None
@@ -52,7 +49,7 @@ async def test_returns_proxy_info_with_new_url_function() -> None:
 
 
 async def test_returns_proxy_info_with_new_url_function_async() -> None:
-    async def new_url(session_id: str | None = None, request: Request | None = None) -> str:  # noqa: ARG001
+    async def new_url() -> str:
         return 'http://proxy.com:1111'
 
     config = ProxyConfiguration(new_url_function=new_url)
@@ -84,75 +81,16 @@ async def test_rotates_proxies() -> None:
     assert info.url == proxy_urls[2]
 
 
-async def test_rotates_proxies_with_sessions() -> None:
-    proxy_urls: list[str | None] = ['http://proxy:1111', 'http://proxy:2222', 'http://proxy:3333']
-    request = Request(url='http://some.domain/abc', unique_key='1')
-    sessions = [f'session_{i}' for i in range(6)]
+async def test_returns_passed_proxy_info() -> None:
+    """Test that a passed `ProxyInfo` is returned unchanged without advancing the rotation."""
+    config = ProxyConfiguration(proxy_urls=['http://proxy:1111', 'http://proxy:2222'])
+    restored_proxy_info = ProxyInfo(url='http://restored:3333', scheme='http', hostname='restored', port=3333)
 
-    config = ProxyConfiguration(proxy_urls=proxy_urls)
-
-    # A single session should always receive the same proxy
-    info = await config.new_proxy_info(session_id=sessions[0])
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(session_id=sessions[0])
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(session_id=sessions[0])
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(session_id=sessions[0], request=request)
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(session_id=sessions[0], request=request)
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    # Different sessions should get rotated proxies
-    info = await config.new_proxy_info(session_id=sessions[1])
-    assert info is not None
-    assert info.url == proxy_urls[1]
-
-    info = await config.new_proxy_info(session_id=sessions[2], request=request)
-    assert info is not None
-    assert info.url == proxy_urls[2]
-
-    info = await config.new_proxy_info(session_id=sessions[3])
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(session_id=sessions[4])
-    assert info is not None
-    assert info.url == proxy_urls[1]
-
-    info = await config.new_proxy_info(session_id=sessions[5], request=request)
-    assert info is not None
-    assert info.url == proxy_urls[2]
-
-    # Without sessions should get rotated proxies
-    info = await config.new_proxy_info()
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(request=request)
-    assert info is not None
-    assert info.url == proxy_urls[1]
+    assert await config.new_proxy_info(restored_proxy_info) is restored_proxy_info
 
     info = await config.new_proxy_info()
     assert info is not None
-    assert info.url == proxy_urls[2]
-
-    info = await config.new_proxy_info()
-    assert info is not None
-    assert info.url == proxy_urls[0]
-
-    info = await config.new_proxy_info(request=request)
-    assert info is not None
-    assert info.url == proxy_urls[1]
+    assert info.url == 'http://proxy:1111'
 
 
 @pytest.mark.parametrize(

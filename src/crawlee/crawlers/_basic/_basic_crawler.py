@@ -139,7 +139,8 @@ class _BasicCrawlerOptions(TypedDict):
     until every crawler using it has finished."""
 
     proxy_configuration: NotRequired[ProxyConfiguration]
-    """HTTP proxy configuration used when making requests."""
+    """Assigns proxies to the sessions of the crawler's default session pool. With a custom `session_pool`, pass it to
+    the pool instead."""
 
     http_client: NotRequired[HttpClient]
     """HTTP client used by `BasicCrawlingContext.send_request` method. Keep it open with `async with` until every
@@ -334,7 +335,8 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             request_manager: Manager of requests that should be processed by the crawler.
             session_pool: A custom `SessionPool` instance, allowing the use of non-default configuration. Keep it open
                 with `async with` until every crawler using it has finished.
-            proxy_configuration: HTTP proxy configuration used when making requests.
+            proxy_configuration: Assigns proxies to the sessions of the crawler's default session pool. With a custom
+                `session_pool`, pass it to the pool instead, since the crawler doesn't accept both.
             http_client: HTTP client used by `BasicCrawlingContext.send_request` method. Keep it open with `async with`
                 until every crawler using it has finished.
             request_handler: A callable responsible for handling requests.
@@ -390,7 +392,17 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                 it, the ID follows the order in which crawlers are created.
             _context_pipeline: Enables extending the request lifecycle and modifying the crawling context.
                 Intended for use by subclasses rather than direct instantiation of `BasicCrawler`.
+
+        Raises:
+            ValueError: If both `session_pool` and `proxy_configuration` are passed.
         """
+        if session_pool is not None and proxy_configuration is not None:
+            raise ValueError(
+                'Both `session_pool` and `proxy_configuration` were passed to the crawler, but a passed session pool '
+                'ignores the `proxy_configuration` of the crawler. Pass `proxy_configuration` to the `SessionPool` '
+                'instead.'
+            )
+
         self._id = str(BasicCrawler.__next_id) if id is None else id
         self._default_rq_alias = None if BasicCrawler.__next_id == 0 else f'__default_{self._id}__'
         BasicCrawler.__next_id += 1
@@ -416,8 +428,9 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
 
         # Core components
         self._request_manager = request_manager
-        self._session_pool = self._own_or_borrow(session_pool, SessionPool)
-        self._proxy_configuration = proxy_configuration
+        self._session_pool = self._own_or_borrow(
+            session_pool, lambda: SessionPool(proxy_configuration=proxy_configuration)
+        )
 
         self._additional_http_error_status_codes = (
             set(additional_http_error_status_codes) if additional_http_error_status_codes else set()
@@ -712,16 +725,6 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
             f'{self._internal_timeout.total_seconds()} seconds',
             max_retries=3,
             logger=self._logger,
-        )
-
-    async def _get_proxy_info(self, request: Request, session: Session | None) -> ProxyInfo | None:
-        """Retrieve a new ProxyInfo object based on crawler configuration and the current request and session."""
-        if not self._proxy_configuration:
-            return None
-
-        return await self._proxy_configuration.new_proxy_info(
-            session_id=session.id if session is not None else None,
-            request=request,
         )
 
     async def get_request_manager(self) -> RequestManager:
@@ -1718,9 +1721,7 @@ class BasicCrawler(Generic[TCrawlingContext, TStatisticsState]):
                     session = Session(id=request.session_id, retired=True)
         else:
             session = await self._get_session()
-        # A request bound to an unusable session fails before it's sent. Its proxy isn't tied to that session, so a
-        # `send_request` call in the failed request handler still goes through the proxy configuration.
-        proxy_info = await self._get_proxy_info(request, None if bound_session_unusable else session)
+        proxy_info = session.proxy_info
         result = RequestHandlerRunResult(key_value_store_getter=self.get_key_value_store)
 
         deferred_cleanup: list[Callable[[], Awaitable[None]]] = []

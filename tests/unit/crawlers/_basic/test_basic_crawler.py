@@ -68,7 +68,7 @@ from crawlee.storages import Dataset, KeyValueStore, RequestQueue
 from tests._utils import open_throttler_held_until_reclaim, poll_until_condition
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Sequence
     from pathlib import Path
 
     from crawlee._types import JsonSerializable
@@ -1809,13 +1809,13 @@ async def test_run_rejects_entered_stats() -> None:
 async def test_repeated_run_keeps_sessions() -> None:
     """A repeated `run()` keeps the sessions of a persisted session pool passed to the crawler, and leaves it open."""
     async with SessionPool(max_pool_size=1, persistence_enabled=True) as session_pool:
-        session_ids = set(session_pool.get_state(as_dict=False).sessions)
+        session = await session_pool.get_session()
         crawler = BasicCrawler(request_handler=AsyncMock(), session_pool=session_pool)
 
         await crawler.run(['https://a.placeholder.com'])
         await crawler.run(['https://b.placeholder.com'])
 
-        assert set(session_pool.get_state(as_dict=False).sessions) == session_ids
+        assert set(session_pool.get_state(as_dict=False).sessions) == {session.id}
         assert session_pool.active
 
 
@@ -3385,20 +3385,9 @@ async def test_bound_session_to_request() -> None:
 
 
 async def test_bound_sessions_to_same_request() -> None:
-    # Use a custom function to avoid errors due to random Session retrieval
-    def create_session_function() -> Callable[[], Session]:
-        counter = -1
-
-        def create_session() -> Session:
-            nonlocal counter
-            counter += 1
-            return Session(id=str(counter))
-
-        return create_session
-
     check_sessions = [str(session_id) for session_id in range(10)]
     used_sessions = list[str]()
-    session_pool = SessionPool(create_session_function=create_session_function())
+    session_pool = SessionPool()
     crawler = BasicCrawler(session_pool=session_pool)
 
     @crawler.router.default_handler
@@ -3411,6 +3400,9 @@ async def test_bound_sessions_to_same_request() -> None:
     ]
 
     async with session_pool:
+        # The pool creates sessions on demand, so the bound ones are added up front.
+        for session_id in check_sessions:
+            session_pool.add_session(Session(id=session_id))
         await crawler.run(requests)
 
     assert len(used_sessions) == 10
@@ -3446,12 +3438,11 @@ async def test_handle_error_bound_session_to_request() -> None:
 
 
 async def test_missing_bound_session_gives_retired_stand_in() -> None:
-    """Test that the failed request handler gets a retired session and a proxy not tied to a missing bound session."""
+    """Test that the failed request handler gets a retired session without a proxy for a missing bound session."""
     failed_request_handler = AsyncMock()
-    new_url_function = Mock(return_value='http://proxy.placeholder.com:8000')
     crawler = BasicCrawler(
         request_handler=AsyncMock(),
-        proxy_configuration=ProxyConfiguration(new_url_function=new_url_function),
+        proxy_configuration=ProxyConfiguration(proxy_urls=['http://proxy.placeholder.com:8000']),
     )
     crawler.failed_request_handler(failed_request_handler)
 
@@ -3462,11 +3453,33 @@ async def test_missing_bound_session_gives_retired_stand_in() -> None:
     assert isinstance(error, RequestCollisionError)
     assert context.session.id == 'missing'
     assert context.session.retired
-    assert context.proxy_info is not None
-    assert context.proxy_info.url == 'http://proxy.placeholder.com:8000'
-    assert context.proxy_info.session_id is None
-    new_url_function.assert_called_once()
-    assert new_url_function.call_args.args[0] is None
+    assert context.proxy_info is None
+
+
+async def test_proxy_info_comes_from_session() -> None:
+    """Test that the crawler sends a request through the proxy that its default pool gave the session."""
+    contexts = list[BasicCrawlingContext]()
+    crawler = BasicCrawler(proxy_configuration=ProxyConfiguration(proxy_urls=['http://proxy.placeholder.com:8000']))
+
+    @crawler.router.default_handler
+    async def handler(context: BasicCrawlingContext) -> None:
+        contexts.append(context)
+
+    await crawler.run(['https://a.placeholder.com'])
+
+    assert len(contexts) == 1
+    assert contexts[0].proxy_info is not None
+    assert contexts[0].proxy_info.url == 'http://proxy.placeholder.com:8000'
+    assert contexts[0].proxy_info is contexts[0].session.proxy_info
+
+
+def test_rejects_proxy_configuration_with_session_pool() -> None:
+    """Test that the crawler refuses a `proxy_configuration` together with a passed session pool."""
+    with pytest.raises(ValueError, match=r'Pass `proxy_configuration` to the `SessionPool` instead'):
+        BasicCrawler(
+            session_pool=SessionPool(),
+            proxy_configuration=ProxyConfiguration(proxy_urls=['http://proxy.placeholder.com:8000']),
+        )
 
 
 async def test_unusable_bound_session_reaches_failed_request_handler() -> None:
