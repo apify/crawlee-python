@@ -15,9 +15,11 @@ from crawlee.sessions import Session
 from crawlee.sessions._models import SessionPoolModel
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
     from types import TracebackType
 
     from crawlee.events import EventManager
+    from crawlee.storages import KeyValueStore
 
 logger = getLogger(__name__)
 
@@ -40,9 +42,10 @@ class SessionPool:
         create_session_settings: dict | None = None,
         create_session_function: CreateSessionFunctionType | None = None,
         event_manager: EventManager | None = None,
-        persistence_enabled: bool = False,
+        persistence_enabled: bool = True,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str = 'CRAWLEE_SESSION_POOL_STATE',
+        persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
     ) -> None:
         """Initialize a new instance.
 
@@ -57,6 +60,8 @@ class SessionPool:
             persistence_enabled: Flag to enable or disable state persistence of the pool.
             persist_state_kvs_name: The name of the `KeyValueStore` used for state persistence.
             persist_state_key: The key under which the session pool's state is stored in the `KeyValueStore`.
+            persist_state_kvs_factory: A function that opens the `KeyValueStore` used for state persistence. Can't be
+                combined with `persist_state_kvs_name`.
         """
         if event_manager:
             service_locator.set_event_manager(event_manager)
@@ -70,6 +75,7 @@ class SessionPool:
             persistence_enabled=persistence_enabled,
             persist_state_kvs_name=persist_state_kvs_name,
             persist_state_key=persist_state_key or 'CRAWLEE_SESSION_POOL_STATE',
+            persist_state_kvs_factory=persist_state_kvs_factory,
         )
 
         self._max_pool_size = max_pool_size

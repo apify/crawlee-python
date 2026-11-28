@@ -12,8 +12,7 @@ async def main() -> None:
         log_message='Crawler statistics',
         # Log values as extra fields of a single message.
         statistics_log_format='inline',
-        # Persist the statistics to the default key-value store.
-        persistence_enabled=True,
+        # Persist the statistics under a custom key in the default key-value store.
         persist_state_key='MY_CRAWLER_STATISTICS',
     )
 

@@ -89,7 +89,7 @@ Use it when the cookies belong to the whole crawl rather than one request, for e
 
 ## Persisting cookies across runs
 
-The session pool can persist its state, including each session's cookies, to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. Persistence is off by default. Enable it with <ApiLink to="class/SessionPool#__init__">`persistence_enabled`</ApiLink> set to `True` on the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>, and give the store a name with `persist_state_kvs_name`. Persistence across restarts needs a named store. An unnamed one is purged on start, so cookies silently won't survive a restart.
+The session pool persists its state, including each session's cookies, to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink>. Persistence is on by default and uses an unnamed store, which is purged on start. For cookies that survive a restart, give the store a name with `persist_state_kvs_name` on the <ApiLink to="class/SessionPool">`SessionPool`</ApiLink>. To turn persistence off, set <ApiLink to="class/SessionPool#__init__">`persistence_enabled`</ApiLink> to `False`.
 
 To see restoration in action, define the pool outside the crawler and read a session from it before the run. On the first run the jar is empty. On later runs the cookies from the previous run are already there.
 
@@ -97,4 +97,4 @@ To see restoration in action, define the pool outside the crawler and read a ses
     {PersistCookies}
 </RunnableCodeBlock>
 
-With persistence enabled, a login you performed on a previous run can carry over, so you skip re-authenticating on every start. For a full walkthrough of logging in, see the [Logging in with a crawler](../guides/logging-in-with-a-crawler) guide.
+With a named store, a login you performed on a previous run can carry over, so you skip re-authenticating on every start. For a full walkthrough of logging in, see the [Logging in with a crawler](../guides/logging-in-with-a-crawler) guide.

@@ -389,6 +389,18 @@ async def test_persist_state_writes_record(key_value_store: KeyValueStore) -> No
     assert list(record['requestData']) == [request.url]
 
 
+async def test_persists_by_default(key_value_store: KeyValueStore) -> None:
+    """Without persistence options, the loader persists its state under `CRAWLEE_SITEMAP_REQUEST_LOADER_STATE`."""
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client)
+
+    await loader.persist_state()
+    await loader.close()
+
+    assert await key_value_store.get_value('CRAWLEE_SITEMAP_REQUEST_LOADER_STATE') is not None
+
+
 async def test_persist_state_before_first_use(key_value_store: KeyValueStore) -> None:
     """`persist_state()` called before the loader is used writes the restored state."""
     sitemap_url = f'{DEFAULT_URL}sitemap.xml'
@@ -407,15 +419,15 @@ async def test_persist_state_before_first_use(key_value_store: KeyValueStore) ->
     assert record['urlQueue'][0] == request.url
 
 
-async def test_persist_state_without_key_writes_nothing(
+async def test_persist_state_disabled_writes_nothing(
     monkeypatch: pytest.MonkeyPatch, key_value_store: KeyValueStore
 ) -> None:
-    """`persist_state()` writes nothing when the loader has no `persist_state_key`."""
+    """`persist_state()` writes nothing when the loader has persistence disabled."""
     sitemap_url = f'{DEFAULT_URL}sitemap.xml'
     client, _ = make_status_stream_client({sitemap_url: [(200, get_basic_sitemap().encode())]})
     set_value = AsyncMock()
     monkeypatch.setattr(key_value_store, 'set_value', set_value)
-    loader = SitemapRequestLoader([sitemap_url], http_client=client)
+    loader = SitemapRequestLoader([sitemap_url], http_client=client, persistence_enabled=False)
 
     await loader.persist_state()
     await loader.close()

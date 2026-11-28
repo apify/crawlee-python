@@ -50,11 +50,12 @@ The following example registers an event manager with a shorter persist state in
 
 State persistence builds on the `PERSIST_STATE` event. Components that need to survive a restart or a migration keep their state in memory, save it to a <ApiLink to="class/KeyValueStore">`KeyValueStore`</ApiLink> when the event fires and the state has changed, and load it back on the next start. The default key-value store of a crawler run then holds records like these:
 
-- `__CRAWLER_STATISTICS_<id>` holds the crawler's [statistics](./statistics). The crawler's default `Statistics` instance has persistence enabled.
+- `__CRAWLER_STATISTICS_<id>` holds the crawler's [statistics](./statistics).
+- `CRAWLEE_SESSION_POOL_STATE` holds the sessions of the crawler's [session pool](./session-management).
 - `__RQ_STATE_<id>` holds the ordering and in-progress information of a request queue backed by the file system storage client. The requests themselves are stored as individual files.
 - `CRAWLEE_STATE_<id>` holds the state you manage with `use_state`, as described in [Crawler state](#crawler-state).
 
-Other components persist their state when you ask them to. The <ApiLink to="class/SessionPool">`SessionPool`</ApiLink> does so with `persistence_enabled=True`, and the <ApiLink to="class/RequestList">`RequestList`</ApiLink> with a `persist_state_key`. For details, see [Request loaders](./request-loaders).
+The <ApiLink to="class/SitemapRequestLoader">`SitemapRequestLoader`</ApiLink> and the rendering type predictor of <ApiLink to="class/AdaptivePlaywrightCrawler">`AdaptivePlaywrightCrawler`</ApiLink> persist their state too. To turn persistence off, create the component yourself with `persistence_enabled=False`. Pass your own statistics, session pool or predictor to the crawler, and enter a session pool or a predictor with `async with` before the run. The <ApiLink to="class/RequestList">`RequestList`</ApiLink> persists its state only with a `persist_state_key` or a `name`. For details, see [Request loaders](./request-loaders).
 
 Internally, these components use a helper class that loads the state on start, subscribes to `PERSIST_STATE`, and saves the state one last time on teardown. The helper isn't part of the public API. In your own code, use `use_state`, or listen to `PERSIST_STATE` and save your data to a key-value store.
 

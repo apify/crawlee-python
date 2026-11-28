@@ -126,6 +126,16 @@ async def test_no_learning_data_prediction() -> None:
         assert probability == 1
 
 
+async def test_persists_by_default() -> None:
+    """Without `persistence_enabled`, the predictor persists its model under `rendering-type-predictor-state`."""
+    async with DefaultRenderingTypePredictor():
+        pass
+
+    kvs = await KeyValueStore.open()
+    record = await kvs.get_value('rendering-type-predictor-state')
+    assert record['model']['is_fitted'] is False
+
+
 async def test_persistent_no_learning_data_prediction() -> None:
     """Test that the model is saved after initialisation in KeyValueStore."""
     persist_key = 'test-no_learning-state'
@@ -231,7 +241,7 @@ def test_url_similarity(url_1: str, url_2: str, expected_rounded_similarity: flo
 )
 async def test_failed_enter_frees_predictor(monkeypatch: pytest.MonkeyPatch, error: BaseException) -> None:
     """A predictor whose entry fails or is cancelled stays inactive and can be entered again."""
-    predictor = DefaultRenderingTypePredictor()
+    predictor = DefaultRenderingTypePredictor(persistence_enabled=False)
     monkeypatch.setattr(predictor._state, 'initialize', AsyncMock(side_effect=error))
 
     with pytest.raises(type(error)):

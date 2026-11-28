@@ -127,6 +127,16 @@ async def test_create_session_function() -> None:
         assert session.user_data == user_data
 
 
+async def test_persists_by_default() -> None:
+    """Without `persistence_enabled`, the pool persists its state under `CRAWLEE_SESSION_POOL_STATE`."""
+    async with SessionPool(max_pool_size=1) as session_pool:
+        session = await session_pool.get_session()
+
+    kvs = await KeyValueStore.open()
+    record = await kvs.get_value('CRAWLEE_SESSION_POOL_STATE')
+    assert [persisted['id'] for persisted in record['sessions']] == [session.id]
+
+
 @pytest.mark.parametrize('kvs_name', [KVS_NAME, None])
 async def test_session_pool_persist(event_manager: EventManager, kvs_name: str | None) -> None:
     """Test persistence of session pool state to KVS and validate stored data integrity."""

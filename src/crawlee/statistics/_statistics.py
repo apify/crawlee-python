@@ -74,7 +74,7 @@ class Statistics(Generic[TStatisticsState]):
     def __init__(
         self,
         *,
-        persistence_enabled: bool = False,
+        persistence_enabled: bool = True,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
         persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
@@ -117,7 +117,7 @@ class Statistics(Generic[TStatisticsState]):
     @staticmethod
     def with_default_state(
         *,
-        persistence_enabled: bool = False,
+        persistence_enabled: bool = True,
         persist_state_kvs_name: str | None = None,
         persist_state_key: str | None = None,
         persist_state_kvs_factory: Callable[[], Coroutine[None, None, KeyValueStore]] | None = None,
