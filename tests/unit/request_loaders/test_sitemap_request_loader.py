@@ -1,4 +1,5 @@
 import gzip
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -92,7 +93,55 @@ async def test_sitemap_http_error_is_skipped_after_retries_exhausted(monkeypatch
 
     assert await loader.fetch_next_request() is None
 
-    assert attempts == [503, 503, 503]
+    assert attempts == [503, 503, 503, 503]
+
+
+@pytest.mark.parametrize(
+    ('sitemap_timeout', 'sitemap_retries', 'expected_attempts'),
+    [
+        pytest.param(timedelta(seconds=5), 0, 1, id='timeout-no-retries'),
+        pytest.param(None, 2, 3, id='no-timeout-two-retries'),
+    ],
+)
+async def test_sitemap_timeout_and_retries(
+    monkeypatch: pytest.MonkeyPatch,
+    sitemap_timeout: timedelta | None,
+    sitemap_retries: int,
+    expected_attempts: int,
+) -> None:
+    """`sitemap_timeout` and `sitemap_retries` apply to each sitemap fetch."""
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(503, b'')]})
+    loader = SitemapRequestLoader(
+        [sitemap_url],
+        http_client=client,
+        sitemap_retries=sitemap_retries,
+        sitemap_timeout=sitemap_timeout,
+    )
+
+    assert await loader.fetch_next_request() is None
+
+    timeouts = [call.kwargs['timeout'] for call in client.send_request.call_args_list]
+    assert timeouts == [sitemap_timeout] * expected_attempts
+
+
+async def test_sitemap_timeout_defaults_to_30_seconds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each attempt to fetch a sitemap times out after 30 seconds unless `sitemap_timeout` is set."""
+    monkeypatch.setattr('crawlee._utils.sitemap.SITEMAP_RETRY_DELAY', 0)
+    sitemap_url = f'{DEFAULT_URL}sitemap.xml'
+    client, _ = make_status_stream_client({sitemap_url: [(503, b'')]})
+    loader = SitemapRequestLoader([sitemap_url], http_client=client)
+
+    assert await loader.fetch_next_request() is None
+
+    assert client.send_request.call_args.kwargs['timeout'] == timedelta(seconds=30)
+
+
+async def test_negative_sitemap_retries_raises() -> None:
+    """A negative `sitemap_retries` is rejected."""
+    with pytest.raises(ValueError, match='sitemap_retries must not be negative'):
+        SitemapRequestLoader([f'{DEFAULT_URL}sitemap.xml'], http_client=AsyncMock(spec=HttpClient), sitemap_retries=-1)
 
 
 async def test_sitemap_loader_drains_requests_after_later_source_fails(monkeypatch: pytest.MonkeyPatch) -> None:

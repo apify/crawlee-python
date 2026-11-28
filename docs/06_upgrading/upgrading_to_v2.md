@@ -650,6 +650,10 @@ class MyHttpClient(HttpClient):
 
 `SitemapRequestLoader.fetch_next_request` skips a URL while its request is still in progress, for example when another sitemap lists it too. In v1, it returned a request for the URL again, and `get_total_count` counted the URL twice.
 
+## Sitemap fetch retries
+
+`SitemapRequestLoader` now fetches a sitemap that keeps failing up to 4 times instead of 3. Its `sitemap_retries` counts the retries after the first attempt, as in Crawlee JS. To keep 3 attempts, pass `sitemap_retries=2`.
+
 ## Crawlers manage only what they create
 
 A crawler now enters and exits only the objects it creates, the same as Crawlee JS. An object you pass is yours to enter and exit. The `Statistics` and the event managers are the exceptions, since the crawler enters them on every run. You can enter an event manager yourself as well. In v1, the crawler entered a passed object that wasn't active yet and exited it when its run finished, even while another crawler still used it.
