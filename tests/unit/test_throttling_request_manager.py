@@ -528,19 +528,30 @@ async def test_crawl_delay_integration(manager: ThrottlingRequestManager[Request
     assert state.crawl_delay == timedelta(seconds=5)
 
 
-async def test_min_interval_keeps_first_value(manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """A later min-interval signal is accepted but doesn't change the crawl-delay."""
+@pytest.mark.parametrize(
+    ('later', 'expected'),
+    [
+        pytest.param(timedelta(seconds=9), timedelta(seconds=9), id='longer-raises'),
+        pytest.param(timedelta(seconds=2), timedelta(seconds=5), id='shorter-ignored'),
+    ],
+)
+async def test_min_interval_keeps_longest_value(
+    manager: ThrottlingRequestManager[RequestQueue],
+    later: timedelta,
+    expected: timedelta,
+) -> None:
+    """A later min-interval signal is accepted and can raise the crawl-delay, but never lowers it."""
     url = f'https://{THROTTLED_DOMAIN}/page1'
     manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=5), scope='hostname'))
 
-    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=timedelta(seconds=9), scope='hostname'))
+    accepted = manager.record_pacing_signal(MinIntervalSignal(url, interval=later, scope='hostname'))
 
     assert accepted is True
-    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == timedelta(seconds=5)
+    assert manager._domain_states[THROTTLED_DOMAIN].crawl_delay == expected
 
 
-async def test_site_keeps_first_crawl_delay(site_manager: ThrottlingRequestManager[RequestQueue]) -> None:
-    """With `registrable_domain`, the first crawl-delay from any host of a site paces the whole site."""
+async def test_site_keeps_longest_crawl_delay(site_manager: ThrottlingRequestManager[RequestQueue]) -> None:
+    """With `registrable_domain`, the longest crawl-delay among the hosts of a site paces the whole site."""
     site_manager.record_pacing_signal(
         MinIntervalSignal('https://www.example.com/page1', interval=timedelta(seconds=5), scope='hostname')
     )
@@ -550,7 +561,7 @@ async def test_site_keeps_first_crawl_delay(site_manager: ThrottlingRequestManag
     )
 
     assert accepted is True
-    assert site_manager._domain_states['example.com'].crawl_delay == timedelta(seconds=5)
+    assert site_manager._domain_states['example.com'].crawl_delay == timedelta(seconds=9)
 
 
 async def test_min_interval_refused_unconfigured(manager: ThrottlingRequestManager[RequestQueue]) -> None:

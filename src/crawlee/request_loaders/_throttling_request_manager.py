@@ -462,8 +462,9 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
 
         A `RateLimitedSignal` backs the domain off for the signal's `wait` if it's positive, and exponentially from
         `base_delay` otherwise. Only the first refusal of a burst advances the backoff. A `MinIntervalSignal` becomes
-        the domain's crawl-delay, unless `min_crawl_delay` is longer. The first one wins, so a robots.txt re-fetch can't
-        change the dispatch cadence mid-crawl.
+        the domain's crawl-delay, unless the domain already has a longer one or `min_crawl_delay` is longer. So the
+        strictest robots.txt among the origins a domain covers sets the pace, and a robots.txt re-fetch can't speed up
+        the dispatch cadence.
 
         Returns:
             `True` if the URL's domain is in `domains`, so the manager paces it by the signal. `False` if the domain
@@ -571,12 +572,12 @@ class ThrottlingRequestManager(RequestManager, Generic[TRequestManager]):
         return True
 
     def _record_declared_interval(self, url: str, interval: timedelta) -> bool:
-        """Record a declared minimum interval as the crawl-delay of the URL's domain, unless it already has one."""
+        """Record a declared minimum interval as the crawl-delay of the URL's domain, unless it has a longer one."""
         state = self._get_domain_state(url)
         if state is None:
             return False
 
-        if state.crawl_delay is None:
+        if state.crawl_delay is None or interval > state.crawl_delay:
             state.crawl_delay = interval
             logger.debug('Set crawl-delay for domain "%s" to %.1fs', state.domain, interval.total_seconds())
 
