@@ -892,3 +892,11 @@ crawler = ParselCrawler(max_session_rotations=0)
 # v2
 crawler = ParselCrawler(blocked_status_codes=[])
 ```
+
+## `error_handler` doesn't replace the request
+
+In v1, a request with a different `unique_key` returned from the `error_handler` replaced the failed one. The crawler added the returned request to the request queue and marked the failed one as handled. In v2, the error handler returns `None`, the same as `errorHandler` in Crawlee JS, and the crawler ignores a returned value. The failed request is retried as usual.
+
+When the error handler sets `context.request.no_retry`, the request now fails right away and goes to the failed request handler. In v1, the crawler still tried it once more.
+
+In the error handler, `context.request.retry_count` is the number of retries before the failed attempt. In v1, for errors other than `SessionError`, the crawler increased it before it called the error handler.
